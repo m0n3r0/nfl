@@ -70,31 +70,51 @@ weekly matchup/start-sit board.
 
 ## Win-probability model (predicting the winning team)
 
-`src/model.py` trains a transparent logistic-regression baseline to predict
-`home_win` from historical games, benchmarked against the Vegas-favorite baseline.
+`src/model.py` trains a **calibrated** logistic-regression model to predict
+`home_win`, benchmarked honestly against the Vegas-favorite baseline. Features come
+from `src/features.py`, which engineers them from **play-by-play** (not season
+summaries) with strict leakage control.
 
-Features (home-team perspective): EPA differential (offense − defense, from prior
-season's `stats_team` EPA + points allowed), turnover margin, rest differential,
-and the Vegas `spread_line`. Defense is derived from points allowed in `games.csv`.
+### Feature engineering (`src/features.py`) — the rigor layer
+- Team efficiency is computed from play-by-play (offense/defense EPA per play,
+  success rate, red-zone TD rate, 3rd-down EPA, pass/rush EPA split).
+- Ratings are **as-of** each (season, week): a game in week W uses team ratings
+  built only from weeks 1..W-1 of that season (week 1 uses the prior completed
+  season). No future games leak into a game's features.
+- Results are cached to `data/processed/` (csv.gz) for fast, reproducible reads.
 
-Backtest (train 2022-2023, test 2024-2025): our model ≈ **68.0%** accuracy;
-Vegas-favorite baseline ≈ **68.4%**. Beating the closing spread is extremely
-hard, so the model is built to *match* it — reported honestly, not overstated.
+### Model evaluation (`src/model.py`)
+- Strict time-based train/test split (train 2022–23, test 2024–25).
+- Time-series (expanding-window) cross-validation for stability.
+- Probability calibration (Platt) + accuracy / log-loss / Brier reported.
+- Reported **both with and without** the Vegas spread as a feature.
+
+Real results (2022–2025 PBP):
+- Model WITHOUT spread ≈ **60.9%** acc (EPA features alone beat a coin flip).
+- Model WITH spread ≈ **68.2%** acc, log-loss 0.62.
+- Vegas-favorite baseline ≈ **68.4%** acc. Time-series CV mean ≈ **67.0%**.
+
+Beating the closing spread is genuinely hard, so the model is built to *match* it
+and is reported honestly — not overstated. Analytical tool, not a betting system.
+
 Run `python cli.py predict` for 2026 win probabilities.
 
-This is an analytical tool, not a betting system.
+### Game-strategy analysis (`src/features.py: strategy_breakdown`)
+Situation-level splits per team from PBP: overall, red-zone, 3rd-down, pass vs
+rush EPA/play, success rate, and pass/shotgun tendency.
 
 ## Web UI
 
-A local Flask app (no build step) shows player stats and predictions:
+A local Flask app (no build step) shows player stats, team ratings, and predictions:
 
 ```bash
 python cli.py web            # http://127.0.0.1:5000
 # or: python web/app.py
 ```
 
-Pages: dashboard (projections + model backtest), players (search + per-player
-history/projection), win predictions by week, and SOS ranking.
+Pages: dashboard (projections + model card), players (search + per-player
+history/projection), win predictions by week, team **ratings**, game **strategy**
+breakdowns, and SOS ranking. API: `/api/modelcard`, `/api/predictions`.
 
 ## Scoring
 

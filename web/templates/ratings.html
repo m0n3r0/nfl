@@ -1,0 +1,29 @@
+{% extends "layout.html" %}
+{% block title %}Team Ratings {{ season }}{% endblock %}
+{% block body %}
+<h1>Team Efficiency Ratings</h1>
+<form method="get" style="margin:12px 0">
+  <select name="season">
+    {% for s in seasons %}<option value="{{ s }}" {% if s==season %}selected{% endif %}>{{ s }}</option>{% endfor %}
+  </select>
+  <select name="week">
+    {% for w in range(1,19) %}<option value="{{ w }}" {% if w==week %}selected{% endif %}>as-of wk {{ w }}</option>{% endfor %}
+  </select>
+  <button type="submit">Go</button>
+</form>
+<p class="muted">As-of-week ratings use only prior games that season (no future leakage). Week 1 uses the prior completed season. Higher EPA/play = better.</p>
+<table>
+  <tr><th>Team</th><th>Off EPA/play</th><th>Def EPA/play (allowed)</th><th>Red-zone TD%</th><th>3rd-down EPA/play</th><th>Pass EPA/play</th><th>Rush EPA/play</th></tr>
+  {% for r in ratings %}
+  <tr>
+    <td><b>{{ r.team }}</b></td>
+    <td>{{ r.off_epa_per_play }}</td>
+    <td>{{ r.def_epa_allowed_per_play }}</td>
+    <td>{{ r.off_rz_td_rate }}</td>
+    <td>{{ r.off_3d_epa_per_play }}</td>
+    <td>{{ r.off_pass_epa_pp }}</td>
+    <td>{{ r.off_rush_epa_pp }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

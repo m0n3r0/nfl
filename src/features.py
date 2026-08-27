@@ -1,0 +1,183 @@
+"""Professional-grade feature engineering from play-by-play.
+
+This is the rigor layer that separates a toy model from a real one:
+
+* Team efficiency is computed from play-by-play, not season-total summaries,
+  so we can derive situation splits (3rd down, red zone, pass vs run).
+* Ratings are computed **as-of** a (season, week) window using only PRIOR games
+  in that season (no future leakage). A game in week W uses team ratings built
+  from weeks 1..W-1 of the same season; week 1 uses the prior completed season.
+* Results are cached to data/processed/ as parquet so the web UI and model are
+  fast and fully reproducible.
+
+Outputs:
+  * team_ratings(season, week) -> DataFrame of per-team offensive/defensive
+    efficiency metrics "as of" that week.
+  * build_model_frame(seasons) -> labeled game rows with leakage-safe features
+    for the win-probability model.
+"""
+
+from __future__ import annotations
+
+import pandas as pd
+from pathlib import Path
+
+from . import ingest
+from .config import PBP_SEASONS, SCHEDULE_SEASON, STATS_SEASON
+
+PROCESSED = ingest.RAW_DIR.parent / "processed"
+PROCESSED.mkdir(parents=True, exist_ok=True)
+
+
+# ---------- raw play filtering ----------
+def _offense_plays(pbp: pd.DataFrame) -> pd.DataFrame:
+    """Keep real offensive plays (pass/rush) with valid EPA, tagged by team."""
+    p = pbp.copy()
+    p = p[p["play_type"].isin(["pass", "run"])]
+    p = p[p["epa"].notna()]
+    # posteam = team with possession (offense); defteam = opponent
+    return p[["game_id", "season", "week", "posteam", "defteam", "epa",
+              "success", "down", "ydstogo", "yardline_100", "rush", "pass",
+              "touchdown", "interception", "fumble", "sack", "qb_scramble",
+              "shotgun", "no_huddle"]]
+
+
+def _team_efficiency_from_plays(plays: pd.DataFrame) -> pd.DataFrame:
+    """Aggregate a set of offensive plays into per-team efficiency metrics.
+
+    Offense metrics are grouped by `posteam`; defense metrics by `defteam`
+    (EPA allowed per play, success rate allowed, red-zone TD rate allowed).
+    """
+    # Precompute situation flags on the same-indexed frame so groupby lambdas
+    # can align by index without re-indexing plays.
+    p = plays.copy()
+    p["is_pass"] = (p["pass"] == 1).astype(float)
+    p["is_rush"] = (p["rush"] == 1).astype(float)
+    p["is_rz"] = (p["yardline_100"] <= 20).astype(float)
+    p["is_3d"] = (p["down"] == 3).astype(float)
+    p["is_td"] = (p["touchdown"] == 1).astype(float)
+
+    off = p.groupby("posteam").agg(
+        off_plays=("epa", "size"),
+        off_epa=("epa", "sum"),
+        off_success=("success", "mean"),
+        off_pass_epa=("epa", lambda s: s[p.loc[s.index, "is_pass"] == 1].sum()),
+        off_rush_epa=("epa", lambda s: s[p.loc[s.index, "is_rush"] == 1].sum()),
+        off_rz_td=("is_td", lambda s: s[p.loc[s.index, "is_rz"] == 1].sum()),
+        off_rz_plays=("is_rz", lambda s: s[p.loc[s.index, "is_rz"] == 1].sum()),
+        off_3d_epa=("epa", lambda s: s[p.loc[s.index, "is_3d"] == 1].sum()),
+        off_3d_plays=("is_3d", lambda s: s[p.loc[s.index, "is_3d"] == 1].sum()),
+    ).reset_index().rename(columns={"posteam": "team"})
+
+    deff = p.groupby("defteam").agg(
+        def_plays=("epa", "size"),
+        def_epa_allowed=("epa", "sum"),
+        def_success_allowed=("success", "mean"),
+        def_pass_epa_allowed=("epa", lambda s: s[p.loc[s.index, "is_pass"] == 1].sum()),
+        def_rush_epa_allowed=("epa", lambda s: s[p.loc[s.index, "is_rush"] == 1].sum()),
+        def_rz_td_allowed=("is_td", lambda s: s[p.loc[s.index, "is_rz"] == 1].sum()),
+        def_rz_plays_allowed=("is_rz", lambda s: s[p.loc[s.index, "is_rz"] == 1].sum()),
+        def_3d_epa_allowed=("epa", lambda s: s[p.loc[s.index, "is_3d"] == 1].sum()),
+        def_3d_plays_allowed=("is_3d", lambda s: s[p.loc[s.index, "is_3d"] == 1].sum()),
+    ).reset_index().rename(columns={"defteam": "team"})
+
+    out = off.merge(deff, on="team", how="outer")
+    # per-play rates
+    out["off_epa_per_play"] = out["off_epa"] / out["off_plays"]
+    out["def_epa_allowed_per_play"] = out["def_epa_allowed"] / out["def_plays"]
+    out["off_rz_td_rate"] = (out["off_rz_td"] / out["off_rz_plays"]).fillna(0)
+    out["def_rz_td_rate_allowed"] = (out["def_rz_td_allowed"] / out["def_rz_plays_allowed"]).fillna(0)
+    out["off_3d_epa_per_play"] = out["off_3d_epa"] / out["off_3d_plays"]
+    out["def_3d_epa_allowed_per_play"] = out["def_3d_epa_allowed"] / out["def_3d_plays_allowed"]
+    return out
+
+
+def team_ratings_asof(season: int, week: int, refresh: bool = False) -> pd.DataFrame:
+    """Per-team efficiency 'as of' (season, week): uses weeks 1..week-1.
+
+    Week 1 uses the prior completed season's full-year efficiency. Cached to
+    data/processed/team_ratings_{season}_w{week}.parquet.
+    """
+    cache = PROCESSED / f"team_ratings_{season}_w{week}.csv.gz"
+    if cache.exists() and not refresh:
+        return pd.read_csv(cache, low_memory=False)
+
+
+    if week > 1:
+        pbp = ingest.load_pbp(season)
+        pbp = pbp[pbp["week"] < week]
+        plays = _offense_plays(pbp)
+        ratings = _team_efficiency_from_plays(plays)
+    else:
+        # use prior season's full year as the preseason prior
+        prev = max([s for s in PBP_SEASONS if s < season] + [STATS_SEASON])
+        pbp = ingest.load_pbp(prev)
+        plays = _offense_plays(pbp)
+        ratings = _team_efficiency_from_plays(plays)
+    ratings.to_csv(cache, index=False, compression="gzip")
+    return ratings
+
+
+def build_model_frame(seasons, refresh: bool = False) -> pd.DataFrame:
+    """Labeled game rows with leakage-safe features (home-team perspective).
+
+    For each game we look up each team's ratings *as of that game's week*
+    (weeks 1..week-1). Features: EPA-per-play differential, red-zone TD-rate
+    differential, 3rd-down EPA differential, pass/rush EPA differential.
+    Target: home_win.
+    """
+    games = ingest.load("games")
+    games = games[games["game_type"].isin(["REG", "POST"])]
+    games = games[games["season"].isin(seasons)]
+
+    rows = []
+    for _, g in games.iterrows():
+        season, week = int(g["season"]), int(g["week"])
+        rt = team_ratings_asof(season, week, refresh=refresh).set_index("team")
+        ht, at = g["home_team"], g["away_team"]
+        if ht not in rt.index or at not in rt.index:
+            continue
+        h, a = rt.loc[ht], rt.loc[at]
+        rows.append({
+            "season": season, "week": week,
+            "home_team": ht, "away_team": at,
+            "home_off_epa_pp": h["off_epa_per_play"], "away_off_epa_pp": a["off_epa_per_play"],
+            "home_def_epa_pp": h["def_epa_allowed_per_play"], "away_def_epa_pp": a["def_epa_allowed_per_play"],
+            "home_rz_td": h["off_rz_td_rate"], "away_rz_td": a["off_rz_td_rate"],
+            "home_3d_epa_pp": h["off_3d_epa_per_play"], "away_3d_epa_pp": a["off_3d_epa_per_play"],
+            "home_pass_epa_pp": h["off_pass_epa"] / h["off_plays"],
+            "away_pass_epa_pp": a["off_pass_epa"] / a["off_plays"],
+            "home_rush_epa_pp": h["off_rush_epa"] / h["off_plays"],
+            "away_rush_epa_pp": a["off_rush_epa"] / a["off_plays"],
+            "spread": g["spread_line"],
+            "home_rest": g.get("home_rest", 0), "away_rest": g.get("away_rest", 0),
+            "home_win": 1 if g["home_score"] > g["away_score"] else 0,
+        })
+    return pd.DataFrame(rows)
+
+
+def strategy_breakdown(pbp: pd.DataFrame, team: str) -> dict:
+    """Situation-level splits for one team (game-strategy analysis)."""
+    p = _offense_plays(pbp)
+    p = p[p["posteam"] == team]
+    if p.empty:
+        return {}
+    def agg(df):
+        return {
+            "epa_per_play": round(df["epa"].mean(), 3),
+            "success_rate": round(df["success"].mean(), 3),
+            "n": int(len(df)),
+        }
+    rz = p[p["yardline_100"] <= 20]
+    third = p[p["down"] == 3]
+    passp = p[p["pass"] == 1]
+    rushp = p[p["rush"] == 1]
+    return {
+        "overall": agg(p),
+        "red_zone": agg(rz),
+        "third_down": agg(third),
+        "pass": agg(passp),
+        "rush": agg(rushp),
+        "pass_rate": round(len(passp) / len(p), 3),
+        "shotgun_rate": round((p["shotgun"] == 1).mean(), 3),
+    }

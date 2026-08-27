@@ -1,0 +1,24 @@
+{% extends "layout.html" %}
+{% block title %}Game Strategy — {{ team }}{% endblock %}
+{% block body %}
+<h1>Game-Strategy Breakdown: {{ team }}</h1>
+<form method="get" style="margin:12px 0">
+  <input name="team" value="{{ team }}" />
+  <select name="season">
+    {% for s in [2022,2023,2024,2025] %}<option value="{{ s }}" {% if s==season %}selected{% endif %}>{{ s }}</option>{% endfor %}
+  </select>
+  <button type="submit">Go</button>
+</form>
+{% if breakdown %}
+<p class="muted">EPA per play, success rate, and play mix from play-by-play. Pass rate / shotgun rate are team tendency signals.</p>
+<table>
+  <tr><th>Situation</th><th>EPA/play</th><th>Success%</th><th>Plays</th></tr>
+  {% for k in ["overall","red_zone","third_down","pass","rush"] %}
+  <tr><td><b>{{ k.replace("_"," ") }}</b></td><td>{{ breakdown[k].epa_per_play }}</td><td>{{ breakdown[k].success_rate }}</td><td>{{ breakdown[k].n }}</td></tr>
+  {% endfor %}
+</table>
+<p>Pass rate: <b>{{ breakdown.pass_rate }}</b> · Shotgun rate: <b>{{ breakdown.shotgun_rate }}</b></p>
+{% else %}
+<p>No plays found for {{ team }} in {{ season }}.</p>
+{% endif %}
+{% endblock %}

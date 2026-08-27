@@ -2,15 +2,21 @@
 {% block title %}NFL Toolkit — {{ season }} Dashboard{% endblock %}
 {% block body %}
 <h1>{{ season }} Fantasy &amp; Win-Prediction Dashboard</h1>
-<p class="muted">Stats season: {{ stats_season }}. Projections use 2022–{{ stats_season }} history + 2026 role + SOS.</p>
+<p class="muted">Stats season: {{ stats_season }}. Projections use 2022–{{ stats_season }} history + 2026 role + SOS. Model trained on play-by-play (2022–2025).</p>
 
 <div class="card">
-  <h2 style="margin-top:0">Model backtest (train 2022–23, test 2024–25)</h2>
-  <p>Our EPA + turnover + rest + spread logistic model:
-     <b class="win">{{ backtest.model_accuracy }}</b> accuracy,
-     log-loss {{ backtest.model_logloss }}.</p>
-  <p>Vegas-favorite baseline: <b>{{ backtest.vegas }}</b> accuracy (n={{ backtest.n_test }}).</p>
-  <p class="muted">Beating the closing spread is extremely hard — the model is built to match it, not clear it. Shown honestly.</p>
+  <h2 style="margin-top:0">Win-probability model — honest evaluation</h2>
+  <p>Train 2022–23, test 2024–25 (n={{ backtest.n_test }}). Leakage-safe PBP features.</p>
+  <table>
+    <tr><th>Model</th><th>Accuracy</th><th>Log-loss</th><th>Brier</th></tr>
+    <tr><td>Our model (no spread)</td><td>{{ backtest.model_no_spread.accuracy }}</td><td>{{ backtest.model_no_spread.log_loss }}</td><td>{{ backtest.model_no_spread.brier }}</td></tr>
+    <tr><td>Our model (+ spread)</td><td>{{ backtest.model_with_spread.accuracy }}</td><td>{{ backtest.model_with_spread.log_loss }}</td><td>{{ backtest.model_with_spread.brier }}</td></tr>
+    <tr><td>Vegas-favorite baseline</td><td>{{ backtest.vegas }}</td><td class="muted">—</td><td class="muted">—</td></tr>
+  </table>
+  <p>Time-series CV mean accuracy: <b>{{ backtest.cv_mean }}</b>
+     (folds: {% for f in backtest.cv_folds %}{{ f.test_season }}={{ f.accuracy }}{% if not loop.last %}, {% endif %}{% endfor %})</p>
+  <p class="muted">EPA features alone beat a coin flip (~61%); the spread closes most of the rest of the gap.
+  Beating the closing spread is genuinely hard — reported honestly, not overstated. Analytical tool, not betting.</p>
 </div>
 
 <h2>Top 2026 PPR projections</h2>

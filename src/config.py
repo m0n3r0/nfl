@@ -32,6 +32,9 @@ STATS_SEASON = 2025
 # Seasons of historical weekly player stats used to build 2026 projections.
 HISTORY_SEASONS = (2022, 2023, 2024, 2025)
 
+# Seasons of play-by-play data used for strategy / team-efficiency features.
+PBP_SEASONS = (2022, 2023, 2024, 2025)
+
 # Backwards-compatible alias used by ingest/ranking.
 DEFAULT_SEASON = STATS_SEASON
 
