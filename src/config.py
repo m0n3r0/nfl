@@ -29,6 +29,9 @@ SCHEDULE_SEASON = 2026
 # Most recent season with published player stats (2026 stats not out yet).
 STATS_SEASON = 2025
 
+# Seasons of historical weekly player stats used to build 2026 projections.
+HISTORY_SEASONS = (2022, 2023, 2024, 2025)
+
 # Backwards-compatible alias used by ingest/ranking.
 DEFAULT_SEASON = STATS_SEASON
 
@@ -84,3 +87,6 @@ SCORING_PRESETS = {
 
 # Positions we surface in rankings.
 FANTASY_POSITIONS = ["QB", "RB", "WR", "TE", "K", "DEF"]
+
+# Offensive skill positions we project / analyze.
+SKILL_POSITIONS = ("QB", "RB", "WR", "TE")

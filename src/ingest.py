@@ -4,10 +4,10 @@ nflverse publishes flat CSVs as GitHub *release* assets (not as files on the
 default branch). We download the ones we need into ``data/raw`` and cache them,
 re-downloading only when explicitly forced.
 
-The schedule is pulled for ``SCHEDULE_SEASON`` (2026 by default) while player
-stats are pulled for ``STATS_SEASON`` (the most recent season with published
-game stats -- 2025 as of late Aug 2026, since the 2026 season hasn't produced
-player stats yet).
+Seasons (see src/config.py):
+  * SCHEDULE_SEASON (2026) -- game schedule we pull.
+  * STATS_SEASON (2025)    -- most recent published player stats.
+  * HISTORY_SEASONS        -- weekly player stats used to build 2026 projections.
 """
 
 from __future__ import annotations
@@ -18,23 +18,17 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-from .config import SCHEDULE_SEASON, STATS_SEASON
+from .config import SCHEDULE_SEASON, STATS_SEASON, HISTORY_SEASONS, SKILL_POSITIONS
 
 # Base URL for nflverse-data release assets.
 _RELEASE_BASE = "https://github.com/nflverse/nflverse-data/releases/download"
 
 
 def _datasets(stats_season: int = STATS_SEASON) -> dict[str, tuple[str, str]]:
-    """Logical name -> (url, local filename) for the given stats season."""
+    """Core datasets for the current stats season: players, games, weekly stats."""
     return {
-        "players": (
-            f"{_RELEASE_BASE}/players/players.csv",
-            "players.csv",
-        ),
-        "games": (
-            f"{_RELEASE_BASE}/schedules/games.csv",
-            "games.csv",
-        ),
+        "players": (f"{_RELEASE_BASE}/players/players.csv", "players.csv"),
+        "games": (f"{_RELEASE_BASE}/schedules/games.csv", "games.csv"),
         "player_week_stats": (
             f"{_RELEASE_BASE}/stats_player/stats_player_week_{stats_season}.csv",
             f"player_week_stats_{stats_season}.csv",
@@ -42,27 +36,50 @@ def _datasets(stats_season: int = STATS_SEASON) -> dict[str, tuple[str, str]]:
     }
 
 
+def _corpus_datasets() -> dict[str, tuple[str, str]]:
+    """Every dataset that makes up the 2026 projection corpus."""
+    d = dict(_datasets(STATS_SEASON))
+    for y in HISTORY_SEASONS:
+        if y == STATS_SEASON:
+            continue
+        d[f"player_week_stats_{y}"] = (
+            f"{_RELEASE_BASE}/stats_player/stats_player_week_{y}.csv",
+            f"player_week_stats_{y}.csv",
+        )
+    d["depth_charts"] = (
+        f"{_RELEASE_BASE}/depth_charts/depth_charts_{SCHEDULE_SEASON}.csv",
+        f"depth_charts_{SCHEDULE_SEASON}.csv",
+    )
+    d["injuries"] = (
+        f"{_RELEASE_BASE}/injuries/injuries_{STATS_SEASON}.csv",
+        f"injuries_{STATS_SEASON}.csv",
+    )
+    return d
+
+
 # Repo root is two levels up from this file (src/ -> repo root).
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RAW_DIR = REPO_ROOT / "data" / "raw"
 
 
-def _datasets_map(stats_season: int = STATS_SEASON) -> dict[str, tuple[str, str]]:
-    return _datasets(stats_season)
-
-
 def _url(name: str, stats_season: int = STATS_SEASON) -> str:
     try:
         return _datasets(stats_season)[name][0]
-    except KeyError as exc:
-        raise KeyError(f"unknown dataset {name!r}; known: {sorted(_datasets(stats_season))}") from exc
+    except KeyError:
+        try:
+            return _corpus_datasets()[name][0]
+        except KeyError as exc:
+            raise KeyError(f"unknown dataset {name!r}") from exc
 
 
 def _dest_path(name: str, stats_season: int = STATS_SEASON) -> Path:
-    return RAW_DIR / _datasets(stats_season)[name][1]
+    src = _datasets(stats_season)
+    if name not in src:
+        src = _corpus_datasets()
+    return RAW_DIR / src[name][1]
 
 
-def download(name: str, refresh: bool = False, timeout: int = 180,
+def download(name: str, refresh: bool = False, timeout: int = 240,
              stats_season: int = STATS_SEASON) -> Path:
     """Download ``name`` into data/raw, returning the local path.
 
@@ -106,11 +123,31 @@ def load(name: str, refresh: bool = False, stats_season: int = STATS_SEASON) -> 
 
 
 def load_all(refresh: bool = False, stats_season: int = STATS_SEASON) -> dict[str, pd.DataFrame]:
-    """Download and load every known dataset. Returns a name->DataFrame dict."""
+    """Download and load the core datasets. Returns a name->DataFrame dict."""
     out = {}
     for name in _datasets(stats_season):
         print(f"Loading {name}...")
         out[name] = load(name, refresh=refresh, stats_season=stats_season)
+    return out
+
+
+def collect_corpus(refresh: bool = False) -> dict[str, pd.DataFrame]:
+    """Download and load the full 2026 projection corpus.
+
+    Returns a dict with keys: players, games, injuries, depth_charts, and
+    player_week_stats_{y} for each year in HISTORY_SEASONS.
+    """
+    out: dict[str, pd.DataFrame] = {}
+    for name in ("players", "games", "injuries", "depth_charts"):
+        print(f"Loading {name}...")
+        try:
+            out[name] = load(name, refresh=refresh)
+        except Exception as exc:  # e.g. a 404 release that isn't out yet
+            print(f"  skipped {name}: {exc}")
+    for y in HISTORY_SEASONS:
+        key = "player_week_stats" if y == STATS_SEASON else f"player_week_stats_{y}"
+        print(f"Loading {key}...")
+        out[key] = load(key, refresh=refresh)
     return out
 
 
@@ -119,3 +156,7 @@ def load_schedule(season: int = SCHEDULE_SEASON, refresh: bool = False) -> pd.Da
     games = load("games", refresh=refresh)
     games = games[games["season"] == season].reset_index(drop=True)
     return games
+
+
+def load_depth_charts(season: int = SCHEDULE_SEASON, refresh: bool = False) -> pd.DataFrame:
+    return load("depth_charts", refresh=refresh)
