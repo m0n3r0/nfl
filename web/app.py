@@ -6,11 +6,13 @@ Server-rendered (Jinja) so it runs with no build step:
     python cli.py web            # same, via the CLI
 
 Pages:
-  /            dashboard (2026 projections top + model backtest summary)
+  /            dashboard (2026 projections + model card)
   /players     searchable player list with 2022-2025 stats + 2026 projection
   /player/<id> single player detail (history + projection)
   /predictions 2026 win probabilities by week
   /sos        2026 strength-of-schedule ranking
+  /ratings     2025 team efficiency ratings (as-of season, per-play EPA etc.)
+  /strategy     game-strategy situation splits for a team (3rd down, red zone, pass/run)
 """
 
 from __future__ import annotations
@@ -24,8 +26,8 @@ ROOT = Path(__file__).resolve().parents[1]
 import sys
 sys.path.insert(0, str(ROOT))
 
-from src import corpus, projections, analysis, model, ingest  # noqa: E402
-from src.config import SCHEDULE_SEASON, STATS_SEASON  # noqa: E402
+from src import corpus, projections, analysis, model, ingest, features  # noqa: E402
+from src.config import SCHEDULE_SEASON, STATS_SEASON, PBP_SEASONS  # noqa: E402
 
 app = Flask(__name__, template_folder=str(Path(__file__).parent / "templates"))
 
@@ -38,16 +40,20 @@ def _get_corpus(preset="ppr"):
 def dashboard():
     c = _get_corpus()
     proj = projections.project_players(c, preset="ppr").head(15)
-    backtest = model.train_and_backtest()
+    # Real, honest model evaluation (computed once per request; cached on disk by features).
+    ev = model.train_and_evaluate((2022, 2023), (2024, 2025))
+    cv = model.time_series_cv(PBP_SEASONS)
     return render_template(
         "dashboard.html",
         season=SCHEDULE_SEASON, stats_season=STATS_SEASON,
         projections=proj.to_dict("records"),
         backtest={
-            "model_accuracy": round(backtest["model_accuracy"], 4) if backtest["model_accuracy"] else None,
-            "model_logloss": round(backtest["model_logloss"], 4) if backtest["model_logloss"] else None,
-            "vegas": backtest["vegas_baseline_accuracy"],
-            "n_test": backtest["n_test"],
+            "model_no_spread": ev["model_no_spread"],
+            "model_with_spread": ev["model_with_spread"],
+            "vegas": ev["vegas_baseline_accuracy"],
+            "n_test": ev["n_test"],
+            "cv_mean": cv["mean_accuracy"],
+            "cv_folds": cv["folds"],
         },
     )
 
@@ -77,7 +83,6 @@ def player_detail(pid):
         return "player not found", 404
     name = ph["player_display_name"].iloc[0]
     pos = ph["position"].iloc[0]
-    # per-season totals
     season_agg = (
         ph.groupby("season")
         .agg(games=("week", "nunique"), ppg=("fantasy_points", "mean"))
@@ -110,10 +115,40 @@ def sos():
     return render_template("sos.html", sos=s.to_dict("records"))
 
 
+@app.route("/ratings")
+def ratings():
+    season = request.args.get("season", default=STATS_SEASON, type=int)
+    week = request.args.get("week", default=1, type=int)
+    rt = features.team_ratings_asof(season, week, refresh=False)
+    rt = rt.sort_values("off_epa_per_play", ascending=False)
+    return render_template(
+        "ratings.html",
+        ratings=rt.fillna(0).round(3).to_dict("records"),
+        season=season, week=week,
+        seasons=list(PBP_SEASONS) + [STATS_SEASON],
+    )
+
+
+@app.route("/strategy")
+def strategy():
+    team = request.args.get("team", "BUF").upper()
+    season = request.args.get("season", default=STATS_SEASON, type=int)
+    pbp = ingest.load_pbp(season)
+    bd = features.strategy_breakdown(pbp, team)
+    return render_template("strategy.html", team=team, season=season, breakdown=bd)
+
+
 @app.route("/api/predictions")
 def api_predictions():
     week = request.args.get("week", type=int)
     return jsonify(model.predict_2026(week=week).to_dict("records"))
+
+
+@app.route("/api/modelcard")
+def api_modelcard():
+    ev = model.train_and_evaluate((2022, 2023), (2024, 2025))
+    cv = model.time_series_cv(PBP_SEASONS)
+    return jsonify({"evaluation": ev, "cv": cv})
 
 
 if __name__ == "__main__":

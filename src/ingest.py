@@ -57,6 +57,51 @@ def _corpus_datasets() -> dict[str, tuple[str, str]]:
     return d
 
 
+def download_asset(tag: str, name: str, refresh: bool = False, timeout: int = 600) -> Path:
+    """Download an arbitrary release asset by (tag, filename) into data/raw/."""
+    url = f"{_RELEASE_BASE}/{tag}/{name}"
+    dest = RAW_DIR / name
+    if dest.exists() and not refresh:
+        return dest
+    RAW_DIR.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_suffix(dest.suffix + ".part")
+    try:
+        with requests.get(url, stream=True, timeout=timeout) as resp:
+            resp.raise_for_status()
+            total = int(resp.headers.get("content-length", 0))
+            written = 0
+            with open(tmp, "wb") as fh:
+                for chunk in resp.iter_content(chunk_size=1 << 16):
+                    if not chunk:
+                        continue
+                    fh.write(chunk)
+                    written += len(chunk)
+            if total:
+                print(f"  downloaded {name}: {written/1e6:.1f}/{total/1e6:.1f} MB", flush=True)
+            else:
+                print(f"  downloaded {name}: {written/1e6:.1f} MB", flush=True)
+    except Exception:
+        if tmp.exists():
+            tmp.unlink()
+        raise
+    tmp.replace(dest)
+    return dest
+
+
+def load_pbp(season: int, refresh: bool = False) -> pd.DataFrame:
+    """Play-by-play for a season (the professional-grade strategy source)."""
+    name = f"play_by_play_{season}.csv"
+    dest = download_asset("pbp", name, refresh=refresh)
+    return pd.read_csv(dest, low_memory=False)
+
+
+def load_team_stats(season: int, refresh: bool = False) -> pd.DataFrame:
+    """Team-level season stats (offense/defense EPA, etc.)."""
+    name = f"stats_team_reg_{season}.csv"
+    dest = download_asset("stats_team", name, refresh=refresh)
+    return pd.read_csv(dest, low_memory=False)
+
+
 # Repo root is two levels up from this file (src/ -> repo root).
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RAW_DIR = REPO_ROOT / "data" / "raw"
