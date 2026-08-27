@@ -16,11 +16,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src import ingest, scoring  # noqa: E402
+from src.config import STATS_SEASON  # noqa: E402
 
 
 def test_scoring_reproduces_nflverse():
     """Our scoring must match nflverse's shipped numbers for all presets."""
-    df = ingest.load("player_week_stats")
+    df = ingest.load("player_week_stats", stats_season=STATS_SEASON)
     for preset in ("standard", "ppr", "half-ppr"):
         v = scoring.validate_against_nflverse(df, preset=preset)
         max_delta = v["delta"].abs().max()
@@ -32,7 +33,7 @@ def test_scoring_reproduces_nflverse():
 
 def test_ppr_equals_standard_plus_receptions():
     """PPR should equal standard scoring plus one point per reception."""
-    df = ingest.load("player_week_stats")
+    df = ingest.load("player_week_stats", stats_season=STATS_SEASON)
     std = scoring.add_scores(df, preset="standard")["fantasy_points"]
     ppr = scoring.add_scores(df, preset="ppr")["fantasy_points"]
     rec = df["receptions"].fillna(0)
@@ -42,9 +43,8 @@ def test_ppr_equals_standard_plus_receptions():
 
 def test_optimize_lineup_fills_skill_slots():
     """Greedy optimizer should fill QB/RB/WR/TE/FLEX from player stats."""
-    df = ingest.load("player_week_stats")
+    df = ingest.load("player_week_stats", stats_season=STATS_SEASON)
     ranked = scoring.add_scores(df, preset="ppr")
-    picks = scoring  # placeholder to avoid lint; real import below
     from src import lineup
     picks = lineup.optimize_lineup(ranked, preset="ppr")
     for slot in ("QB", "RB", "WR", "TE", "FLEX"):

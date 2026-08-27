@@ -9,26 +9,35 @@ Player stats, rosters, and schedules are pulled from the public
 [nflverse-data](https://github.com/nflverse/nflverse-data) GitHub release assets
 (no API key required). Data is cached under `data/raw/` and not committed.
 
+The "current" season is configured in `src/config.py`:
+- `SCHEDULE_SEASON = 2026` — the game schedule we pull.
+- `STATS_SEASON = 2025` — the most recent season with published *player* stats.
+  As of late August 2026 the 2026 regular season has not yet produced game stats,
+  so rankings currently use 2025 player stats. When nflverse publishes 2026 weekly
+  stats, set `STATS_SEASON = 2026` and re-run `python cli.py ingest --refresh`.
+
 ## Setup
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python cli.py ingest        # download + cache 2024 data into data/raw/
+python cli.py ingest        # download + cache data into data/raw/
 ```
 
 ## CLI
 
 ```bash
 python cli.py ingest                  # download + cache nflverse data
+python cli.py schedule                # print the 2026 game schedule
 python cli.py rank --preset ppr --top 15
 python cli.py week 9 --preset half-ppr --top 10
 python cli.py lineup --preset ppr
 python cli.py validate                # compare our scoring vs nflverse's shipped numbers
 ```
 
-Presets: `standard`, `ppr`, `half-ppr`.
+Presets: `standard`, `ppr`, `half-ppr`. Most commands accept `--season <YEAR>` to
+override the stats year (the schedule command uses `SCHEDULE_SEASON`).
 
 ## Scoring
 

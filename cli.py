@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """Command-line interface for the fantasy football toolkit.
 
+The "current" season is driven by src/config.py: SCHEDULE_SEASON (2026) for the
+game schedule, STATS_SEASON (2025) for the most recent published player stats.
+
 Examples
 --------
   python cli.py ingest                 # download + cache nflverse data
+  python cli.py schedule               # print the 2026 game schedule
   python cli.py rank --preset ppr --top 15
   python cli.py week 12 --preset half-ppr
   python cli.py lineup --preset ppr
@@ -16,45 +20,60 @@ import argparse
 import sys
 
 from src import ingest, scoring, lineup
-from src.config import FANTASY_POSITIONS
+from src.config import FANTASY_POSITIONS, SCHEDULE_SEASON, STATS_SEASON
 
 
-def _df(name: str, refresh: bool):
-    return ingest.load(name, refresh=refresh)
+def _df(name: str, refresh: bool, stats_season: int = STATS_SEASON):
+    return ingest.load(name, refresh=refresh, stats_season=stats_season)
 
 
 def cmd_ingest(args) -> int:
-    print("Downloading nflverse datasets into data/raw ...")
-    ingest.load_all(refresh=args.refresh)
+    season = args.season or STATS_SEASON
+    print(f"Downloading nflverse datasets (stats season {season}, "
+          f"schedule season {SCHEDULE_SEASON}) into data/raw ...")
+    ingest.load_all(refresh=args.refresh, stats_season=season)
     print("Done. Files cached in data/raw/.")
     return 0
 
 
+def cmd_schedule(args) -> int:
+    season = args.season or SCHEDULE_SEASON
+    games = ingest.load_schedule(season=season, refresh=args.refresh)
+    print(f"\n=== {season} schedule ({len(games)} games) ===")
+    cols = ["week", "gameday", "away_team", "home_team", "game_type"]
+    _print_table(games[cols].sort_values(["week", "gameday"]))
+    return 0
+
+
 def cmd_rank(args) -> int:
-    df = _df("player_week_stats", refresh=args.refresh)
+    season = args.season or STATS_SEASON
+    df = _df("player_week_stats", args.refresh, stats_season=season)
     table = scoring.rank_players(
         df, preset=args.preset, positions=args.positions, top_n=args.top
     )
+    print(f"\n=== {season} season rankings ({args.preset}) ===")
     _print_table(table)
     return 0
 
 
 def cmd_week(args) -> int:
-    df = _df("player_week_stats", refresh=args.refresh)
+    season = args.season or STATS_SEASON
+    df = _df("player_week_stats", args.refresh, stats_season=season)
     table = scoring.weekly_rankings(
         df, week=args.week, preset=args.preset, positions=args.positions, top_n=args.top
     )
-    print(f"\n=== Week {args.week} ({args.preset}) ===")
+    print(f"\n=== {season} Week {args.week} ({args.preset}) ===")
     _print_table(table)
     return 0
 
 
 def cmd_lineup(args) -> int:
-    df = _df("player_week_stats", refresh=args.refresh)
+    season = args.season or STATS_SEASON
+    df = _df("player_week_stats", args.refresh, stats_season=season)
     ranked = scoring.add_scores(df, preset=args.preset, copy=True)
     picks = lineup.optimize_lineup(ranked, preset=args.preset)
     total = lineup.lineup_total(picks)
-    print(f"\n=== Optimized lineup ({args.preset}) | projected total: {total} ===")
+    print(f"\n=== Optimized lineup ({args.preset}, stats {season}) | projected total: {total} ===")
     empty = []
     for slot, players in picks.items():
         label = f"{slot}"
@@ -71,11 +90,11 @@ def cmd_lineup(args) -> int:
     return 0
 
 
-
 def cmd_validate(args) -> int:
-    df = _df("player_week_stats", refresh=args.refresh)
+    season = args.season or STATS_SEASON
+    df = _df("player_week_stats", args.refresh, stats_season=season)
     sample = scoring.validate_against_nflverse(df, preset=args.preset)
-    print(f"\n=== Scoring validation vs nflverse ({args.preset}) ===")
+    print(f"\n=== Scoring validation vs nflverse ({args.preset}, {season}) ===")
     print(f"max abs delta: {sample['delta'].abs().max():.2f}")
     print(f"mean abs delta: {sample['delta'].abs().mean():.4f}")
     _print_table(sample.head(15))
@@ -103,15 +122,28 @@ def _pos_type(value: str):
     return items
 
 
+def _add_season(p):
+    p.add_argument("--season", type=int, default=None,
+                   help=f"stats season (default {STATS_SEASON}); schedule uses "
+                        f"{SCHEDULE_SEASON}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Fantasy football toolkit")
     sub = p.add_subparsers(dest="command", required=True)
 
     pi = sub.add_parser("ingest", help="download + cache nflverse data")
+    _add_season(pi)
     pi.add_argument("--refresh", action="store_true", help="re-download even if cached")
     pi.set_defaults(func=cmd_ingest)
 
+    ps = sub.add_parser("schedule", help=f"print the {SCHEDULE_SEASON} game schedule")
+    ps.add_argument("--season", type=int, default=None, help=f"schedule season (default {SCHEDULE_SEASON})")
+    ps.add_argument("--refresh", action="store_true")
+    ps.set_defaults(func=cmd_schedule)
+
     pr = sub.add_parser("rank", help="season rankings by total fantasy points")
+    _add_season(pr)
     pr.add_argument("--preset", default="ppr", choices=["standard", "ppr", "half-ppr"])
     pr.add_argument("--positions", type=_pos_type, default=None, help="QB,RB,WR,TE,K,DEF")
     pr.add_argument("--top", type=int, default=20)
@@ -119,6 +151,7 @@ def build_parser() -> argparse.ArgumentParser:
     pr.set_defaults(func=cmd_rank)
 
     pw = sub.add_parser("week", help="rankings for a specific week")
+    _add_season(pw)
     pw.add_argument("week", type=int, help="week number")
     pw.add_argument("--preset", default="ppr", choices=["standard", "ppr", "half-ppr"])
     pw.add_argument("--positions", type=_pos_type, default=None)
@@ -127,11 +160,13 @@ def build_parser() -> argparse.ArgumentParser:
     pw.set_defaults(func=cmd_week)
 
     pl = sub.add_parser("lineup", help="greedy optimized starting lineup")
+    _add_season(pl)
     pl.add_argument("--preset", default="ppr", choices=["standard", "ppr", "half-ppr"])
     pl.add_argument("--refresh", action="store_true")
     pl.set_defaults(func=cmd_lineup)
 
     pv = sub.add_parser("validate", help="compare scoring vs nflverse shipped values")
+    _add_season(pv)
     pv.add_argument("--preset", default="ppr", choices=["standard", "ppr", "half-ppr"])
     pv.add_argument("--refresh", action="store_true")
     pv.set_defaults(func=cmd_validate)
