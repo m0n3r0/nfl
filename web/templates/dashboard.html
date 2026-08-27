@@ -1,0 +1,28 @@
+{% extends "layout.html" %}
+{% block title %}NFL Toolkit — {{ season }} Dashboard{% endblock %}
+{% block body %}
+<h1>{{ season }} Fantasy &amp; Win-Prediction Dashboard</h1>
+<p class="muted">Stats season: {{ stats_season }}. Projections use 2022–{{ stats_season }} history + 2026 role + SOS.</p>
+
+<div class="card">
+  <h2 style="margin-top:0">Model backtest (train 2022–23, test 2024–25)</h2>
+  <p>Our EPA + turnover + rest + spread logistic model:
+     <b class="win">{{ backtest.model_accuracy }}</b> accuracy,
+     log-loss {{ backtest.model_logloss }}.</p>
+  <p>Vegas-favorite baseline: <b>{{ backtest.vegas }}</b> accuracy (n={{ backtest.n_test }}).</p>
+  <p class="muted">Beating the closing spread is extremely hard — the model is built to match it, not clear it. Shown honestly.</p>
+</div>
+
+<h2>Top 2026 PPR projections</h2>
+<table>
+  <tr><th>#</th><th>Player</th><th>Pos</th><th>Team</th><th>Proj/G</th><th>Proj Total</th></tr>
+  {% for p in projections %}
+  <tr>
+    <td>{{ p.rank }}</td>
+    <td><a href="/player/{{ p.player_id }}">{{ p.player_display_name }}</a></td>
+    <td>{{ p.position }}</td><td>{{ p.last_team }}</td>
+    <td>{{ p.proj_ppg }}</td><td>{{ p.proj_total }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

@@ -68,6 +68,34 @@ override the stats year (the schedule command uses `SCHEDULE_SEASON`).
 `analysis.py` adds consistency (CV, boom/bust rates), SOS rankings, and a
 weekly matchup/start-sit board.
 
+## Win-probability model (predicting the winning team)
+
+`src/model.py` trains a transparent logistic-regression baseline to predict
+`home_win` from historical games, benchmarked against the Vegas-favorite baseline.
+
+Features (home-team perspective): EPA differential (offense − defense, from prior
+season's `stats_team` EPA + points allowed), turnover margin, rest differential,
+and the Vegas `spread_line`. Defense is derived from points allowed in `games.csv`.
+
+Backtest (train 2022-2023, test 2024-2025): our model ≈ **68.0%** accuracy;
+Vegas-favorite baseline ≈ **68.4%**. Beating the closing spread is extremely
+hard, so the model is built to *match* it — reported honestly, not overstated.
+Run `python cli.py predict` for 2026 win probabilities.
+
+This is an analytical tool, not a betting system.
+
+## Web UI
+
+A local Flask app (no build step) shows player stats and predictions:
+
+```bash
+python cli.py web            # http://127.0.0.1:5000
+# or: python web/app.py
+```
+
+Pages: dashboard (projections + model backtest), players (search + per-player
+history/projection), win predictions by week, and SOS ranking.
+
 ## Scoring
 
 Weights were reverse-engineered from nflverse's own shipped `fantasy_points` /

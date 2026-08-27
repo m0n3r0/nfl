@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+{% block title %}Strength of Schedule{% endblock %}
+{% block body %}
+<h1>2026 Strength of Schedule</h1>
+<p class="muted">Higher SOS = easier schedule (opponents allow more points). Derived from 2025 team points allowed.</p>
+<table>
+  <tr><th>Rank</th><th>Team</th><th>SOS</th></tr>
+  {% for s in sos %}
+  <tr><td>{{ s.rank }}</td><td><b>{{ s.team }}</b></td><td>{{ s.sos }}</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}
