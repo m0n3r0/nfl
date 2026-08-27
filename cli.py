@@ -19,7 +19,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from src import ingest, scoring, lineup
+from src import ingest, scoring, lineup, corpus, projections, analysis
 from src.config import FANTASY_POSITIONS, SCHEDULE_SEASON, STATS_SEASON
 
 
@@ -101,6 +101,56 @@ def cmd_validate(args) -> int:
     return 0
 
 
+def cmd_corpus(args) -> int:
+    print("Collecting 2026 projection corpus (this downloads ~80MB of data)...")
+    c = ingest.collect_corpus(refresh=args.refresh)
+    print("Corpus ready. Tables in memory:")
+    for k, v in c.items():
+        if hasattr(v, "shape"):
+            print(f"  {k}: {v.shape[0]} rows x {v.shape[1]} cols")
+    return 0
+
+
+def _build_corpus(preset: str):
+    return corpus.build(preset=preset)
+
+
+def cmd_projections(args) -> int:
+    c = _build_corpus(args.preset)
+    proj = projections.project_players(c, preset=args.preset)
+    if args.positions:
+        proj = proj[proj["position"].isin(args.positions)]
+    print(f"\n=== 2026 projections ({args.preset}) ===")
+    _print_table(proj.head(args.top))
+    return 0
+
+
+def cmd_consistency(args) -> int:
+    c = _build_corpus(args.preset)
+    cons = analysis.consistency(c, preset=args.preset)
+    if args.positions:
+        cons = cons[cons["position"].isin(args.positions)]
+    print(f"\n=== Consistency (CV; lower = steadier) ({args.preset}) ===")
+    _print_table(cons.head(args.top))
+    return 0
+
+
+def cmd_matchups(args) -> int:
+    c = _build_corpus(args.preset)
+    board = analysis.weekly_matchups(c, week=args.week, preset=args.preset, top_n=args.top)
+    print(f"\n=== 2026 Week {args.week} matchups ({args.preset}) ===")
+    _print_table(board)
+    return 0
+
+
+def cmd_sos(args) -> int:
+    c = corpus.build()  # SOS is schedule/defense based; preset-independent
+    sos = analysis.sos_ranking(c)
+    print("\n=== 2026 Strength-of-Schedule (easier = higher sos) ===")
+    _print_table(sos)
+    return 0
+
+
 def _print_table(df):
     if df is None or len(df) == 0:
         print("(no rows)")
@@ -170,6 +220,32 @@ def build_parser() -> argparse.ArgumentParser:
     pv.add_argument("--preset", default="ppr", choices=["standard", "ppr", "half-ppr"])
     pv.add_argument("--refresh", action="store_true")
     pv.set_defaults(func=cmd_validate)
+
+    pc = sub.add_parser("corpus", help="download + assemble the 2026 projection corpus")
+    pc.add_argument("--refresh", action="store_true")
+    pc.set_defaults(func=cmd_corpus)
+
+    pj = sub.add_parser("projections", help="2026 projections (multi-year + role + SOS)")
+    pj.add_argument("--preset", default="ppr", choices=["standard", "ppr", "half-ppr"])
+    pj.add_argument("--positions", type=_pos_type, default=None)
+    pj.add_argument("--top", type=int, default=30)
+    pj.set_defaults(func=cmd_projections)
+
+    pcons = sub.add_parser("consistency", help="weekly consistency / boom-bust by player")
+    pcons.add_argument("--preset", default="ppr", choices=["standard", "ppr", "half-ppr"])
+    pcons.add_argument("--positions", type=_pos_type, default=None)
+    pcons.add_argument("--top", type=int, default=30)
+    pcons.set_defaults(func=cmd_consistency)
+
+    pm = sub.add_parser("matchups", help="2026 weekly start/sit board")
+    pm.add_argument("week", type=int, help="2026 week number")
+    pm.add_argument("--preset", default="ppr", choices=["standard", "ppr", "half-ppr"])
+    pm.add_argument("--top", type=int, default=25)
+    pm.set_defaults(func=cmd_matchups)
+
+    pso = sub.add_parser("sos", help="2026 team strength-of-schedule ranking")
+    pso.add_argument("--top", type=int, default=32)
+    pso.set_defaults(func=cmd_sos)
 
     return p
 
