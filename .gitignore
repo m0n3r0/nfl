@@ -28,3 +28,6 @@ data/processed/
 
 # --- Jupyter checkpoints ---
 .ipynb_checkpoints/
+
+# --- FD nation draft driver (runtime-generated) ---
+logs/draft_log.txt

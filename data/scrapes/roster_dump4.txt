@@ -1,0 +1,839 @@
+=== SETTINGS (scoring) ===
+Yahoo Sports
+Yahoo Sports
+Search query
+News
+Finance
+Sports
+More
+B
+ Fantasy Football
+Overview
+League
+My Team
+Matchups
+Players
+Research
+Draft
+StatTracker
+…
+Fantasy
+Network
+Fantasy Plus
+FD nation (ID# 1329011)
+Yahoo Sports Fantasy Football
+Scoring & Settings
+Setting	Value
+League ID#:	1329011
+League Name:	FD nation
+League Logo:	
+Auto-renew Enabled:	Yes
+Draft Type:	Live Standard Draft
+Draft Time:	Fri Aug 28 6:00pm EDT [ Add to My Calendar ]
+Cash League Settings:	Not a cash league
+Max Teams:	10
+Live Draft Pick Time:	1 Minute
+Scoring Type:	Head-to-Head
+Start Scoring on:	Week 1
+Can't Cut List Provider:	Yahoo Sports
+Max Acquisitions for Entire Season:	No maximum
+Max Acquisitions per Week:	No maximum
+Max Trades for Entire Season	No maximum
+Trade End Date:	November 28, 2026
+Allow Draft Pick Trades:	No
+Trade Review:	League Votes
+Votes Required to Veto:	Default
+Trade Reject Time:	2 days
+Waiver Time:	2 days
+Waiver Type:	Continual rolling list
+Weekly Waivers	Game Time - Tuesday
+Allow injured players from waivers or free agents to be added directly to injury slot:	Yes
+Post Draft Players:	Follow Waiver Rules
+Playoffs:	4 teams - Week 16 and 17 (ends Monday, Jan 4)
+Playoff Tie-Breaker:	Higher seed wins
+Playoff Reseeding:	Yes
+Divisions:	No
+Lock Eliminated Teams:	No
+Play Against Median Score:	No
+Play Against a Second Opponent:	No
+Apply Injured Status For Postponed Games	Yes
+Roster Positions:	QB, WR, WR, RB, RB, TE, W/R/T, K, DEF, BN, BN, BN, BN, BN, BN, IR, IR
+Fractional Points:	Yes
+Negative Points:	Yes
+Lock Benched Players:	No
+Make League Publicly Viewable:	No
+Invite Permissions:	All Managers Can Invite
+Offense	League Value	Yahoo Default Value
+Passing Yards	25 yards per point	
+Passing Touchdowns	4	
+Interceptions	-1	
+Rushing Yards	10 yards per point	
+Rushing Touchdowns	6	
+Receptions	0.5	
+Receiving Yards	10 yards per point	
+Receiving Touchdowns	6	
+Return Touchdowns	6	
+2-Point Conversions	2	
+Fumbles Lost	-2	
+Offensive Fumble Return TD	6	
+Kickers	League Value	Yahoo Default Value
+Field Goals 0-19 Yards	3	
+Field Goals 20-29 Yards	3	
+Field Goals 30-39 Yards	3	
+Field Goals 40-49 Yards	4	
+Field Goals 50+ Yards	5	
+Point After Attempt Made	1	
+Defense/Special Teams	League Value	Yahoo Default Value
+Sack	1	
+Interception	2	
+Fumble Recovery	2	
+Touchdown	6	
+Safety	2	
+Block Kick	2	
+Kickoff and Punt Return Touchdowns	6	
+Points Allowed 0 points	10	
+Points Allowed 1-6 points	7	
+Points Allowed 7-13 points	4	
+Points Allowed 14-20 points	1	
+Points Allowed 21-27 points	0	
+Points Allowed 28-34 points	
+=== https://football.fantasysports.yahoo.com/f1/1329011/draftanalysis ===
+Yahoo Sports
+Yahoo Sports
+Search query
+News
+Finance
+Sports
+More
+B
+ Fantasy Football
+Overview
+League
+My Team
+Matchups
+Players
+Research
+Draft
+StatTracker
+…
+Fantasy
+Network
+Fantasy Plus
+FD nation (ID# 1329011)
+Yahoo Sports Fantasy Football
+Draft Analysis
+
+*ADP based on standard scoring settings
+
+Standard
+ 
+Salary Cap
+ALL
+QB
+RB
+WR
+TE
+W/R/T
+K
+DEF
+ALL
+Fantasy
+	
+Basic ADP
+	
+Plus ADP 
+
+Player	Rank	Pos Rank	CER	%Drafted	Preseason	All Drafts	Last 7 Days	Preseason 💎	All Drafts 💎	Last 7 Days 💎
+
+Jahmyr Gibbs
+Det - RB
+	
+1
+	
+	
+	
+100%
+	
+1.5
+	
+1.5
+	
+	
+	
+	
+
+
+Bijan Robinson
+Atl - RB
+	
+2
+	
+	
+	
+100%
+	
+1.9
+	
+1.9
+	
+	
+	
+	
+
+
+Ja'Marr Chase
+Cin - WR
+	
+3
+	
+	
+	
+100%
+	
+3.3
+	
+3.3
+	
+	
+	
+	
+
+
+Puka Nacua
+LAR - WR
+Q
+	
+4
+	
+	
+	
+100%
+	
+4.7
+	
+4.7
+	
+	
+	
+	
+
+
+Christian McCaffrey
+SF - RB
+Q
+	
+5
+	
+	
+	
+100%
+	
+5.6
+	
+5.5
+	
+	
+	
+	
+
+
+Jaxon Smith-Njigba
+Sea - WR
+	
+7
+	
+	
+	
+100%
+	
+6.6
+	
+6.6
+	
+	
+	
+	
+
+
+Jonathan Taylor
+Ind - RB
+	
+8
+	
+	
+	
+100%
+	
+7.1
+	
+7.1
+	
+	
+	
+	
+
+
+Amon-Ra St. Brown
+Det - WR
+	
+6
+	
+	
+	
+100%
+	
+8.0
+	
+8.0
+	
+	
+	
+	
+
+
+James Cook III
+Buf - RB
+	
+10
+	
+	
+	
+100%
+	
+9.9
+	
+9.9
+	
+	
+	
+	
+
+
+CeeDee Lamb
+Dal - WR
+	
+9
+	
+	
+	
+100%
+	
+10.2
+	
+10.2
+	
+	
+	
+	
+
+
+Justin Jefferson
+Min - WR
+	
+12
+	
+	
+	
+100%
+	
+12.4
+	
+12.4
+	
+	
+	
+	
+
+
+Saquon Barkley
+Phi - RB
+	
+11
+	
+	
+	
+100%
+	
+12.4
+	
+12.5
+	
+	
+	
+	
+
+
+Ashton Jeanty
+LV - RB
+	
+14
+	
+	
+	
+100%
+	
+14.0
+	
+14.0
+	
+	
+	
+	
+
+
+De'Von Achane
+Mia - RB
+	
+16
+	
+	
+	
+100%
+	
+15.8
+	
+15.7
+	
+	
+	
+	
+
+
+Chase Brown
+Cin - RB
+	
+15
+	
+	
+	
+100%
+	
+16.6
+	
+16.6
+	
+	
+	
+	
+
+
+Kenneth Walker III
+KC - RB
+	
+13
+	
+	
+	
+100%
+	
+17.1
+	
+17.1
+	
+	
+	
+	
+
+
+Derrick Henry
+Bal - RB
+	
+19
+	
+	
+	
+100%
+	
+18.2
+	
+18.2
+	
+	
+	
+	
+
+
+Drake London
+Atl - WR
+	
+17
+	
+	
+	
+100%
+	
+18.6
+	
+18.6
+	
+	
+	
+	
+
+
+Omarion Hampton
+LAC - RB
+	
+18
+	
+	
+	
+100%
+	
+18.6
+	
+18.6
+	
+	
+	
+	
+
+
+Josh Allen
+Buf - QB
+	
+28
+	
+	
+	
+100%
+	
+19.6
+	
+19.6
+	
+	
+	
+	
+
+
+Brock Bowers
+LV - TE
+	
+20
+	
+	
+	
+100%
+	
+21.1
+	
+21.0
+	
+	
+	
+	
+
+
+Nico Collins
+Hou - WR
+	
+21
+	
+	
+	
+100%
+	
+22.2
+	
+22.2
+	
+	
+	
+	
+
+
+George Pickens
+Dal - WR
+	
+22
+	
+	
+	
+100%
+	
+22.4
+	
+22.4
+	
+	
+	
+	
+
+
+A.J. Brown
+NE - WR
+	
+23
+	
+	
+	
+100%
+	
+25.0
+	
+25.1
+	
+	
+	
+	
+
+
+Trey McBride
+Ari - TE
+	
+32
+	
+	
+	
+100%
+	
+25.3
+	
+25.2
+	
+	
+	
+	
+
+
+Jeremiyah Love
+Ari - RB
+Q
+	
+26
+	
+	
+	
+100%
+	
+27.2
+	
+27.1
+	
+	
+	
+	
+
+
+DeVonta Smith
+Phi - WR
+Q
+	
+25
+	
+	
+	
+100%
+	
+29.4
+	
+29.4
+	
+	
+	
+	
+
+
+Kyren Williams
+LAR - RB
+	
+31
+	
+	
+	
+100%
+	
+29.6
+	
+29.5
+	
+	
+	
+	
+
+
+Josh Jacobs
+GB - RB
+Q
+	
+37
+	
+	
+	
+100%
+	
+32.6
+	
+32.5
+	
+	
+	
+	
+
+
+Chris Olave
+NO - WR
+	
+34
+	
+	
+	
+100%
+	
+33.2
+	
+33.2
+	
+	
+	
+	
+1-30
+	
+Yahoo Sports - NBC Sports Network - Paid Fantasy Terms - Feedback - Terms and Privacy Policy - Privacy Dashboard  - About Our Ads - Help
+
+Certain Data by Sportradar, Rotowire, FTN, BAKER Engine and THE BLITZ
+
+Guillotine trademarks are used with Fantasy Life's permission.
+
+© 2026 Yahoo Fantasy Sports LLC. All rights reserved.
+=== https://football.fantasysports.yahoo.com/f1/1329011/draft ===
+Yahoo Sports
+Yahoo Sports
+Search query
+News
+Finance
+Sports
+More
+B
+ Fantasy Football
+Overview
+League
+My Team
+Matchups
+Players
+Research
+Draft
+StatTracker
+…
+Fantasy
+Network
+Get Fantasy Plus
+FD nation (ID# 1329011)
+Yahoo Sports Fantasy Football
+Draft Central Overview
+Draft Kits
+Draft Kits
+to crush draft prep
+Personalized and built for your league, with expert guidance from our top fantasy analysts.
+
+Subscribe to Unlock
+Instant Mock Drafts
+Instant Mock Drafts
+to skip the wait
+Draft immediately against our algorithms, no more lobbies, no more dropouts.
+
+Subscribe to Unlock
+Game Plan buy
+FD nation · 7 Teams · 15 Rounds · 1 minute
+
+Try 3 Rounds Free
+Live Mock Drafts
+Standard Drafts | Salary Cap Drafts
+Pre-Draft Player Rankings 
+
+Edit My Rankings 
+
+Player rankings are used to draft your team. If you're happy with our default order, you don't need to edit your rankings. To ranking players in your own custom order, select the Edit My Rankings link.
+
+Export Pre-Draft Player Rankings
+
+You must customize players before you can export to another team.
+
+Draft Analysis View All 
+All Players
+ 
+QB
+ 
+WR
+ 
+RB
+ 
+TE
+ 
+W/R/T
+ 
+K
+ 
+DEF
+Action
+	
+Player
+	
+Avg Pick
+	
+Avg Round
+	
+Percent Drafted
+
+		
+Jahmyr GibbsVideo ForecastPlayer Note
+Det - RB
+Sun 1:00 pm vs NO
+	1.5	1.0	100%
+		
+Bijan RobinsonVideo ForecastPlayer Note
+Atl - RB
+Sun 1:00 pm @ Pit
+	1.9	1.0	100%
+		
+Ja'Marr ChaseVideo ForecastPlayer Note
+Cin - WR
+Sun 1:00 pm vs TB
+	3.3	1.0	100%
+		
+Puka NacuaQVideo ForecastNew Player Note
+LAR - WR
+Thu 8:35 pm vs SF
+	4.7	1.0	100%
+		
+Christian McCaffreyQVideo ForecastPlayer Note
+SF - RB
+Thu 8:35 pm @ LAR
+	5.5	1.0	100%
+	
+Draft Countdown
+
+Test your system to see if it is draft compatible
+
+Yahoo Sports Fantasy Experts View All  
+2026 Fantasy Football Instant Mock Draft, No. 3 Pick: Analysis, key takeaways and full roster
+Ben Zweiman August 19, 2026
+Fantasy Football: 7 players Justin Boone thinks could be league winners in 2026
+Justin Boone August 19, 2026
+Fantasy Football: Caleb Williams vs. Justin Herbert and more QB debates you may have to face in your 2026 drafts
+Scott Pianowski August 19, 2026
+Fantasy Football Roundtable: Here are the running backs our Yahoo analysts believe are primed for breakouts in 2026
+Yahoo Sports Fantasy Staff August 19, 2026
+Fantasy Football: Volume is king — Joel Smyth breaks down quality of RB workloads and whether or not it hints at value for 2026
+Joel Smyth August 19, 2026
+Top Headlines
+Colts' Keenan Allen and Falcons' Za'Darius Smith sit out the teams' first joint practice
+MICHAEL MAROT` August 19, 2026
+Ravens and Vikings give each other a valuable test on the first day of joint practice
+DAVE CAMPBELL August 19, 2026
+A fifth-round pick out of Arkansas barges into the Titans’ right guard battle
+TERESA M. WALKER August 19, 2026
+Cowboys' starting offensive tackles are trending in different directions during training camp
+DAN GREENSPAN August 19, 2026
+Among his former teammates again, Patriots' Brown says he's moved on from sour departure from Philly
+KYLE HIGHTOWER August 19, 2026
+Murphy and Turner are emerging as young cornerstones on the Bengals' defense
+CHARLIE GOLDSMITH August 19, 2026
+Texans receiver Jayden Higgins is out for the season with a torn ACL, AP source says
+ROB MAADDI August 19, 2026
+Seahawks sign 2-time Pro Bowl cornerback Trevon Diggs while Terrion Arnold remains unsigned
+ANDREW DESTIN August 19, 2026
+Commanders rookie Sonny Styles is eager for his next opportunity after a short preseason debut
+ETHAN CADEAUX Augu
+=== DRAFT BOARD PLAYERS (top 60) ===

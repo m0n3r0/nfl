@@ -144,3 +144,39 @@ rounding and that PPR = standard + receptions.
   rather than fabricating 0-point picks. Feed those datasets in to fill them.
 - The lineup optimizer is a greedy "best available" heuristic, not an optimal
   integer-program solver.
+
+## FD nation draft automation (module)
+
+Yahoo Fantasy Football league **"FD nation"** (ID `1329011`), manager **Doge** (team #2).
+An automated draft driver + read-only scrapers driven via Edge Chrome DevTools
+Protocol (CDP). Lives as a self-contained module alongside the toolkit above.
+
+### Layout
+- `driver/draft_driver.py` — live draft driver (board + guardrails + human-like CDP clicks). Runs on Windows via `py.exe`.
+- `skills/` — Hermes skills (edge-cdp, fantasy-read, fantasy-draft) for reuse in Hermes Desktop.
+- `memory/fantasy_fd_nation.md` — persistent league context for the agent.
+- `data/board/` — draft board + K/DEF ADP (verified Yahoo data).
+- `data/scrapes/` — roster/standings/settings extracts from the live tab.
+- `validation/` — mock-draft + click validation logs (2026-08-21).
+- `logs/draft_log.txt` — created at draft time; every pick decision logged here.
+- `images/` — proof screenshots.
+
+### League facts (verified live 2026-08-28)
+.5 PPR, H2H, 15 rounds, 1 min/pick, snake, **10 teams**. Roster: 1QB/2WR/2RB/1TE/1WRT/1K/1DEF/6BN/2IR.
+Draft: **Tue Sep 1 2026, 5:00pm EDT** (= 2026-09-02 06:00 JST on the machine).
+
+### How to run the draft
+Edge must be open on port 9222 with `--remote-allow-origins=*` and the user logged in.
+Then on Windows:
+```
+py.exe driver/draft_driver.py
+```
+Or let the scheduled task **FDnationDraftDriver** fire automatically at draft time.
+
+### Safety net
+Yahoo default pre-rank is the auto-draft fallback if the driver errors.
+
+### Honest limitations
+- Cannot guarantee wins (real NFL games decide outcomes).
+- Live pick→Draft-button flow validated at mechanism level, not end-to-end (Yahoo mock gated).
+- Keep Edge + machine on at draft time.

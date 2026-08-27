@@ -1,0 +1,6 @@
+EDGE_UP tabs=1
+  TAB https://football.fantasysports.yahoo.com/f1/1329011 | FD nation | Fantasy Football | Yahoo! Sports
+CURRENT_URL https://football.fantasysports.yahoo.com/f1/1329011
+LOGGED_IN_INDICATOR True
+TITLE FD nation | Fantasy Football | Yahoo! Sports
+YAHOO_STATE {'hasYahoo': True, 'bodyHasFantasy': True}
