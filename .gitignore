@@ -24,7 +24,7 @@ env/
 data/raw/
 data/processed/
 *.parquet
-*.csv.bak
+*.csv.bz
 
 # --- Jupyter checkpoints ---
 .ipynb_checkpoints/
