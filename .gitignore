@@ -1,0 +1,30 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+
+# --- Tooling ---
+.idea/
+.vscode/
+.DS_Store
+
+# --- Secrets / local config ---
+.env
+*.local
+
+# --- Data (large or derived artifacts) ---
+data/raw/
+data/processed/
+*.parquet
+*.csv.bak
+
+# --- Jupyter checkpoints ---
+.ipynb_checkpoints/
