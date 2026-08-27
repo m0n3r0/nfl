@@ -31,3 +31,4 @@ data/processed/
 
 # --- FD nation draft driver (runtime-generated) ---
 logs/draft_log.txt
+__pycache__/
