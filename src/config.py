@@ -10,13 +10,27 @@ scoring* via least-squares regression (R^2 = 1.000 on the 2024 weekly table, res
 ~1e-13), so they reproduce nflverse's numbers exactly rather than a generic textbook
 scheme. Key findings:
   * interceptions cost -2.0 (not -1)
-  * every fumble LOST costs -2.0, split across rushing / receiving / sack fumbles
+  * every fumble LOST costs -2.0 (split across rushing / receiving / sack fumbles)
   * 2-point conversions are worth +2.0
   * K/DEF/ST players are scored 0 in the *player* stat table (defense is team-level)
+
+SEASONS
+-------
+SCHEDULE_SEASON is the season whose game schedule we pull (2026 by default).
+STATS_SEASON is the most recent season with published *player* stats. As of late
+August 2026 the 2026 regular season has not yet produced game stats, so the latest
+available player stat year is 2025. When nflverse publishes 2026 weekly stats, bump
+STATS_SEASON to 2026 and re-run ``python cli.py ingest --refresh``.
 """
 
-# Which season's data the ingestion step pulls by default.
-DEFAULT_SEASON = 2024
+# Season whose game schedule we use for the "current" year.
+SCHEDULE_SEASON = 2026
+
+# Most recent season with published player stats (2026 stats not out yet).
+STATS_SEASON = 2025
+
+# Backwards-compatible alias used by ingest/ranking.
+DEFAULT_SEASON = STATS_SEASON
 
 # Raw stat-line columns that drive fantasy scoring (nflverse stat table names).
 SCORING_STATS = [
