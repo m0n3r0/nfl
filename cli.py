@@ -19,7 +19,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from src import ingest, scoring, lineup, corpus, projections, analysis
+from src import ingest, scoring, lineup, corpus, projections, analysis, model
 from src.config import FANTASY_POSITIONS, SCHEDULE_SEASON, STATS_SEASON
 
 
@@ -151,6 +151,23 @@ def cmd_sos(args) -> int:
     return 0
 
 
+def cmd_predict(args) -> int:
+    preds = model.predict_2026(week=args.week)
+    title = f"2026" + (f" Week {args.week}" if args.week else " (all weeks)")
+    print(f"\n=== {title} win probabilities ===")
+    _print_table(preds)
+    return 0
+
+
+def cmd_web(args) -> int:
+    import os
+    from web import app
+    port = args.port
+    print(f"Starting web UI at http://127.0.0.1:{port}  (Ctrl-C to stop)")
+    app.run(host="127.0.0.1", port=port, debug=False)
+    return 0
+
+
 def _print_table(df):
     if df is None or len(df) == 0:
         print("(no rows)")
@@ -246,6 +263,14 @@ def build_parser() -> argparse.ArgumentParser:
     pso = sub.add_parser("sos", help="2026 team strength-of-schedule ranking")
     pso.add_argument("--top", type=int, default=32)
     pso.set_defaults(func=cmd_sos)
+
+    ppred = sub.add_parser("predict", help="2026 win probabilities")
+    ppred.add_argument("week", type=int, nargs="?", default=None, help="2026 week (omit for all)")
+    ppred.set_defaults(func=cmd_predict)
+
+    pw = sub.add_parser("web", help="launch the local web UI")
+    pw.add_argument("--port", type=int, default=5000)
+    pw.set_defaults(func=cmd_web)
 
     return p
 

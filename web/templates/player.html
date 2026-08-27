@@ -1,0 +1,24 @@
+{% extends "layout.html" %}
+{% block title %}{{ name }}{% endblock %}
+{% block body %}
+<h1>{{ name }} <span class="pill">{{ pos }}</span></h1>
+<p><a href="/players">← players</a></p>
+
+{% if projection %}
+<div class="card">
+  <h2 style="margin-top:0">2026 Projection (PPR)</h2>
+  <p>Baseline/G: <b>{{ projection.baseline_ppg }}</b> ·
+     Role share: <b>{{ projection.role_share }}</b> ·
+     Team SOS: <b>{{ projection.team_sos }}</b></p>
+  <p><b class="win">Proj {{ projection.proj_ppg }}/game · {{ projection.proj_total }} total</b></p>
+</div>
+{% endif %}
+
+<h2>Season history (fantasy PPG)</h2>
+<table>
+  <tr><th>Season</th><th>Games</th><th>PPG</th></tr>
+  {% for h in history %}
+  <tr><td>{{ h.season }}</td><td>{{ h.games }}</td><td>{{ h.ppg }}</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

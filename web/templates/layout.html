@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{% block title %}NFL Toolkit{% endblock %}</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; margin: 0; background: #0f1419; color: #e6e6e6; }
+  header { background: #16202c; padding: 14px 24px; border-bottom: 1px solid #243240; position: sticky; top: 0; z-index: 10; }
+  header a { color: #7fb3ff; text-decoration: none; margin-right: 18px; font-weight: 600; }
+  header a:hover { color: #bcd6ff; }
+  .wrap { max-width: 1120px; margin: 24px auto; padding: 0 16px; }
+  h1 { font-size: 22px; } h2 { font-size: 16px; color: #9fd0ff; margin-top: 26px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 10px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #202c38; }
+  th { color: #8aa; }
+  tr:hover td { background: #15202c; }
+  .card { background: #16202c; border: 1px solid #243240; border-radius: 8px; padding: 14px 18px; margin-top: 14px; }
+  .pill { background: #1d2b3a; border: 1px solid #2c4055; border-radius: 12px; padding: 2px 10px; font-size: 12px; }
+  .win { color: #5fd38a; } .loss { color: #e07373; }
+  input, select { background: #0f1419; color: #e6e6e6; border: 1px solid #2c4055; padding: 6px 8px; border-radius: 6px; }
+  a { color: #7fb3ff; } a:hover { color: #bcd6ff; }
+  .muted { color: #7a8a99; font-size: 12px; }
+  .bar { height: 6px; background: #1d2b3a; border-radius: 3px; overflow: hidden; }
+  .bar > span { display: block; height: 100%; background: #5fd38a; }
+</style>
+</head>
+<body>
+<header>
+  <a href="/">Dashboard</a>
+  <a href="/players">Players</a>
+  <a href="/predictions">Win Predictions</a>
+  <a href="/sos">SOS</a>
+</header>
+<div class="wrap">
+{% block body %}{% endblock %}
+</div>
+</body>
+</html>

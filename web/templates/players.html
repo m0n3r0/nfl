@@ -1,0 +1,26 @@
+{% extends "layout.html" %}
+{% block title %}Players{% endblock %}
+{% block body %}
+<h1>Players</h1>
+<form method="get" style="margin:12px 0">
+  <input name="q" value="{{ q }}" placeholder="search name…" />
+  <select name="pos">
+    <option value="">All positions</option>
+    {% for p in positions %}<option value="{{ p }}" {% if pos==p %}selected{% endif %}>{{ p }}</option>{% endfor %}
+  </select>
+  <button type="submit">Search</button>
+</form>
+<table>
+  <tr><th>#</th><th>Player</th><th>Pos</th><th>Team</th><th>Games</th><th>Baseline/G</th><th>Role</th><th>SOS</th><th>Proj/G</th><th>Proj Total</th></tr>
+  {% for p in players %}
+  <tr>
+    <td>{{ p.rank }}</td>
+    <td><a href="/player/{{ p.player_id }}">{{ p.player_display_name }}</a></td>
+    <td>{{ p.position }}</td><td>{{ p.last_team }}</td>
+    <td>{{ p.games }}</td><td>{{ p.baseline_ppg }}</td><td>{{ p.role_share }}</td><td>{{ p.team_sos }}</td>
+    <td>{{ p.proj_ppg }}</td><td>{{ p.proj_total }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<p class="muted">Showing up to 200 rows. Use search to narrow.</p>
+{% endblock %}
