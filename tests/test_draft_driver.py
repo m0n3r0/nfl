@@ -262,7 +262,7 @@ def _board(*rows):
 
 
 def test_scarcity_premium_anchors_rb_over_higher_value_wr():
-    """12-team overlay: while we still NEED an RB, the scarcity premium lifts a
+    """10-team overlay: while we still NEED an RB, the scarcity premium lifts a
     lower-raw-value RB above a higher-value WR, so we anchor RB early instead of
     letting the crowd's RB inflation (negative VALUE) price us out of the slot."""
     board = _board(("RB Stud", "RB", 2.0), ("WR Stud", "WR", 6.0))
@@ -300,13 +300,14 @@ def test_normalize_available_maps_def_code_to_board_name():
 
 
 def test_board_has_enough_candidates_per_required_position():
-    """12-team draft: each forced one-slot position (QB, TE, K, DEF) needs >=12
-    BOARD candidates so the anchor-driven forced pick can always fill the slot
-    even if rivals snipe the top names before our anchor round."""
+    """10-team draft: each forced one-slot position (QB, TE, K, DEF) must have
+    exactly 10 BOARD candidates so the anchor-driven forced pick can always fill
+    the slot even if rivals snipe the top names before our anchor round."""
     from collections import Counter
     counts = Counter(pos for (_, _, pos, _) in dd.BOARD)
     for pos in ("QB", "TE", "K", "DEF"):
-        assert counts[pos] >= 12, "%s has only %d candidates (<12 for 12-team)" % (pos, counts[pos])
+        assert counts[pos] == 10, "%s has %d candidates (expected 10)" % (pos, counts[pos])
+    assert len(dd.BOARD) == 67, "BOARD has %d players (expected 67)" % len(dd.BOARD)
 
 
 if __name__ == "__main__":
