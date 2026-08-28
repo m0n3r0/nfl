@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FD nation — Mock Draft Room</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 16px; }
+  h2 { margin: 0 0 4px; }
+  #turn { font-weight: 700; color: #0a0; min-height: 1.2em; }
+  #turn.waiting { color: #888; font-weight: 400; }
+  ul { list-style: none; padding: 0; margin: 0; max-width: 520px; }
+  li { padding: 6px 8px; border-bottom: 1px solid #e2e2e2; display: flex;
+       align-items: center; justify-content: space-between; }
+  li .nm { font-size: 14px; }
+  .draft-btn { margin-left: 12px; padding: 4px 12px; }
+  #drafted div { color: #555; }
+</style>
+</head>
+<body>
+  <h2>FD nation — Mock Draft Room</h2>
+  <div id="turn" class="waiting"></div>
+  <h3>Available</h3>
+  <ul id="available"></ul>
+  <h3>Drafted (<span id="count">0</span>)</h3>
+  <ul id="drafted"></ul>
+
+  <script>
+  // Minimal Yahoo-style draft-room simulation. The driver parses rows whose
+  // innerText looks like "First Last TEAM - POS" and clicks the per-row "Draft"
+  // button. We expose window.MockDraft so the Python harness can control turns
+  // and simulate opponents without a real Yahoo session.
+  window.MockDraft = (function () {
+    var avail = [];      // [{name, team, pos}]
+    var drafted = [];
+
+    function render() {
+      var ul = document.getElementById("available");
+      ul.innerHTML = "";
+      var turnOn = document.getElementById("turn").textContent === "YOUR TURN";
+      avail.forEach(function (p) {
+        var li = document.createElement("li");
+        var span = document.createElement("span");
+        span.className = "nm";
+        span.textContent = p.name + " " + p.team + " - " + p.pos;
+        var btn = document.createElement("button");
+        btn.className = "draft-btn";
+        btn.textContent = "Draft";
+        btn.disabled = !turnOn;
+        btn.onclick = function () { draftPlayer(p.name); };
+        li.appendChild(span);
+        li.appendChild(btn);
+        ul.appendChild(li);
+      });
+      document.getElementById("count").textContent = drafted.length;
+    }
+
+    function draftPlayer(name) {
+      var i = avail.findIndex(function (p) { return p.name === name; });
+      if (i < 0) return;
+      var p = avail.splice(i, 1)[0];
+      drafted.push(p);
+      var d = document.getElementById("drafted");
+      // Use a <div>, NOT <li>: the driver's read_available() scans every
+      // tr/li on the page, so drafted players rendered as <li> would be
+      // mistaken for still-available and re-drafted. A <div> keeps them out
+      // of the available scan (mirrors Yahoo, where drafted players leave the
+      // available list into a separate "My Team"/results area).
+      var div = document.createElement("div");
+      div.textContent = p.name + " " + p.team + " - " + p.pos;
+      d.appendChild(div);
+      setTurn(false);
+      render();
+    }
+
+    function setTurn(on) {
+      var t = document.getElementById("turn");
+      t.textContent = on ? "YOUR TURN" : "";
+      t.className = on ? "" : "waiting";
+      var btns = document.querySelectorAll(".draft-btn");
+      for (var i = 0; i < btns.length; i++) btns[i].disabled = !on;
+    }
+
+    return {
+      load: function (list) { avail = list.slice(); drafted = []; setTurn(false); render(); },
+      setTurn: setTurn,
+      // Opponent pick: remove a name from the available pool.
+      removePlayer: function (name) {
+        var i = avail.findIndex(function (p) { return p.name === name; });
+        if (i >= 0) { avail.splice(i, 1); render(); }
+      },
+      availableNames: function () { return avail.map(function (p) { return p.name; }); },
+      drafted: function () { return drafted.slice(); },
+      clear: function () { avail = []; drafted = []; render(); }
+    };
+  })();
+  </script>
+</body>
+</html>

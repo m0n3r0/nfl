@@ -486,8 +486,10 @@ def read_available(ws):
       var rows=document.querySelectorAll('tr, li');
       for(var i=0;i<rows.length;i++){
         var t=rows[i].innerText.replace(/\\s+/g,' ').trim();
-        // player name pattern: "First Last" followed by "TEAM - POS"
-        var m=t.match(/([A-Z][a-z]+(?:['’]\\w+)?\\.?[ -][A-Z][a-z]+(?:['’]\\w+)?(?:[ -][A-Z][a-z]+)?)\\s+(?:[A-Z]{2,4}\\s*-\\s*(QB|RB|WR|TE|K|DEF|DST))/);
+        // player name pattern: "First Last" (or "First" for team defenses like
+        // "Ravens") followed by "TEAM - POS". The name may be 1-3 words; the
+        // second/third word is optional so single-word defense names parse.
+        var m=t.match(/([A-Z][a-z]+(?:['’]\\w+)?(?:\.?[ -][A-Z][a-z]+(?:['’]\\w+)?){0,2})\\s+(?:[A-Z]{2,4}\\s*-\\s*(QB|RB|WR|TE|K|DEF|DST))/);
         if(m && !seen[m[1]]){ seen[m[1]]=1; out.push([m[1], m[2], m[3], t]); }
       }
       return out.slice(0,40);
@@ -579,7 +581,11 @@ def choose_pick(available, drafted, round_num, board, adp_map=None):
             continue
         return (c["name"], c.get("team"), pos, c.get("adp") or 0)
 
-    # 3) fallback: best available by value ignoring need (still respect timing)
+    # 3) bench / fallback: every REQUIRED slot is already filled (or still
+    #    timing-guarded), so draft the best available player by value to fill
+    #    the bench. We intentionally do NOT skip already-filled positions here
+    #    -- a 2nd RB/WR on the bench is fine. Still respect the K/DEF-last and
+    #    QB-round timing guards so we don't reach for K/DEF before their window.
     for c in cands:
         pos = c["pos"]
         if pos in ("K", "DEF") and round_num < (TOTAL_ROUNDS - K_DEF_LAST_ROUNDS + 1):
@@ -611,10 +617,32 @@ def click_player(ws,name):
     if not box: return False
     click_at(ws,int(box["x"]),int(box["y"]))
     time.sleep(random.uniform(0.3,0.8))
+    # Click the DRAFT button inside the chosen player's own row, NOT the first
+    # enabled draft button on the page. The displayed list is sorted by Yahoo
+    # (ADP / default board order), so the value pick we chose is usually NOT the
+    # top row -- clicking the top button would draft the wrong player. Scope the
+    # button search to the row that holds the chosen name.
     btn = ev(ws,"""(function(){
-      var bs=document.querySelectorAll('button');
-      for(var i=0;i<bs.length;i++){ if(/draft|select|confirm/i.test(bs[i].textContent)&&!bs[i].disabled){var r=bs[i].getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2};} }
-      return null; })()""")
+      var name=%r;
+      var all=document.querySelectorAll('*');
+      var row=null;
+      for(var i=0;i<all.length;i++){
+        if(all[i].children.length<4 && all[i].textContent.indexOf(name)>=0){
+          var el=all[i];
+          while(el && el.parentElement && el.tagName!=='TR' && el.tagName!=='LI'){ el=el.parentElement; }
+          if(el && (el.tagName==='TR'||el.tagName==='LI')){ row=el; break; }
+        }
+      }
+      if(row){
+        var bs=row.querySelectorAll('button');
+        for(var j=0;j<bs.length;j++){
+          if(/draft|select|confirm/i.test(bs[j].textContent) && !bs[j].disabled){
+            var r=bs[j].getBoundingClientRect();
+            return {x:Math.round(r.left+r.width/2), y:Math.round(r.top+r.height/2)};
+          }
+        }
+      }
+      return null; })()"""%name)
     if btn:
         click_at(ws,int(btn["x"]),int(btn["y"]))
         return True

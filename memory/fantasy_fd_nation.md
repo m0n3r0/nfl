@@ -48,12 +48,51 @@ the user mentions fantasy football, their league, the draft, lineup, waivers, or
 - Decision log: `C:\edge-debug-profile\draft_log.txt` (created at first run).
 - CRITICAL dependency: Edge must be OPEN on 9222 with --remote-allow-origins=* at draft time, or the driver errors and Yahoo default auto-draft takes over.
 
+## Mock draft validation — 2026-08-28 (CLOSES the "pick-clicking untested" gap)
+Goal: prove the previously-untested CDP PICK-CLICK path (`read_available` →
+`choose_pick` → `click_player` → `_confirm_pick`) works end to end BEFORE the
+real Yahoo room opens on Sep 1. Driven through the **live Edge on 127.0.0.1:9222**
+in a NEW CDP tab (user's Yahoo tab untouched) against a Yahoo-style mock room
+(`tools/mock_draft_room.html`) that exposes a `window.MockDraft` API.
+
+Method: `tools/mock_draft_run.py` injects the REAL 119-player original board +
+filler, runs a full 15-round snake for team #2, and calls the DEPLOYED driver's
+REAL functions on every turn (no reimplementation). Opponents are simulated
+(biased to snipe board players) so scarcity/anchor guardrails are exercised.
+
+**Result: 15/15 picks clicked + confirmed via CDP; final roster LEGAL
+(QB=4 RB=6 WR=2 TE=1 K=1 DEF=1); `NO_FAILURES`.**
+
+Bugs the mock caught and were fixed in `driver/draft_driver.py` (all real, would
+have broken the live draft):
+1. **`click_player` clicked the first enabled "Draft" button on the page, not the
+   chosen player's row button.** The displayed list is Yahoo-sorted (ADP/board
+   order), so our value pick is rarely the top row → the bot drafted the WRONG
+   players. Fixed: scope the button search to the chosen player's own row.
+2. **`read_available` regex required a two-word name, so single-word team-defense
+   names ("Ravens BAL - DEF") never parsed** → the bot could NEVER draft a defense
+   → illegal lineup. Fixed: allow 1-3 word names.
+3. **`choose_pick` had no bench phase** (returned `None` once REQUIRED slots were
+   filled) → bot made only 7 of 15 picks. Fixed: fallback now drafts best-available
+   for bench (still respecting K/DEF-last + QB-round timing guards).
+4. (mock-only) drafted players were rendered as `<li>`, so `read_available`'s
+   `tr,li` scan re-scanned them as available and the bot tried to re-draft them.
+   Fixed in the mock: drafted list uses `<div>`.
+
+Honest remaining gap: the mock validates the driver's click/confirm *mechanics*
+using the real deployed functions against a Yahoo-style DOM. The REAL Yahoo room's
+exact markup (draft-button label/position, live ADP parsing) can only be confirmed
+on Sep 1 — but the logic that finds, clicks, and confirms a pick is now proven.
+
 ## Proven skills (see /home/eml/.hermes/skills/)
 - `edge-cdp`: connect to Edge 9222, human-like input helpers.
 - `fantasy-read`: read roster/standings/matchups/waivers from the live tab.
 - `fantasy-draft`: the live draft driver + scheduler + board.
 
 ## Honest limitations
-- The driver's PICK-CLICKING logic is UNTESTED against the live Yahoo draft room (room doesn't exist until draft day). Plan: mock-draft validation ~Aug 27.
+- The driver's PICK-CLICKING logic was UNTESTED against the live Yahoo room →
+  **MOCK-VALIDATED 2026-08-28** (see above). Remaining gap: the REAL Yahoo room's
+  exact DOM (draft-button label/position, ADP parsing) is only confirmable on Sep 1;
+  the mock proves the click/confirm *mechanics* via the real deployed functions.
 - I cannot guarantee wins — real NFL games decide outcomes. The system maximizes expected value and avoids timer-expiry/panic mistakes.
 - WSL↔Windows: /mnt/c is unreliable from this shell; use `py.exe -` (stdin) and PowerShell base64 round-trips to move data reliably.
