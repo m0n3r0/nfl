@@ -5,7 +5,7 @@ the user mentions fantasy football, their league, the draft, lineup, waivers, or
 
 ## League facts (verified 2026-08-20 via live Edge CDP)
 - Platform: Yahoo Fantasy Football, league ID **1329011**, name **"FD nation"**.
-- Manager: user is **"Doge"**, team **#2** (URL team id = 2). **12 teams** (user corrected to 12 on 2026-08-28; the 2026-08-28 live capture showed only 10 spots filled — RE-VERIFY the exact team count on draft day Sep 1 before trusting). Known teams (10 observed 08-28): Goal Line Dwayne (commish), Game Plan buy, Take it in the Browns, Kwasi's Wins, QB Sneak Christopher, Otto-matic Win!, Neal Before Zod.
+- Manager: user is **"Doge"**, team **#2** (URL team id = 2). **10 teams** (verified 2026-08-28 via live Edge CDP — the FD nation Teams page listed exactly 10 teams; Yahoo Settings confirms "Max Teams: 10"; the earlier "12 teams" claim was incorrect). Known teams (10 total observed 08-28, 7 named): Goal Line Dwayne (commish), Game Plan buy, Take it in the Browns, Kwasi's Wins, QB Sneak Christopher, Otto-matic Win!, Neal Before Zod.
 - Format: Head-to-Head, **.5 PPR** (Receptions = 0.5), fractional points ON, negative points ON.
 - Roster: 1 QB, 2 WR, 2 RB, 1 TE, 1 W/R/T (flex), 1 K, 1 DEF, 6 BN, 2 IR (15 active + 2 IR).
 - Draft: **Live Standard snake**, 15 rounds, **1 minute per pick**, scheduled **Tue Sep 1 2026, 5:00pm EDT** (= 2026-09-02 06:00 JST on this machine). *Corrected 2026-08-28 from the live Yahoo tab — repo had Aug 28; actual draft is Sep 1.*
@@ -13,16 +13,16 @@ the user mentions fantasy football, their league, the draft, lineup, waivers, or
 - Waiver: 2-day rolling list; trade review by league vote; max acquisitions unlimited.
 
 ## Draft strategy (user-approved)
-- Format: **12-team** .5 PPR snake. Draft by **value = FantasyPros_RT_ADP − FantasyPros_ECR**
+- Format: **10-team** .5 PPR snake. Draft by **value = FantasyPros_RT_ADP − FantasyPros_ECR**
   (RT ADP from the free fantasypros.com/nfl/real-time-adp/ scrape; ECR from the
   free FP key — full `ADP − ECR` value at **$0**, no paid tier). Yahoo's own ADP
   is scraped live per turn only as a patch for names the RT scrape missed
   (~53/54 covered). Falls back to the pre-built ADP board if no key / scrape fails.
-- 12-team scarcity anchoring: RB is the scarcest position, so the bot (a) adds a
+- 10-team scarcity anchoring: RB is the scarcest position, so the bot (a) adds a
   soft +8 value premium to RBs we still need (anchors them early despite the
   crowd's RB inflation) and (b) hard-forces slots by `ANCHOR_BY_ROUND`: 1st RB by
   R3, 2nd RB by R5, WR by R5/R9, TE by R7, QB by R10, K/DEF by R14.
-- BOARD depth for 12-team: ~75 players (12 QBs, 12 TEs, 12 Ks, 12 DEFs) so a required
+- BOARD depth for 10-team: ~67 players (10 QBs, 10 TEs, 10 Ks, 10 DEFs) so a required
   slot is never stranded if the crowd snipes the top names before our anchor turn.
 - Other guardrails: no QB before round 10; K/DEF only last 2 rounds; don't double
   a position past its slot count; ADP sanity window (don't reach absurdly above ADP).
