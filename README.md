@@ -236,13 +236,14 @@ weekly kicking columns + DEF from derived team defense). Copy it next to the
 deployed driver (`C:\edge-debug-profile\original_board.json`) before the draft.
 The driver reads it and drafts best-player-available by projected value + 10-team
 scarcity/anchor guardrails, and logs `BOARD_MODE=ORIGINAL(nflverse)`. Without
-this file (and no `FP_API_KEY`), it falls back to the built-in static board.
+this file it falls back to the built-in static board (regardless of `FP_API_KEY`).
 
 #### FantasyPros cross-check (optional, opt-in)
-Only if you set `FP_API_KEY` does the driver instead build a FantasyPros value
-board (ECR + Real-Time ADP scrape, Yahoo ADP as a live patch) — the legacy path
-described in [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md). Without a key, the
-original nflverse board is used.
+Only if you set `DRAFT_ENGINE=fantasypros` (and a key is present) does the driver
+instead build a FantasyPros value board (ECR + Real-Time ADP scrape, Yahoo ADP as a
+live patch) — the legacy path described in
+[docs/DATA_SOURCES.md](docs/DATA_SOURCES.md). The mere presence of `FP_API_KEY`
+does NOT switch engines; the original nflverse board is the hard default.
 
 ```bat
 setx FP_API_KEY "your-free-key"

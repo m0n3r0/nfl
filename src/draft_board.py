@@ -120,15 +120,23 @@ def _kicker_board(corpus: dict) -> list[dict]:
     k["k_pts"] = k.apply(score_kicker_row, axis=1)
     k["w"] = k["season"].map(_SEASON_WEIGHTS)
     k["wp"] = k["k_pts"] * k["w"]
-    grp = k.groupby(["player_id", "player_display_name", team_col])
+    # Group by player only: a kicker may appear under several teams across
+    # seasons (journeymen like Matthew Wright show up for KC/PIT/SF), but he is
+    # ONE draftee. Collapse to one row per player_id and use his highest-weighted
+    # team as the canonical one so we never carry 3 copies of the same kicker.
+    grp = k.groupby(["player_id", "player_display_name"])
     agg = grp.agg(wp=("wp", "sum"), wsum=("w", "sum"),
                   games=("week", "nunique")).reset_index()
+    best_team = (k.groupby(["player_id", team_col])["wp"].sum()
+                   .reset_index().sort_values("wp", ascending=False)
+                   .drop_duplicates("player_id").set_index("player_id")[team_col])
     agg = agg[agg["wsum"] > 0]
     agg["ppg"] = agg["wp"] / agg["wsum"]
     agg["proj_total"] = (agg["ppg"] * 17).round(1)
+    agg["team"] = agg["player_id"].map(best_team)
     agg = agg.sort_values("proj_total", ascending=False).head(K_TOP)
     return [{
-        "name": r["player_display_name"], "team": r[team_col],
+        "name": r["player_display_name"], "team": r["team"],
         "pos": "K", "value": float(r["proj_total"]),
     } for _, r in agg.iterrows()]
 
@@ -176,12 +184,24 @@ def board_to_driver_map(board: list[dict]) -> dict:
 
     ecr/adp are None so choose_pick drives purely off `value` (our projection),
     applying the existing scarcity premium + anchor guardrails unchanged.
+
+    Keys are the player name; if two distinct players share a display name we
+    disambiguate with the team (e.g. "Matthew Wright (KC)") so neither entry is
+    silently dropped. Note: choose_pick matches on the stored plain `name`, not
+    the key, so disambiguation here is purely defensive against dict collisions.
     """
-    return {
-        b["name"]: {"name": b["name"], "team": b["team"], "pos": b["pos"],
+    out: dict[str, dict] = {}
+    suffix: dict[str, int] = {}
+    for b in board:
+        key = b["name"]
+        if key in out:
+            key = "%s (%s)" % (b["name"], b["team"])
+            while key in out:
+                suffix[key] = suffix.get(key, 0) + 1
+                key = "%s (%s)%d" % (b["name"], b["team"], suffix[key])
+        out[key] = {"name": b["name"], "team": b["team"], "pos": b["pos"],
                     "adp": None, "ecr": None, "value": b["value"]}
-        for b in board
-    }
+    return out
 
 
 def write_original_board(path: str | Path, corpus: dict | None = None,
