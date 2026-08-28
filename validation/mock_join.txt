@@ -1,0 +1,3 @@
+URL https://football.fantasysports.yahoo.com/
+ROOM {"plinks":7,"mentions":true,"body":"Yahoo Sports\nYahoo Sports\nSearch query\nB\n Fantasy Football\nOverview\nLeague\nMy Team\nMatchups\nPlayers\nResearch\nDraft\nStatTracker\nFD nation (ID# 1329011)\nYahoo Sports Fantasy Football\nFantasy Football 2026\nMy Teams and Leagues\nInstant Mock Drafts & Draft Kits\nTo crush draft prep\nPersonalized and built for your league, with expert guidance from our top fantasy analysts.\n\nSubscribe to Unlock\nPre-Draf"}
+AVAILABLE ['Players', 'Cameron Jordan', 'Mason Tipton', 'Mekhi Wingo', 'Jaylen Harrell', 'Sanoussi Kane', 'Jaden Davis']

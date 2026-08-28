@@ -1,0 +1,3 @@
+TARGET {'name': 'Jahmyr Gibbs', 'x': 467, 'y': 1320, 'w': 934, 'h': 2639}
+ELEMENT_BEFORE null
+AFTER_CLICK {"sel":"","hl":null}
