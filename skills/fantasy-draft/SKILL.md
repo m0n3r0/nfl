@@ -44,11 +44,17 @@ Allen(QB), Bowers(TE), Nico, Pickens, A.J.Brown, McBride(TE), Jeremiyah Love(RB)
 Kyren, Jacobs, Olave.
 
 ## Value metric (live board)
-`VALUE = FantasyPros_RT_ADP − FantasyPros_ECR` — RT ADP from the free
-fantasypros.com/nfl/real-time-adp/ scrape, ECR from the free FP key (full
-`ADP−ECR` value at $0, no paid tier). Yahoo ADP is scraped live per turn only as
-a patch for names the RT scrape misses. Falls back to the static ADP board if
-no key / scrape fails. Full detail in `docs/DATA_SOURCES.md`.
+**Default: the original nflverse-derived board** — `python cli.py original-board`
+builds `data/board/original_board.json` from our own projections (skill),
+kicking columns (K), and derived team defense (DEF); `value = projected 2026
+fantasy points`. The deployed driver reads that JSON and drafts
+best-player-available by value + 10-team scarcity/anchor guardrails. **No
+FantasyPros / Yahoo / third-party feed is used by default.**
+
+FantasyPros (`VALUE = FantasyPros_RT_ADP − FantasyPros_ECR`) is now an **opt-in
+legacy cross-check** used only when `FP_API_KEY` is configured; Yahoo ADP is a
+live per-turn patch used only in that legacy mode. Full detail in
+`docs/DATA_SOURCES.md` (see "Original board engine").
 
 ## Run it manually (Windows)
 ```

@@ -5,6 +5,35 @@ team, *which sources to tap*, and *how this repo uses them*. It backs up the
 "better source to tap" discussion and the live value-board in
 `driver/draft_driver.py`.
 
+## Original board engine (PRIMARY — zero external dependencies)
+
+The draft board the driver actually uses is built **entirely from our own
+nflverse-derived corpus** — no FantasyPros, no Yahoo, no third-party feed at draft
+time. It is produced by `src/draft_board.py::build_original_board` and serialized to
+`data/board/original_board.json` via `python cli.py original-board`. The deployed
+driver reads that JSON with stdlib `json` only (it cannot import `src`).
+
+  * **Skill QB/RB/WR/TE** — `src.projections.project_players` (multi-year weighted
+    baseline → regression to mean → 2026 depth-chart role → SOS).
+  * **K** — scored from the weekly kicking columns (`fg_made_0_19` … `fg_made_60_`,
+    `xp_made`); nflverse zeroes K in the player table, so we score FG/XPs ourselves,
+    distance-tiered.
+  * **DEF** — from the derived team defense (points allowed + SOS); lower points
+    allowed = higher value.
+
+Each board entry carries `value = projected 2026 fantasy points`; the driver drafts
+best-player-available by that value, still applying the 10-team scarcity premium and
+anchor guardrails. This is the **default** board whenever `FP_API_KEY` is not set.
+
+**Honest trade-off:** without a crowd signal we lose `VALUE = ADP − ECR` — the
+ability to exploit opponents' drafting errors (snagging players the crowd
+undervalues). The original engine instead maximizes **our own expected points**
+(BPA by our projection + scarcity/need overlay). That is the correct reading of "an
+original engine that does not depend on others": we are no longer leaning on
+anyone else's rankings, at the cost of forfeiting the crowd-arbitrage edge.
+FantasyPros/Yahoo below are now an **optional, opt-in legacy cross-check** (only when
+`FP_API_KEY` is configured), not the primary input.
+
 ## What actually wins (the honest version)
 
 The repo already pulls from **nflverse**, which is the best *free* historical +
@@ -71,10 +100,11 @@ per-turn patch for the handful of names the RT scrape doesn't cover. So:
 Spend the money elsewhere (or not at all) unless you specifically want ETR's
 in-season analysis or Draft Sharks' live draft sync.
 
-## How the live value board works (`driver/draft_driver.py`)
+## FantasyPros value board (OPT-IN LEGACY cross-check)
 
-The driver no longer drafts from a fixed list. At draft start it builds a
-**value board**:
+The driver no longer drafts from a fixed list. **By default it drafts from the
+original nflverse-only board above.** Only when `FP_API_KEY` is configured does it
+instead build a FantasyPros value board (this legacy cross-check):
 
 ```
 VALUE = FantasyPros_RT_ADP − FantasyPros_ECR   # PRIMARY (free): RT scrape + ECR
