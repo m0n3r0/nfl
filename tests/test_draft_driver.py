@@ -167,11 +167,41 @@ def test_unmatched_players_deprioritized():
     assert max(r["value"] for r in unmatched) < min(r["value"] for r in matched)
 
 
+def test_parse_adp():
+    """Yahoo ADP is extracted from the draft-row text via its explicit label."""
+    assert dd.parse_adp("Josh Allen BUF - QB ADP 12.3 extra") == 12.3
+    assert dd.parse_adp("ADP: 5") == 5.0
+    assert dd.parse_adp("ADP 7.5") == 7.5
+    assert dd.parse_adp("no adp in this row 99") is None
+    assert dd.parse_adp("") is None
+
+
+def test_choose_pick_uses_yahoo_adp():
+    """When a live Yahoo ADP is known, VALUE = Yahoo_ADP - FantasyPros_ECR must
+    drive the pick (not the static ECR order)."""
+    board = {
+        "Shiny Guy":  {"name": "Shiny Guy",  "team": "X", "pos": "RB",
+                       "adp": 2,  "value": -1.0, "ecr": 1},
+        "Value Guy":  {"name": "Value Guy",  "team": "Y", "pos": "RB",
+                       "adp": 30, "value": -5.0, "ecr": 5},
+    }
+    drafted, round_num = {}, 1
+    # No ADP map -> picks the best ECR player (Shiny Guy).
+    p_no = dd.choose_pick(["Shiny Guy", "Value Guy"], drafted, round_num, board)
+    assert p_no[0] == "Shiny Guy"
+    # With Yahoo ADP for Value Guy, he's +25 value vs Shiny's -1 -> Value Guy.
+    p_yes = dd.choose_pick(["Shiny Guy", "Value Guy"], drafted, round_num,
+                           board, adp_map={"value guy": 30})
+    assert p_yes[0] == "Value Guy"
+
+
 if __name__ == "__main__":
     test_fetch_fp_consensus_keeps_zero_adp()
     test_build_value_board_full_coverage_with_zero_adp()
     test_build_value_board_ecr_only_when_adp_absent()
     test_build_value_board_matches_def_by_team_id()
     test_unmatched_players_deprioritized()
+    test_parse_adp()
+    test_choose_pick_uses_yahoo_adp()
     test_build_value_board_static_fallback_without_key()
     print("All draft-driver tests passed.")

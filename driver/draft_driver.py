@@ -6,7 +6,7 @@ Guarantees a legal lineup: required slots (QB,2RB,2WR,TE,K,DEF) filled by
 their deadlines, bench (6 BN) filled with best available afterwards.
 All decisions logged to C:\edge-debug-profile\draft_log.txt
 """
-import json, os, urllib.request, websocket, time, random, math, sys, io, datetime
+import json, os, re, urllib.request, websocket, time, random, math, sys, io, datetime
 
 CDP = "http://127.0.0.1:9222"
 LEAGUE = "1329011"
@@ -240,9 +240,19 @@ def click_at(ws,x,y,button="left"):
     ws.send(json.dumps({"id":0,"method":"Input.dispatchMouseEvent","params":{"type":"mouseReleased","x":x,"y":y,"button":button,"clickCount":1}}))
     time.sleep(random.uniform(0.1,0.4))
 
+_ADP_RE = re.compile(r"ADP\s*[:#]?\s*(\d{1,3}(?:\.\d+)?)", re.I)
+
+def parse_adp(text):
+    """Extract a Yahoo Average Draft Position from a draft-row's text.
+    Yahoo shows ADP with an explicit 'ADP' label, so we only match that label
+    (avoids mistaking a jersey number for ADP). Returns float or None."""
+    m = _ADP_RE.search(text or "")
+    return float(m.group(1)) if m else None
+
 def read_available(ws):
     # Name-based scan (Yahoo player rows hold the name in a cell, NOT inside the
-    # /nfl/players/ anchor which only wraps an icon). Collect names from rows.
+    # /nfl/players/ anchor which only wraps an icon). Return [name, row_text] so
+    # the caller can also pull Yahoo ADP (Average Draft Position) from the row.
     return ev(ws,"""(function(){
       var out=[];
       var seen={};
@@ -250,8 +260,8 @@ def read_available(ws):
       for(var i=0;i<rows.length;i++){
         var t=rows[i].innerText.replace(/\\s+/g,' ').trim();
         // player name pattern: "First Last" followed by "TEAM - POS"
-        var m=t.match(/([A-Z][a-z]+(?:['’]\\w+)?\\.?[ -][A-Z][a-z]+(?:['’]\\w+)?(?:[ -][A-Z][a-z]+)?)\\s+(?:[A-Z]{2,4}\\s*-\\s*(?:QB|RB|WR|TE|K|DEF))/);
-        if(m && !seen[m[1]]){ seen[m[1]]=1; out.push(m[1]); }
+        var m=t.match(/([A-Z][a-z]+(?:['’]\\w+)?\\.?[ -][A-Z][a-z]+(?:['’]\\w+)?(?:[ -][A-Z][a-z]+)?)\\s+(?:[A-Z]{2,4}\\s*-\\s*(?:QB|RB|WR|TE|K|DEF|DST))/);
+        if(m && !seen[m[1]]){ seen[m[1]]=1; out.push([m[1], t]); }
       }
       return out.slice(0,40);
     })()""")
@@ -265,19 +275,36 @@ def is_my_pick(ws):
       return false;
     })()""")
 
-def choose_pick(available, drafted, round_num, board):
+def choose_pick(available, drafted, round_num, board, adp_map=None):
     """Position-target-aware pick driven by a value board.
 
-    `board` is a dict name -> {name, team, pos, adp, value}. Candidates are the
-    board entries whose name is still available, sorted by VALUE desc (highest
-    value = drafted later than experts rank them = best pick).
+    `board` is a dict name -> {name, team, pos, adp, value, ecr?}. Candidates are
+    the board entries whose name is still available, sorted by effective VALUE
+    desc:
+      - If a live Yahoo ADP is known for the player AND we have a FantasyPros ECR,
+        effective VALUE = Yahoo_ADP - ECR (true value: drafted later than experts
+        rank = best value).
+      - Otherwise fall back to the board's precomputed value (ECR-based, or
+        ADP-based if a paid FantasyPros tier supplied ADP).
     1) If a REQUIRED slot is still unfilled AND we're at/past its FORCE_BY_ROUND,
        force the highest-value available player at that position.
     2) Otherwise pick the highest-value available player respecting timing guards.
     3) Fallback: best available ignoring need (still respect timing)."""
+    adp_map = adp_map or {}
     avail_lower = {n.lower() for n in available}
-    cands = [v for v in board.values() if v["name"].lower() in avail_lower]
-    cands.sort(key=lambda v: v.get("value", 0.0), reverse=True)
+    scored = []
+    for v in board.values():
+        if v["name"].lower() not in avail_lower:
+            continue
+        eff = v.get("value", 0.0)
+        ecr = v.get("ecr")
+        if ecr is not None:
+            ya = adp_map.get(v["name"].lower())
+            if ya is not None:
+                eff = float(ya) - float(ecr)   # Yahoo ADP - FantasyPros ECR
+        scored.append((eff, v))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    cands = [v for _, v in scored]
 
     # 1) forced fills for required slots past deadline
     for pos, need in REQUIRED.items():
@@ -353,9 +380,18 @@ def run_draft():
     while time.time()<deadline and picks_made<TOTAL_ROUNDS:
         try:
             if is_my_pick(ws):
-                available=read_available(ws)
-                log("MY_PICK round="+str(round_num)+" avail="+str(len(available)))
-                pick=choose_pick(available,drafted,round_num,board)
+                raw_avail = read_available(ws)
+                available = [n for n, _ in raw_avail]
+                # Yahoo ADP (Average Draft Position) per available player, scraped
+                # live from the draft-room row. Drives true VALUE = ADP - ECR.
+                adp_map = {}
+                for n, text in raw_avail:
+                    a = parse_adp(text)
+                    if a is not None:
+                        adp_map[n.lower()] = a
+                log("MY_PICK round="+str(round_num)+" avail="+str(len(available))
+                    + " yahoo_adp="+str(len(adp_map)))
+                pick=choose_pick(available,drafted,round_num,board,adp_map=adp_map)
                 if pick:
                     name,team,pos,adp=pick
                     ok=click_player(ws,name)

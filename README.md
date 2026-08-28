@@ -227,13 +227,17 @@ FP_API_KEY=your-free-key
 # or the short alias the driver also accepts:
 API=your-free-key
 ```
-- **Free key:** FantasyPros' free tier exposes Expert Consensus Rankings (ECR)
-  but **not ADP** (ADP is gated behind a paid tier). With a free key the driver
-  drafts **best-player-available by ECR** and logs `BOARD_MODE=LIVE(FantasyPros)`
-  with mode `ECR-only (free tier, BPA)`. This is a strong live strategy; it just
-  isn't the ADP−ECR "value" metric.
-- **Paid key (ADP):** if your plan exposes ADP, the driver upgrades to true
-  `VALUE = ADP − ECR` and logs mode `ADP-ECR (paid tier)`.
+- **Free key + Yahoo ADP (recommended):** FantasyPros' free tier exposes Expert
+  Consensus Rankings (ECR) but **not ADP** (ADP is gated behind a paid tier).
+  Instead the driver **scrapes Yahoo's own ADP** live from the draft room each
+  turn, so you get the true `VALUE = Yahoo_ADP − FantasyPros_ECR` ("value")
+  metric on the free key. It logs `BOARD_MODE=LIVE(FantasyPros)` with mode
+  `Yahoo_ADP−ECR`.
+- **Free key, no Yahoo ADP shown:** if the draft room doesn't expose ADP for a
+  player, that pick falls back to **best-player-available by ECR** (mode
+  `ECR-only`). Still a strong live strategy.
+- **Paid FantasyPros key (ADP):** if your plan exposes ADP, the driver can also
+  use `VALUE = ADP − ECR` from FantasyPros directly.
 - **No key / fetch failure:** logs `BOARD_MODE=STATIC` and falls back to the
   fixed board.
 

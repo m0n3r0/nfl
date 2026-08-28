@@ -75,27 +75,38 @@ The driver no longer drafts from a fixed list. At draft start it builds a
 **value board**:
 
 ```
-VALUE = ADP − ECR        # paid FantasyPros tier (ADP available)
-     = −ECR              # free tier (ECR only → best-player-available)
+VALUE = Yahoo_ADP − FantasyPros_ECR   # recommended: Yahoo ADP scraped live + FP ECR
+     = FantasyPros_ADP − ECR          # if a paid FP key exposes ADP
+     = −ECR                           # fallback when no ADP is available
 ```
 
-- **Paid tier (ADP present):** a player the experts rank #5 but the crowd drafts
-  at #20 has `VALUE = +15` (great — drafted later than they should be). We pick
-  the **highest VALUE** available player.
-- **Free tier (ECR only):** ADP isn't available, so we draft the **best player
-  available by ECR** (`VALUE = −ECR`, i.e. lowest expert rank first). Still a
-  strong live strategy; just not the ADP−ECR "value" metric.
-- Both modes respect the same position/timing guardrails (required slots forced
+- **Recommended (free key + Yahoo ADP):** FantasyPros' free tier gives ECR but
+  hides ADP, so we **scrape Yahoo's own ADP** live from the draft room each turn
+  (Yahoo ADP is the real "crowd" for *this* league). `VALUE = Yahoo_ADP −
+  FantasyPros_ECR` is the true value metric — a player experts rank #5 but the
+  Yahoo crowd drafts at #20 has `VALUE = +15` (great). We pick the **highest
+  VALUE** available player.
+- **Paid FantasyPros tier (ADP present):** `VALUE = FantasyPros_ADP − ECR`.
+- **No ADP available:** we draft **best-player-available by ECR** (`VALUE = −ECR`,
+  lowest expert rank first). Still a strong live strategy.
+- All modes respect the same position/timing guardrails (required slots forced
   by their deadline, K/DEF only late, QB after round 10).
 
 ### Source
 
-- **Primary:** [FantasyPros consensus rankings API](https://www.fantasypros.com/api-data/)
+- **ECR:** [FantasyPros consensus rankings API](https://www.fantasypros.com/api-data/)
   — `GET /nfl/{season}/consensus-rankings?position={POS}&scoring={SCORING}`,
   authenticated with an `x-api-key` header. On the free key it returns
   `rank_ecr` (+ `tier`, consensus spread) per player; **`adp` is absent** (the
   ADP route is paid). Defenses are requested as `position=DST` and matched back
   to `BOARD` by `player_team_id`.
+- **ADP:** **Yahoo's own Average Draft Position**, scraped live from the draft
+  room each turn via the existing Edge automation (`read_available` reads the
+  ADP label off each available player's row; `parse_adp` extracts it). This is
+  the most relevant ADP for a Yahoo league and needs no paid key. *(The exact
+  row selector should be confirmed with a 30-second look at the live draft room
+  on draft day — Sep 1; if Yahoo doesn't render the `ADP` label, the driver
+  transparently falls back to ECR best-player-available.)*
 - **Fallback:** if `FP_API_KEY` is missing **or** any fetch fails, the driver
   silently falls back to the static `BOARD` (original ADP-ordered behaviour) and
   logs `BOARD_MODE=STATIC`. The draft never breaks.
