@@ -13,11 +13,15 @@ the user mentions fantasy football, their league, the draft, lineup, waivers, or
 - Waiver: 2-day rolling list; trade review by league vote; max acquisitions unlimited.
 
 ## Draft strategy (user-approved)
-- Format: **10-team** .5 PPR snake. Draft by **value = FantasyPros_RT_ADP − FantasyPros_ECR**
-  (RT ADP from the free fantasypros.com/nfl/real-time-adp/ scrape; ECR from the
-  free FP key — full `ADP − ECR` value at **$0**, no paid tier). Yahoo's own ADP
-  is scraped live per turn only as a patch for names the RT scrape missed
-  (~53/54 covered). Falls back to the pre-built ADP board if no key / scrape fails.
+- Format: **10-team** .5 PPR snake. Draft from the **original nflverse-derived
+  board** (default; zero third-party feed) — `python cli.py original-board` builds
+  `data/board/original_board.json` from our own projections (skill), kicking columns
+  (K), and derived team defense (DEF); the deployed driver reads it and drafts
+  best-player-available by projected value + 10-team scarcity/anchor guardrails.
+  FantasyPros (ECR + Real-Time ADP) is now an **opt-in legacy cross-check** used
+  only when `FP_API_KEY` is configured; Yahoo ADP is a live per-turn patch used only
+  in that legacy mode. Without a crowd signal we forfeit `VALUE = ADP − ECR`
+  (crowd-arbitrage); the original engine maximizes our own expected points.
 - 10-team scarcity anchoring: RB is the scarcest position, so the bot (a) adds a
   soft +8 value premium to RBs we still need (anchors them early despite the
   crowd's RB inflation) and (b) hard-forces slots by `ANCHOR_BY_ROUND`: 1st RB by

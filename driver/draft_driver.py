@@ -181,6 +181,42 @@ def static_board():
     return {b[0]: {"name": b[0], "team": b[1], "pos": b[2], "adp": b[3],
                    "value": -b[3]} for b in BOARD}
 
+
+# ---- Original board (zero third-party dependency) ----------------------------
+# Built by `python cli.py original-board` from nflverse-derived data only (skill
+# projections + K from kicking columns + DEF from derived team defense) and
+# serialized to original_board.json. The deployed driver reads that JSON with
+# stdlib json so it never imports src or calls FantasyPros. This is the DEFAULT
+# board when no FP_API_KEY is configured.
+def _board_list_to_map(board_list):
+    """Convert the JSON board list into the dict shape choose_pick expects."""
+    return {b["name"]: {"name": b["name"], "team": b["team"], "pos": b["pos"],
+                        "adp": b.get("adp"), "ecr": b.get("ecr"),
+                        "value": b["value"]}
+            for b in board_list}
+
+
+def load_original_board(path=None):
+    """Load the original nflverse-only board from JSON. Returns the driver board
+    map, or None if the file is missing/unreadable. When `path` is None the file
+    is looked up next to this script (the deployment layout)."""
+    if path is None:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "original_board.json")
+    if not os.path.exists(path):
+        return None
+    try:
+        with io.open(path, "r", encoding="utf-8") as f:
+            board_list = json.load(f)
+    except Exception as e:
+        log("ORIGINAL_BOARD: load failed (%s) -> None" % repr(e))
+        return None
+    if not isinstance(board_list, list) or not board_list:
+        log("ORIGINAL_BOARD: empty/invalid -> None")
+        return None
+    log("ORIGINAL_BOARD: loaded %d players from %s" % (len(board_list), path))
+    return _board_list_to_map(board_list)
+
 def _norm_name(full, team=None):
     """Normalize a full player name to the FantasyPros Real-Time ADP table key
     format: 'First Last' -> 'F. Last' (first initial + last; apostrophes/dots
@@ -635,14 +671,29 @@ def run_draft():
     if not verify_session(ws):
         log("DRAFT_DRIVER_ABORT: session verification failed (see VERIFY log)")
         return
-    # Build the value board once: live FantasyPros ECR, with ADP taken from the
-    # free Real-Time ADP scrape (same source as ECR => consistent VALUE=ADP-ECR).
-    # Falls back to static BOARD if neither an FP key nor RT ADP is available.
-    rt_adp = scrape_fp_realtime_adp()
-    vb = build_value_board(adp_map=rt_adp)
-    board = vb if vb else static_board()
-    log("ADP_SOURCE=" + ("FANTASYPROS_REALTIME" if rt_adp else "NONE"))
-    log("BOARD_MODE=" + ("LIVE(FantasyPros)" if vb else "STATIC"))
+    # Board selection (no third-party dependency by default):
+    #   * No FP_API_KEY  -> ORIGINAL board (nflverse-only JSON). Zero external calls.
+    #   * FP_API_KEY set -> legacy FantasyPros cross-check (ECR + RT ADP scrape),
+    #     kept only as an opt-in overlay; tests exercise this path.
+    #   * Neither        -> static BOARD fallback so the draft never breaks.
+    if FP_API_KEY:
+        rt_adp = scrape_fp_realtime_adp()
+        vb = build_value_board(adp_map=rt_adp)
+        board = vb if vb else static_board()
+        log("ADP_SOURCE=" + ("FANTASYPROS_REALTIME" if rt_adp else "NONE"))
+        log("BOARD_MODE=" + ("LIVE(FantasyPros)" if vb else "STATIC"))
+    else:
+        ob = load_original_board()
+        if ob is not None:
+            board = ob
+            log("BOARD_MODE=ORIGINAL(nflverse)")
+        else:
+            board = static_board()
+            log("BOARD_MODE=STATIC (no original board JSON, no FP key)")
+    # Rebuild the DEF name map from the ACTIVE board so any defense it includes
+    # (keyed by its team code) resolves when Yahoo shows 'CODE - DEF'.
+    DEF_CODE_TO_NAME = {v["team"].upper(): v["name"]
+                        for v in board.values() if v.get("pos") == "DEF"}
     drafted={}
     round_num=1
     picks_made=0

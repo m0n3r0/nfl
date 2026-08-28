@@ -19,7 +19,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from src import ingest, scoring, lineup, corpus, projections, analysis, model
+from src import ingest, scoring, lineup, corpus, projections, analysis, model, draft_board
 from src.config import FANTASY_POSITIONS, SCHEDULE_SEASON, STATS_SEASON
 
 
@@ -151,6 +151,28 @@ def cmd_sos(args) -> int:
     return 0
 
 
+def cmd_original_board(args) -> int:
+    """Build the original, nflverse-only draft board and write it to JSON.
+
+    No FantasyPros / Yahoo dependency: skill positions come from the projection
+    engine, K from the weekly kicking columns, DEF from derived team defense.
+    The JSON is consumed by the stdlib-only deployed driver.
+    """
+    board = draft_board.write_original_board(
+        "data/board/original_board.json", preset=args.preset
+    )
+    from collections import Counter
+    counts = Counter(b["pos"] for b in board)
+    print(f"\n=== Original draft board ({args.preset}) -> data/board/original_board.json ===")
+    print(f"  total players: {len(board)}")
+    for pos in ("QB", "RB", "WR", "TE", "K", "DEF"):
+        print(f"  {pos}: {counts.get(pos, 0)}")
+    print("  top 5 by projected value:")
+    for b in board[:5]:
+        print(f"    {b['name']} ({b['team']} {b['pos']}) -> {b['value']}")
+    return 0
+
+
 def cmd_predict(args) -> int:
     preds = model.predict_2026(week=args.week)
     title = f"2026" + (f" Week {args.week}" if args.week else " (all weeks)")
@@ -267,6 +289,12 @@ def build_parser() -> argparse.ArgumentParser:
     ppred = sub.add_parser("predict", help="2026 win probabilities")
     ppred.add_argument("week", type=int, nargs="?", default=None, help="2026 week (omit for all)")
     ppred.set_defaults(func=cmd_predict)
+
+    pob = sub.add_parser("original-board",
+                         help="build the original nflverse-only draft board -> JSON")
+    pob.add_argument("--preset", default="half-ppr",
+                     choices=["standard", "ppr", "half-ppr"])
+    pob.set_defaults(func=cmd_original_board)
 
     pw = sub.add_parser("web", help="launch the local web UI")
     pw.add_argument("--port", type=int, default=5000)

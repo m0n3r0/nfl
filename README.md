@@ -196,7 +196,7 @@ Protocol (CDP). Lives as a self-contained module alongside the toolkit above.
 - `driver/draft_driver.py` — live draft driver (board + guardrails + human-like CDP clicks). Runs on Windows via `py.exe`.
 - `skills/` — Hermes skills (edge-cdp, fantasy-read, fantasy-draft) for reuse in Hermes Desktop.
 - `memory/fantasy_fd_nation.md` — persistent league context for the agent.
-- `data/board/` — draft board + K/DEF ADP (verified Yahoo data).
+- `data/board/` — original draft board (`original_board.json`, nflverse-derived, zero external deps) + K/DEF ADP reference.
 - `data/scrapes/` — roster/standings/settings extracts from the live tab.
 - `validation/` — mock-draft + click validation logs (2026-08-21).
 - `logs/draft_log.txt` — created at draft time; every pick decision logged here.
@@ -224,10 +224,26 @@ py.exe driver/draft_driver.py
 ```
 Or let the scheduled task **FDnationDraftDriver** fire automatically at draft time.
 
-#### Live value board (optional but recommended)
-By default the driver drafts from a fixed board. To draft from live
-[FantasyPros](https://www.fantasypros.com/api-data/) data, provide an API key
-(any of these work — the driver loads `.env` automatically):
+#### Draft board (default: original, nflverse-only)
+By default the driver drafts from the **original board** built entirely from our
+own nflverse-derived data — **no FantasyPros, no Yahoo, no third-party feed**.
+Generate it once (needs network the first time) with:
+```
+python cli.py original-board
+```
+This writes `data/board/original_board.json` (skill projections + K from the
+weekly kicking columns + DEF from derived team defense). Copy it next to the
+deployed driver (`C:\edge-debug-profile\original_board.json`) before the draft.
+The driver reads it and drafts best-player-available by projected value + 10-team
+scarcity/anchor guardrails, and logs `BOARD_MODE=ORIGINAL(nflverse)`. Without
+this file (and no `FP_API_KEY`), it falls back to the built-in static board.
+
+#### FantasyPros cross-check (optional, opt-in)
+Only if you set `FP_API_KEY` does the driver instead build a FantasyPros value
+board (ECR + Real-Time ADP scrape, Yahoo ADP as a live patch) — the legacy path
+described in [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md). Without a key, the
+original nflverse board is used.
+
 ```bat
 setx FP_API_KEY "your-free-key"
 ```
@@ -237,19 +253,6 @@ FP_API_KEY=your-free-key
 # or the short alias the driver also accepts:
 API=your-free-key
 ```
-- **Free key + Yahoo ADP (recommended):** FantasyPros' free tier exposes Expert
-  Consensus Rankings (ECR) but **not ADP** (ADP is gated behind a paid tier).
-  Instead the driver **scrapes Yahoo's own ADP** live from the draft room each
-  turn, so you get the true `VALUE = Yahoo_ADP − FantasyPros_ECR` ("value")
-  metric on the free key. It logs `BOARD_MODE=LIVE(FantasyPros)` with mode
-  `Yahoo_ADP−ECR`.
-- **Free key, no Yahoo ADP shown:** if the draft room doesn't expose ADP for a
-  player, that pick falls back to **best-player-available by ECR** (mode
-  `ECR-only`). Still a strong live strategy.
-- **Paid FantasyPros key (ADP):** if your plan exposes ADP, the driver can also
-  use `VALUE = ADP − ECR` from FantasyPros directly.
-- **No key / fetch failure:** logs `BOARD_MODE=STATIC` and falls back to the
-  fixed board.
 
 See [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md) for the full strategy,
 pricing, and setup.
