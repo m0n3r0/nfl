@@ -40,7 +40,7 @@ Full implementation: `C:\edge-debug-profile\draft_driver.py` (also
 ## Board (~67 players: skill + K/DEF tiers + 10-team depth at TE/QB, embedded in script)
 Gibbs, Bijan, Chase, Puka, McCaffrey, Amon-Ra, JSN, Taylor, CeeDee, Cook,
 Saquon, Jefferson, Jeanty, Achane, ChaseBrown, K.Walker, Henry, London, Hampton,
-Allen(QB), Bowers(TE), Nico, Pickens, A.J.Brown, McBride(TE), Love, DeVonta,
+Allen(QB), Bowers(TE), Nico, Pickens, A.J.Brown, McBride(TE), Jeremiyah Love(RB), DeVonta,
 Kyren, Jacobs, Olave.
 
 ## Value metric (live board)

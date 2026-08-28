@@ -300,13 +300,14 @@ def test_normalize_available_maps_def_code_to_board_name():
 
 
 def test_board_has_enough_candidates_per_required_position():
-    """10-team draft: each forced one-slot position (QB, TE, K, DEF) needs >=10
-    BOARD candidates so the anchor-driven forced pick can always fill the slot
-    even if rivals snipe the top names before our anchor round."""
+    """10-team draft: each forced one-slot position (QB, TE, K, DEF) must have
+    exactly 10 BOARD candidates so the anchor-driven forced pick can always fill
+    the slot even if rivals snipe the top names before our anchor round."""
     from collections import Counter
     counts = Counter(pos for (_, _, pos, _) in dd.BOARD)
     for pos in ("QB", "TE", "K", "DEF"):
-        assert counts[pos] >= 10, "%s has only %d candidates (<10 for 10-team)" % (pos, counts[pos])
+        assert counts[pos] == 10, "%s has %d candidates (expected 10)" % (pos, counts[pos])
+    assert len(dd.BOARD) == 67, "BOARD has %d players (expected 67)" % len(dd.BOARD)
 
 
 if __name__ == "__main__":
