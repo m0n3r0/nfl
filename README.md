@@ -207,7 +207,7 @@ Protocol (CDP). Lives as a self-contained module alongside the toolkit above.
 Draft: **Tue Sep 1 2026, 5:00pm EDT** (= 2026-09-02 06:00 JST on the machine).
 
 ### How to run the draft
-Edge must be open on port 9222 with `--remote-allow-origins=*` and the user logged in.
+Edge must be open on port 9222, bound to loopback (`--remote-debugging-address=127.0.0.1`), with `--remote-allow-origins=*` and the user logged in. See the security note below for the required firewall restriction.
 
 > **Security note (read before opening the port).** CDP exposes a *full browser-control
 > interface* on the debug port — anyone who can reach `http://127.0.0.1:9222` can drive

@@ -57,20 +57,20 @@ py.exe C:\edge-debug-profile\draft_driver.py
 Requires Edge open on 9222 with --remote-allow-origins=* at that moment.
 
 ## Scheduled task (already deployed)
-Task "FDnationDraftDriver" fires 2026-08-28 18:00 EDT and runs the driver.
+Task "FDnationDraftDriver" fires 2026-09-01 17:00 EDT and runs the driver.
 Recreate if needed (PowerShell, Windows side):
 ```powershell
 $py = (Get-Command py).Source
 $script = 'C:\edge-debug-profile\draft_driver.py'
 $off = [TimeSpan]::FromHours(-4)
-$dto = [DateTimeOffset]::New(2026,8,28,18,0,0,$off)
+$dto = [DateTimeOffset]::New(2026,9,1,17,0,0,$off)
 $trigger = New-ScheduledTaskTrigger -Once -At $dto.LocalDateTime
 $trigger.StartBoundary = $dto.ToString("yyyy-MM-ddTHH:mm:sszzz")
 $action = New-ScheduledTaskAction -Execute $py -Argument $script -WorkingDirectory 'C:\edge-debug-profile'
 Register-ScheduledTask -TaskName "FDnationDraftDriver" -Action $action -Trigger $trigger -Force
 ```
 NOTE: this machine is JST (UTC+9); the stored trigger shows +09:00 and next-run
-2026-08-29 07:00 local, which IS 6pm EDT Aug 28. Correct.
+2026-09-02 06:00 local, which IS 5pm EDT Sep 1. Correct.
 
 ## Safety net
 Yahoo DEFAULT pre-rank is the auto-draft fallback if the driver errors (e.g. Edge
