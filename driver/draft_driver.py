@@ -671,12 +671,15 @@ def run_draft():
     if not verify_session(ws):
         log("DRAFT_DRIVER_ABORT: session verification failed (see VERIFY log)")
         return
-    # Board selection (no third-party dependency by default):
-    #   * No FP_API_KEY  -> ORIGINAL board (nflverse-only JSON). Zero external calls.
-    #   * FP_API_KEY set -> legacy FantasyPros cross-check (ECR + RT ADP scrape),
-    #     kept only as an opt-in overlay; tests exercise this path.
-    #   * Neither        -> static BOARD fallback so the draft never breaks.
-    if FP_API_KEY:
+    # Engine selection. The original nflverse-built board (self-built, no
+    # third-party dependency) is the DEFAULT draft engine. FantasyPros is an
+    # OPT-IN legacy overlay enabled ONLY by an explicit DRAFT_ENGINE=fantasypros
+    # env var -- the mere presence of FP_API_KEY no longer switches engines
+    # (it used to, which silently overrode the original method whenever a .env
+    # carrying the key was on the working path). User mandate: FD nation drafts
+    # from the original board.
+    engine = (os.environ.get("DRAFT_ENGINE") or "original").strip().lower()
+    if engine == "fantasypros" and FP_API_KEY:
         rt_adp = scrape_fp_realtime_adp()
         vb = build_value_board(adp_map=rt_adp)
         board = vb if vb else static_board()
@@ -689,7 +692,9 @@ def run_draft():
             log("BOARD_MODE=ORIGINAL(nflverse)")
         else:
             board = static_board()
-            log("BOARD_MODE=STATIC (no original board JSON, no FP key)")
+            log("BOARD_MODE=STATIC (no original board JSON)")
+        if engine == "fantasypros" and not FP_API_KEY:
+            log("ENGINE_OVERRIDE_IGNORED: DRAFT_ENGINE=fantasypros set but FP_API_KEY missing -> original board used")
     # Rebuild the DEF name map from the ACTIVE board so any defense it includes
     # (keyed by its team code) resolves when Yahoo shows 'CODE - DEF'.
     DEF_CODE_TO_NAME = {v["team"].upper(): v["name"]

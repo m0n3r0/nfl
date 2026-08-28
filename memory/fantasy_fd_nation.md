@@ -19,8 +19,9 @@ the user mentions fantasy football, their league, the draft, lineup, waivers, or
   (K), and derived team defense (DEF); the deployed driver reads it and drafts
   best-player-available by projected value + 10-team scarcity/anchor guardrails.
   FantasyPros (ECR + Real-Time ADP) is now an **opt-in legacy cross-check** used
-  only when `FP_API_KEY` is configured; Yahoo ADP is a live per-turn patch used only
-  in that legacy mode. Without a crowd signal we forfeit `VALUE = ADP − ECR`
+  only when `DRAFT_ENGINE=fantasypros` is set explicitly (and a key is present); the
+  mere presence of `FP_API_KEY` does NOT switch engines. Yahoo ADP is a live per-turn
+  patch used only in that legacy mode. Without a crowd signal we forfeit `VALUE = ADP − ECR`
   (crowd-arbitrage); the original engine maximizes our own expected points.
 - 10-team scarcity anchoring: RB is the scarcest position, so the bot (a) adds a
   soft +8 value premium to RBs we still need (anchors them early despite the

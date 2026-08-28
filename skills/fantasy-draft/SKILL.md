@@ -52,7 +52,8 @@ best-player-available by value + 10-team scarcity/anchor guardrails. **No
 FantasyPros / Yahoo / third-party feed is used by default.**
 
 FantasyPros (`VALUE = FantasyPros_RT_ADP − FantasyPros_ECR`) is now an **opt-in
-legacy cross-check** used only when `FP_API_KEY` is configured; Yahoo ADP is a
+legacy cross-check** used only when `DRAFT_ENGINE=fantasypros` is set (and a key is
+present); Yahoo ADP is a
 live per-turn patch used only in that legacy mode. Full detail in
 `docs/DATA_SOURCES.md` (see "Original board engine").
 

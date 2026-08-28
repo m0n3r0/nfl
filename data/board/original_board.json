@@ -174,12 +174,6 @@
     "value": 230.6
   },
   {
-    "name": "Jake Moody",
-    "team": "CHI",
-    "pos": "K",
-    "value": 229.5
-  },
-  {
     "name": "Jaxon Smith-Njigba",
     "team": "SEA",
     "pos": "WR",
@@ -190,12 +184,6 @@
     "team": "MIN",
     "pos": "WR",
     "value": 223.4
-  },
-  {
-    "name": "Mike Badgley",
-    "team": "CHI",
-    "pos": "K",
-    "value": 221.0
   },
   {
     "name": "Mike Evans",
@@ -294,12 +282,6 @@
     "value": 194.4
   },
   {
-    "name": "Matthew Wright",
-    "team": "KC",
-    "pos": "K",
-    "value": 192.7
-  },
-  {
     "name": "Rhamondre Stevenson",
     "team": "NE",
     "pos": "RB",
@@ -348,12 +330,6 @@
     "value": 186.0
   },
   {
-    "name": "Matthew Wright",
-    "team": "PIT",
-    "pos": "K",
-    "value": 182.8
-  },
-  {
     "name": "Courtland Sutton",
     "team": "DEN",
     "pos": "WR",
@@ -370,18 +346,6 @@
     "team": "ARI",
     "pos": "TE",
     "value": 179.6
-  },
-  {
-    "name": "Anders Carlson",
-    "team": "SF",
-    "pos": "K",
-    "value": 178.5
-  },
-  {
-    "name": "Austin Seibert",
-    "team": "WAS",
-    "pos": "K",
-    "value": 175.7
   },
   {
     "name": "Brian Thomas Jr.",
@@ -414,22 +378,10 @@
     "value": 171.3
   },
   {
-    "name": "Matthew Wright",
-    "team": "SF",
-    "pos": "K",
-    "value": 170.0
-  },
-  {
     "name": "Tetairoa McMillan",
     "team": "CAR",
     "pos": "WR",
     "value": 166.7
-  },
-  {
-    "name": "John Parker Romo",
-    "team": "MIN",
-    "pos": "K",
-    "value": 165.8
   },
   {
     "name": "Chuba Hubbard",
@@ -474,6 +426,12 @@
     "value": 152.5
   },
   {
+    "name": "Austin Seibert",
+    "team": "WAS",
+    "pos": "K",
+    "value": 152.2
+  },
+  {
     "name": "Emeka Egbuka",
     "team": "TB",
     "pos": "WR",
@@ -484,12 +442,6 @@
     "team": "SEA",
     "pos": "RB",
     "value": 149.7
-  },
-  {
-    "name": "Zane Gonzalez",
-    "team": "ATL",
-    "pos": "K",
-    "value": 149.2
   },
   {
     "name": "Jaylen Warren",
@@ -534,6 +486,12 @@
     "value": 142.6
   },
   {
+    "name": "Ben Sauls",
+    "team": "NYG",
+    "pos": "K",
+    "value": 141.7
+  },
+  {
     "name": "Rome Odunze",
     "team": "CHI",
     "pos": "WR",
@@ -570,6 +528,12 @@
     "value": 134.5
   },
   {
+    "name": "Charlie Smyth",
+    "team": "NO",
+    "pos": "K",
+    "value": 133.2
+  },
+  {
     "name": "Jerry Jeudy",
     "team": "CLE",
     "pos": "WR",
@@ -582,10 +546,22 @@
     "value": 130.5
   },
   {
+    "name": "Cameron Dicker",
+    "team": "LAC",
+    "pos": "K",
+    "value": 130.0
+  },
+  {
     "name": "Jacory Croskey-Merritt",
     "team": "WAS",
     "pos": "RB",
     "value": 129.9
+  },
+  {
+    "name": "Jason Myers",
+    "team": "SEA",
+    "pos": "K",
+    "value": 128.9
   },
   {
     "name": "Dalton Kincaid",
@@ -600,10 +576,34 @@
     "value": 123.7
   },
   {
+    "name": "Matthew Wright",
+    "team": "KC",
+    "pos": "K",
+    "value": 123.6
+  },
+  {
+    "name": "Will Reichard",
+    "team": "MIN",
+    "pos": "K",
+    "value": 123.5
+  },
+  {
     "name": "Jake Ferguson",
     "team": "DAL",
     "pos": "TE",
     "value": 123.0
+  },
+  {
+    "name": "Zane Gonzalez",
+    "team": "ATL",
+    "pos": "K",
+    "value": 120.7
+  },
+  {
+    "name": "Chris Boswell",
+    "team": "PIT",
+    "pos": "K",
+    "value": 119.5
   },
   {
     "name": "Tre Tucker",
