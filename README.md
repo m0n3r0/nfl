@@ -3,6 +3,46 @@
 Fantasy football toolkit. Ingests public NFL player/stat data, scores it, ranks
 players, and builds a weekly lineup.
 
+> **Two parts, one repo:**
+> 1. **Toolkit** — ingest, score, rank, project, and model NFL players (sections below).
+> 2. **FD nation draft automation** — a self-contained module that auto-drafts a
+>    specific Yahoo league through the Edge browser. See
+>    [FD nation draft automation (module)](#fd-nation-draft-automation-module).
+
+## What is fantasy football? (ELI5)
+
+Imagine you're a coach, not a player. Before the NFL season you "draft" real
+players onto your own fake team. Every week those real players rack up points from
+what they actually do in games — touchdowns, yards, catches, field goals. Your
+team's points go head-to-head against another person's team; the higher score
+wins that week. Do it for ~15 weeks and the best record (or playoff bracket) wins
+the league. It's a season-long game of "which real players will do best?"
+
+## Is money involved?
+
+It depends on the league — this repo doesn't decide that. Many leagues are free
+and just-for-fun among friends; others have a small buy-in or prizes. **This
+codebase is a pure analysis + automation tool**: it builds projections, ranks
+players, and (for FD nation) auto-drafts. It is **not** a betting or gambling
+system and it places no wagers. See the honesty notes under
+[Known limitations](#known-limitations) and
+[FD nation → Honest limitations](#honest-limitations).
+
+## Contents
+
+- [What is fantasy football? (ELI5)](#what-is-fantasy-football-eli5)
+- [Is money involved?](#is-money-involved)
+- [Data source](#data-source)
+- [Setup](#setup)
+- [CLI](#cli)
+- [2026 projection engine](#2026-projection-engine)
+- [Win-probability model](#win-probability-model-predicting-the-winning-team)
+- [Web UI](#web-ui)
+- [Scoring](#scoring)
+- [Tests](#tests)
+- [Known limitations](#known-limitations)
+- [FD nation draft automation (module)](#fd-nation-draft-automation-module)
+
 ## Data source
 
 Player stats, rosters, and schedules are pulled from the public
