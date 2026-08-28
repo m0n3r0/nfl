@@ -79,23 +79,22 @@ BOARD = [
     ("Derrick Henry","Bal","RB",18.2),("Drake London","Atl","WR",18.6),
     ("Omarion Hampton","LAC","RB",18.7),("Josh Allen","Buf","QB",19.6),("Lamar Jackson","Bal","QB",30.0),("Jayden Daniels","Wsh","QB",35.0),("Joe Burrow","Cin","QB",45.0),
     ("Justin Herbert","LAC","QB",55.0),("Patrick Mahomes","KC","QB",60.0),("Jalen Hurts","Phi","QB",65.0),("Dak Prescott","Dal","QB",70.0),
-    ("Baker Mayfield","TB","QB",80.0),("Bo Nix","Den","QB",90.0),("Jordan Love","GB","QB",100.0),("Trevor Lawrence","Jax","QB",110.0),
+    ("Baker Mayfield","TB","QB",80.0),("Bo Nix","Den","QB",90.0),
     ("Brock Bowers","LV","TE",21.1),("Nico Collins","Hou","WR",22.2),
     ("George Pickens","Dal","WR",22.4),("A.J. Brown","NE","WR",25.0),
-    ("Trey McBride","Ari","TE",25.4),("Travis Kelce","KC","TE",35.0),("George Kittle","SF","TE",40.0),("Sam LaPorta","Det","TE",45.0),("T.J. Hockenson","Min","TE",55.0),("Mark Andrews","Bal","TE",70.0),("Kyle Pitts","Atl","TE",80.0),("David Njoku","Cle","TE",85.0),("Tucker Kraft","GB","TE",90.0),("Zach Ertz","Was","TE",95.0),("Dalton Kincaid","Buf","TE",100.0),("Jeremiyah Love","Ari","RB",27.2),
+    ("Trey McBride","Ari","TE",25.4),("Travis Kelce","KC","TE",35.0),("George Kittle","SF","TE",40.0),("Sam LaPorta","Det","TE",45.0),("T.J. Hockenson","Min","TE",55.0),("Mark Andrews","Bal","TE",70.0),("Kyle Pitts","Atl","TE",80.0),("David Njoku","Cle","TE",85.0),("Tucker Kraft","GB","TE",90.0),("Jeremiyah Love","Ari","RB",27.2),
     ("DeVonta Smith","Phi","WR",29.4),("Kyren Williams","LAR","RB",29.6),
     ("Josh Jacobs","GB","RB",32.8),("Chris Olave","NO","WR",34.0),
-    # K tier (draft only last rounds) -- 12 for 12-team depth
+    # K tier (draft only last rounds) -- 10 for 10-team depth
     ("Brandon Aubrey","Dal","K",85.0),("Ka'imi Fairbairn","Hou","K",119.0),
     ("Cameron Dicker","LAC","K",123.0),("Jason Myers","Sea","K",124.0),
     ("Cam Little","Jax","K",129.0),("Harrison Butker","KC","K",115.0),("Justin Tucker","Bal","K",135.0),
     ("Jake Elliott","Phi","K",140.0),("Younghoe Koo","Atl","K",145.0),("Wil Lutz","Den","K",150.0),
-    ("Chris Boswell","Pit","K",155.0),("Eddy Pineiro","Car","K",160.0),
-    # DEF tier (draft only last rounds) -- 12 for 12-team depth
+    # DEF tier (draft only last rounds) -- 10 for 10-team depth
     ("Rams","LAR","DEF",89.0),("Texans","Hou","DEF",93.0),
     ("Broncos","Den","DEF",101.0),("Seahawks","Sea","DEF",107.0),
     ("Eagles","Phi","DEF",123.0),("Patriots","NE","DEF",127.0),("Bills","Buf","DEF",115.0),("49ers","SF","DEF",120.0),
-    ("Steelers","Pit","DEF",125.0),("Packers","GB","DEF",130.0),("Ravens","Bal","DEF",135.0),("Buccaneers","TB","DEF",140.0),
+    ("Steelers","Pit","DEF",125.0),("Packers","GB","DEF",130.0),
 ]
 
 # Map a Yahoo team-defense code to the BOARD's short DEF key, so a defense
@@ -108,7 +107,7 @@ DEF_CODE_TO_NAME = {t.upper(): n for (n, t, p, a) in BOARD if p == "DEF"}
 REQUIRED = {"QB":1, "RB":2, "WR":2, "TE":1, "K":1, "DEF":1}
 
 # Anchor schedule: by which round the Nth still-needed player at POS must be
-# taken (forced if still missing). Tuned for a 12-team league where the RB/TE
+# taken (forced if still missing). Tuned for a 10-team league where the RB/TE
 # wells run dry fast: lock 2 RBs by round 5, 2 WRs by round 9, TE by 7, etc.
 ANCHOR_BY_ROUND = {
     "RB":  [3, 5],     # 1st RB by R3, 2nd RB by R5
@@ -119,7 +118,7 @@ ANCHOR_BY_ROUND = {
     "DEF": [14],
 }
 
-# Positional-scarcity soft premium. In a 12-team league the crowd OVER-drafts
+# Positional-scarcity soft premium. In a 10-team league the crowd OVER-drafts
 # RBs (low Yahoo ADP), so VALUE = Yahoo_ADP - ECR scores good RBs NEGATIVE and
 # would let the bot skip them for "higher-value" WRs -- then the RB well runs
 # dry. While we still NEED a scarce position, add this premium to its effective
@@ -515,7 +514,7 @@ def choose_pick(available, drafted, round_num, board, adp_map=None):
             ya = adp_map.get(v["name"].lower())
             if ya is not None:
                 eff = float(ya) - float(ecr)   # Yahoo ADP - FantasyPros ECR
-        # 12-team positional-scarcity soft premium: while we still NEED a scarce
+        # 10-team positional-scarcity soft premium: while we still NEED a scarce
         # position, lift its effective value so the crowd's RB inflation can't
         # price us out of the position before the anchor deadline forces it.
         need = REQUIRED.get(v["pos"], 0) - drafted.get(v["pos"], 0)

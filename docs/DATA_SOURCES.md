@@ -102,9 +102,9 @@ VALUE = FantasyPros_RT_ADP − FantasyPros_ECR   # PRIMARY (free): RT scrape + E
 - All modes respect the same position/timing guardrails (required slots forced
   by their deadline, K/DEF only late, QB after round 10).
 
-### 12-team scarcity anchor (positional overlay)
+### 10-team scarcity anchor (positional overlay)
 
-FD nation is a **12-team** league, so the RB/TE wells run dry fast. The catch:
+FD nation is a **10-team** league, so the RB/TE wells run dry fast. The catch:
 the crowd *over-drafts* RBs (low Yahoo ADP), which makes `VALUE = Yahoo_ADP − ECR`
 score good RBs *negative* — left to raw value, the bot would skip RBs for
 "higher-value" WRs and get shut out of the scarcest position. Two guardrails fix
