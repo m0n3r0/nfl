@@ -195,6 +195,34 @@ def test_choose_pick_uses_yahoo_adp():
     assert p_yes[0] == "Value Guy"
 
 
+def _board(*rows):
+    """rows: (name, pos, value) -> board dict the driver understands."""
+    return {n: {"name": n, "team": "T", "pos": p, "adp": None, "value": v}
+            for (n, p, v) in rows}
+
+
+def test_scarcity_premium_anchors_rb_over_higher_value_wr():
+    """12-team overlay: while we still NEED an RB, the scarcity premium lifts a
+    lower-raw-value RB above a higher-value WR, so we anchor RB early instead of
+    letting the crowd's RB inflation (negative VALUE) price us out of the slot."""
+    board = _board(("RB Stud", "RB", 2.0), ("WR Stud", "WR", 6.0))
+    # Raw values say WR > RB (6 > 2); the RB need premium flips the decision.
+    pick = dd.choose_pick(["RB Stud", "WR Stud"], {}, 1, board)
+    assert pick[0] == "RB Stud"
+
+
+def test_anchor_forces_rb_on_schedule():
+    """ANCHOR_BY_ROUND must force the 1st RB by R3 and the 2nd by R5, but NOT
+    before those rounds (so we still grab a falling stud early)."""
+    board = _board(("RB A", "RB", 1.0), ("WR A", "WR", 20.0))
+    # 1st RB: not forced at R2 (WR taken), forced at R3 (RB taken).
+    assert dd.choose_pick(["RB A", "WR A"], {}, 2, board)[0] == "WR A"
+    assert dd.choose_pick(["RB A", "WR A"], {}, 3, board)[0] == "RB A"
+    # 2nd RB: with 1 already, not forced at R4 (WR taken), forced at R5 (RB taken).
+    assert dd.choose_pick(["RB A", "WR A"], {"RB": 1}, 4, board)[0] == "WR A"
+    assert dd.choose_pick(["RB A", "WR A"], {"RB": 1}, 5, board)[0] == "RB A"
+
+
 if __name__ == "__main__":
     test_fetch_fp_consensus_keeps_zero_adp()
     test_build_value_board_full_coverage_with_zero_adp()
@@ -203,5 +231,7 @@ if __name__ == "__main__":
     test_unmatched_players_deprioritized()
     test_parse_adp()
     test_choose_pick_uses_yahoo_adp()
+    test_scarcity_premium_anchors_rb_over_higher_value_wr()
+    test_anchor_forces_rb_on_schedule()
     test_build_value_board_static_fallback_without_key()
     print("All draft-driver tests passed.")

@@ -92,6 +92,24 @@ VALUE = Yahoo_ADP − FantasyPros_ECR   # recommended: Yahoo ADP scraped live + 
 - All modes respect the same position/timing guardrails (required slots forced
   by their deadline, K/DEF only late, QB after round 10).
 
+### 12-team scarcity anchor (positional overlay)
+
+FD nation is a **12-team** league, so the RB/TE wells run dry fast. The catch:
+the crowd *over-drafts* RBs (low Yahoo ADP), which makes `VALUE = Yahoo_ADP − ECR`
+score good RBs *negative* — left to raw value, the bot would skip RBs for
+"higher-value" WRs and get shut out of the scarcest position. Two guardrails fix
+this (both in `choose_pick`):
+
+- **Soft scarcity premium** (`SCARCITY_BONUS`) — while we still *need* a scarce
+  position (RB), its effective value gets a `+8` lift so close calls anchor it
+  early instead of being out-ranked by WRs. Once the slot is filled the premium
+  drops to zero (we don't hoard RBs).
+- **Hard anchor schedule** (`ANCHOR_BY_ROUND`) — the Nth still-needed player at
+  each position is *forced* if the round has passed its deadline: 1st RB by R3,
+  2nd RB by R5, 1st/2nd WR by R5/R9, TE by R7, QB by R10, K/DEF by R14. This
+  guarantees a legal lineup and a 2-RB foundation regardless of how the value
+  board scores.
+
 ### Source
 
 - **ECR:** [FantasyPros consensus rankings API](https://www.fantasypros.com/api-data/)

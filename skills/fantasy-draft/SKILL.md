@@ -17,9 +17,9 @@ Live snake draft automation for Yahoo league 1329011. Picks by a verified ADP
 board with guardrails, clicks via human-like Edge CDP input, logs to a file.
 
 ## League parameters (verified)
-- .5 PPR, H2H, 15 rounds, 1 min/pick, snake. 7 teams.
+- .5 PPR, H2H, 15 rounds, 1 min/pick, snake. 12 teams.
 - Roster: 1QB/2WR/2RB/1TE/1WRT/1K/1DEF/6BN/2IR.
-- Draft: Fri Aug 28 2026 6:00pm EDT (= 2026-08-29 07:00 JST on this machine).
+- Draft: Tue Sep 1 2026 5:00pm EDT (= 2026-09-02 06:00 JST on this machine).
 
 ## The driver script
 Full implementation: `C:\edge-debug-profile\draft_driver.py` (also
@@ -28,6 +28,8 @@ Full implementation: `C:\edge-debug-profile\draft_driver.py` (also
 2. Opens the draft room, polls for "your pick" (team 2).
 3. On your pick: reads available players, chooses highest board player passing
    guardrails:
+   - 12-team RB anchor: soft +8 scarcity premium on RBs still needed, hard force
+     1st RB by R3 / 2nd RB by R5 (ANCHOR_BY_ROUND schedule)
    - no QB before round 10
    - K/DEF only last 2 rounds
    - no doubling a filled position slot
@@ -35,7 +37,7 @@ Full implementation: `C:\edge-debug-profile\draft_driver.py` (also
 4. Clicks the player row + Draft/confirm with Bézier+jitter motion.
 5. Logs every decision to `C:\edge-debug-profile\draft_log.txt`.
 
-## Board (verified top-30 ADP, embedded in script)
+## Board (~54 players: skill + K/DEF tiers + 12-team depth at TE/QB, embedded in script)
 Gibbs, Bijan, Chase, Puka, McCaffrey, Amon-Ra, JSN, Taylor, CeeDee, Cook,
 Saquon, Jefferson, Jeanty, Achane, ChaseBrown, K.Walker, Henry, London, Hampton,
 Allen(QB), Bowers(TE), Nico, Pickens, A.J.Brown, McBride(TE), Love, DeVonta,
@@ -74,7 +76,7 @@ Ran mock-draft validation. Findings + fixes applied to the driver:
    NO K and NO DEF players, so the driver would draft 15 skill players and leave K/DEF
    EMPTY (illegal lineup). FIX: added K tier (Aubrey/Fairbairn/Dicker/Myers/Little) and
    DEF tier (Rams/Texans/Broncos/Seahawks/Eagles/Patriots) with real Yahoo ADP; rewrote
-   `choose_pick` to be position-target-aware (forces required slots by FORCE_BY_ROUND
+   `choose_pick` to be position-target-aware (forces required slots by ANCHOR_BY_ROUND
    deadlines, fills bench with best available). RE-TEST: LEGAL_LINEUP_CHECK PASS —
    exactly QB,TE,K,DEF=1 and RB,WR>=2, K/DEF in last 2 rounds, QB at round 10.
 

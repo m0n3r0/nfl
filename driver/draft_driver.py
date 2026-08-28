@@ -69,27 +69,44 @@ BOARD = [
     ("Ashton Jeanty","LV","RB",14.1),("Chase Brown","Cin","RB",16.6),
     ("De'Von Achane","Mia","RB",15.7),("Kenneth Walker III","KC","RB",17.0),
     ("Derrick Henry","Bal","RB",18.2),("Drake London","Atl","WR",18.6),
-    ("Omarion Hampton","LAC","RB",18.7),("Josh Allen","Buf","QB",19.6),
+    ("Omarion Hampton","LAC","RB",18.7),("Josh Allen","Buf","QB",19.6),("Lamar Jackson","Bal","QB",30.0),("Jayden Daniels","Wsh","QB",35.0),("Joe Burrow","Cin","QB",45.0),
     ("Brock Bowers","LV","TE",21.1),("Nico Collins","Hou","WR",22.2),
     ("George Pickens","Dal","WR",22.4),("A.J. Brown","NE","WR",25.0),
-    ("Trey McBride","Ari","TE",25.4),("Jeremiyah Love","Ari","RB",27.2),
+    ("Trey McBride","Ari","TE",25.4),("Travis Kelce","KC","TE",35.0),("George Kittle","SF","TE",40.0),("Sam LaPorta","Det","TE",45.0),("T.J. Hockenson","Min","TE",55.0),("Mark Andrews","Bal","TE",70.0),("Kyle Pitts","Atl","TE",80.0),("Jeremiyah Love","Ari","RB",27.2),
     ("DeVonta Smith","Phi","WR",29.4),("Kyren Williams","LAR","RB",29.6),
     ("Josh Jacobs","GB","RB",32.8),("Chris Olave","NO","WR",34.0),
     # K tier (draft only last rounds)
     ("Brandon Aubrey","Dal","K",85.0),("Ka'imi Fairbairn","Hou","K",119.0),
     ("Cameron Dicker","LAC","K",123.0),("Jason Myers","Sea","K",124.0),
-    ("Cam Little","Jax","K",129.0),
+    ("Cam Little","Jax","K",129.0),("Harrison Butker","KC","K",115.0),("Justin Tucker","Bal","K",135.0),
     # DEF tier (draft only last rounds)
     ("Rams","LAR","DEF",89.0),("Texans","Hou","DEF",93.0),
     ("Broncos","Den","DEF",101.0),("Seahawks","Sea","DEF",107.0),
-    ("Eagles","Phi","DEF",123.0),("Patriots","NE","DEF",127.0),
+    ("Eagles","Phi","DEF",123.0),("Patriots","NE","DEF",127.0),("Bills","Buf","DEF",115.0),("49ers","SF","DEF",120.0),
 ]
 
 # Required starting slots (filled by deadline); bench fills the rest.
 REQUIRED = {"QB":1, "RB":2, "WR":2, "TE":1, "K":1, "DEF":1}
-# By which round each required slot should be secured (forced if missing).
-# QB by round 10, K/DEF by last 2 rounds, skill by round ~9.
-FORCE_BY_ROUND = {"RB":9, "WR":9, "TE":7, "QB":10, "K":14, "DEF":14}
+
+# Anchor schedule: by which round the Nth still-needed player at POS must be
+# taken (forced if still missing). Tuned for a 12-team league where the RB/TE
+# wells run dry fast: lock 2 RBs by round 5, 2 WRs by round 9, TE by 7, etc.
+ANCHOR_BY_ROUND = {
+    "RB":  [3, 5],     # 1st RB by R3, 2nd RB by R5
+    "WR":  [5, 9],     # 1st WR by R5, 2nd WR by R9
+    "TE":  [7],        # TE by R7
+    "QB":  [10],       # QB by R10
+    "K":   [14],       # K/DEF in last 2 rounds
+    "DEF": [14],
+}
+
+# Positional-scarcity soft premium. In a 12-team league the crowd OVER-drafts
+# RBs (low Yahoo ADP), so VALUE = Yahoo_ADP - ECR scores good RBs NEGATIVE and
+# would let the bot skip them for "higher-value" WRs -- then the RB well runs
+# dry. While we still NEED a scarce position, add this premium to its effective
+# value so the bot anchors it early. The anchor schedule above is the hard
+# guarantee; this premium just biases close calls toward scarce positions.
+SCARCITY_BONUS = {"RB": 8.0}
 
 def log(s):
     line = datetime.datetime.now().strftime("%H:%M:%S") + " " + str(s)
@@ -286,8 +303,9 @@ def choose_pick(available, drafted, round_num, board, adp_map=None):
         rank = best value).
       - Otherwise fall back to the board's precomputed value (ECR-based, or
         ADP-based if a paid FantasyPros tier supplied ADP).
-    1) If a REQUIRED slot is still unfilled AND we're at/past its FORCE_BY_ROUND,
-       force the highest-value available player at that position.
+    1) If a REQUIRED slot is still unfilled AND we're at/past its anchor
+       deadline (ANCHOR_BY_ROUND), force the highest-value available player at
+       that position.
     2) Otherwise pick the highest-value available player respecting timing guards.
     3) Fallback: best available ignoring need (still respect timing)."""
     adp_map = adp_map or {}
@@ -302,13 +320,20 @@ def choose_pick(available, drafted, round_num, board, adp_map=None):
             ya = adp_map.get(v["name"].lower())
             if ya is not None:
                 eff = float(ya) - float(ecr)   # Yahoo ADP - FantasyPros ECR
+        # 12-team positional-scarcity soft premium: while we still NEED a scarce
+        # position, lift its effective value so the crowd's RB inflation can't
+        # price us out of the position before the anchor deadline forces it.
+        need = REQUIRED.get(v["pos"], 0) - drafted.get(v["pos"], 0)
+        if need > 0 and v["pos"] in SCARCITY_BONUS:
+            eff += SCARCITY_BONUS[v["pos"]]
         scored.append((eff, v))
     scored.sort(key=lambda x: x[0], reverse=True)
     cands = [v for _, v in scored]
 
-    # 1) forced fills for required slots past deadline
+    # 1) forced fills for required slots past their anchor deadline
     for pos, need in REQUIRED.items():
-        if drafted.get(pos, 0) < need and round_num >= FORCE_BY_ROUND.get(pos, 99):
+        have = drafted.get(pos, 0)
+        if have < need and round_num >= ANCHOR_BY_ROUND[pos][have]:
             for c in cands:
                 if c["pos"] == pos:
                     return (c["name"], c.get("team"), pos, c.get("adp") or 0)

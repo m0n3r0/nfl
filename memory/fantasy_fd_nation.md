@@ -5,7 +5,7 @@ the user mentions fantasy football, their league, the draft, lineup, waivers, or
 
 ## League facts (verified 2026-08-20 via live Edge CDP)
 - Platform: Yahoo Fantasy Football, league ID **1329011**, name **"FD nation"**.
-- Manager: user is **"Doge"**, team **#2** (URL team id = 2). Other teams: Goal Line Dwayne (commish), Game Plan buy, Take it in the Browns, Kwasi's Wins, QB Sneak Christopher, Otto-matic Win!, Neal Before Zod. All 10 spots filled (verified live 2026-08-28; was 7 of 10 on 2026-08-20).
+- Manager: user is **"Doge"**, team **#2** (URL team id = 2). **12 teams** (user corrected to 12 on 2026-08-28; the 2026-08-28 live capture showed only 10 spots filled — RE-VERIFY the exact team count on draft day Sep 1 before trusting). Known teams (10 observed 08-28): Goal Line Dwayne (commish), Game Plan buy, Take it in the Browns, Kwasi's Wins, QB Sneak Christopher, Otto-matic Win!, Neal Before Zod.
 - Format: Head-to-Head, **.5 PPR** (Receptions = 0.5), fractional points ON, negative points ON.
 - Roster: 1 QB, 2 WR, 2 RB, 1 TE, 1 W/R/T (flex), 1 K, 1 DEF, 6 BN, 2 IR (15 total).
 - Draft: **Live Standard snake**, 15 rounds, **1 minute per pick**, scheduled **Tue Sep 1 2026, 5:00pm EDT** (= 2026-09-02 06:00 JST on this machine). *Corrected 2026-08-28 from the live Yahoo tab — repo had Aug 28; actual draft is Sep 1.*
@@ -13,13 +13,17 @@ the user mentions fantasy football, their league, the draft, lineup, waivers, or
 - Waiver: 2-day rolling list; trade review by league vote; max acquisitions unlimited.
 
 ## Draft strategy (user-approved)
-- Approach: draft by **value = expert rank − ADP** when a live FantasyPros feed is
-  available (set `FP_API_KEY` for the free API); otherwise fall back to the
-  pre-built ADP board (verified top-30). Automatic guardrails apply either way:
-  - No QB before round 10.
-  - K and DEF only in the last 2 rounds.
-  - Don't double a position that's already filled to its slot count.
-  - ADP sanity window (don't reach absurdly above ADP).
+- Format: **12-team** .5 PPR snake. Draft by **value = Yahoo_ADP − FantasyPros_ECR**
+  (Yahoo ADP scraped live from the draft room; ECR from the free FP key). Falls
+  back to the pre-built ADP board if no key / fetch fails.
+- 12-team scarcity anchoring: RB is the scarcest position, so the bot (a) adds a
+  soft +8 value premium to RBs we still need (anchors them early despite the
+  crowd's RB inflation) and (b) hard-forces slots by `ANCHOR_BY_ROUND`: 1st RB by
+  R3, 2nd RB by R5, WR by R5/R9, TE by R7, QB by R10, K/DEF by R14.
+- BOARD depth for 12-team: ~54 players (12 TEs, 4 QBs, 8 K, 9 DEF) so a required
+  slot is never stranded if the crowd snipes the top names before our anchor turn.
+- Other guardrails: no QB before round 10; K/DEF only last 2 rounds; don't double
+  a position past its slot count; ADP sanity window (don't reach absurdly above ADP).
 - Safety net: Yahoo DEFAULT pre-rank (ADP-based) is the auto-draft fallback. User accepted this (custom Edit-My-Rankings UI was too fragile to automate safely — Yahoo uses a JS drag widget with no stable controls).
 - Do-not-draft list: **none** (user confirmed).
 
