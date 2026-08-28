@@ -215,17 +215,30 @@ py.exe driver/draft_driver.py
 Or let the scheduled task **FDnationDraftDriver** fire automatically at draft time.
 
 #### Live value board (optional but recommended)
-By default the driver drafts from a fixed board. To draft by **value** (expert
-rank − ADP) using live [FantasyPros](https://www.fantasypros.com/api-data/)
-data, set a free API key before the draft:
+By default the driver drafts from a fixed board. To draft from live
+[FantasyPros](https://www.fantasypros.com/api-data/) data, provide an API key
+(any of these work — the driver loads `.env` automatically):
 ```bat
 setx FP_API_KEY "your-free-key"
 ```
-With the key, the driver logs `BOARD_MODE=LIVE(FantasyPros)` and picks the
-highest-value available player each turn; without it (or on any fetch failure)
-it logs `BOARD_MODE=STATIC` and falls back to the fixed board. See
-[docs/DATA_SOURCES.md](docs/DATA_SOURCES.md) for the full strategy, pricing, and
-setup.
+```ini
+# .env  (repo root; already git-ignored)
+FP_API_KEY=your-free-key
+# or the short alias the driver also accepts:
+API=your-free-key
+```
+- **Free key:** FantasyPros' free tier exposes Expert Consensus Rankings (ECR)
+  but **not ADP** (ADP is gated behind a paid tier). With a free key the driver
+  drafts **best-player-available by ECR** and logs `BOARD_MODE=LIVE(FantasyPros)`
+  with mode `ECR-only (free tier, BPA)`. This is a strong live strategy; it just
+  isn't the ADP−ECR "value" metric.
+- **Paid key (ADP):** if your plan exposes ADP, the driver upgrades to true
+  `VALUE = ADP − ECR` and logs mode `ADP-ECR (paid tier)`.
+- **No key / fetch failure:** logs `BOARD_MODE=STATIC` and falls back to the
+  fixed board.
+
+See [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md) for the full strategy,
+pricing, and setup.
 
 ### Safety net
 Yahoo default pre-rank is the auto-draft fallback if the driver errors.

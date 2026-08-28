@@ -19,12 +19,38 @@ ADP_WINDOW = 40              # reach guard: skip board pick if ADP >> board rank
 
 # ---- Live value board (FantasyPros API) -------------------------------------
 # Instead of drafting from a fixed list, we pull live Expert Consensus Rankings
-# (ECR) + ADP from FantasyPros and draft by VALUE = ADP - ECR
-# (players the experts rank well above where the crowd is drafting = best value).
-# Requires a FREE API key (https://www.fantasypros.com/api-data/) in FP_API_KEY.
-# If the key is missing or the fetch fails, we fall back to the static BOARD
-# (original behaviour). Set FP_SCORING to match your league (.5 PPR -> HALF).
-FP_API_KEY = os.environ.get("FP_API_KEY")
+# (ECR) from FantasyPros and draft the best available player by ECR (a strong
+# best-player-available signal). If the key's plan also exposes ADP (a PAID
+# FantasyPros tier), we upgrade to true VALUE = ADP - ECR (players the experts
+# rank well above where the crowd drafts = best value).
+# Requires an API key (https://www.fantasypros.com/api-data/) in FP_API_KEY
+# (or API= in a .env file). If the key is missing or the fetch fails, we fall
+# back to the static BOARD (original behaviour). Set FP_SCORING to match your
+# league (.5 PPR -> HALF).
+def _load_dotenv():
+    """Minimal .env loader (no python-dotenv dependency). Loads the first
+    .env found at the repo root or the current working directory, setting only
+    vars that aren't already in the environment (real env vars win)."""
+    candidates = [
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"),
+        os.path.join(os.getcwd(), ".env"),
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            with io.open(path, "r", encoding="utf-8-sig") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    k, v = line.split("=", 1)
+                    k, v = k.strip(), v.strip().strip('"').strip("'")
+                    if k and k not in os.environ:
+                        os.environ[k] = v
+            return
+
+_load_dotenv()
+# Canonical env var is FP_API_KEY; accept a bare API= alias for convenience.
+FP_API_KEY = os.environ.get("FP_API_KEY") or os.environ.get("API")
 FP_BASE = "https://api.fantasypros.com/public/v2/json"
 FP_SEASON = 2026
 FP_SCORING = "HALF"          # FD nation is .5 PPR
@@ -86,8 +112,10 @@ def _fp_get(path):
 def fetch_fp_consensus(position):
     """Pull FantasyPros consensus rankings (ECR + ADP) for one position.
     Returns a list of dicts with name/team/pos/ecr/adp (adp may be None)."""
+    # FantasyPros codes defenses as DST; our board/logic use DEF internally.
+    api_pos = "DST" if position == "DEF" else position
     data = _fp_get("/nfl/%d/consensus-rankings?position=%s&scoring=%s"
-                   % (FP_SEASON, position, FP_SCORING))
+                   % (FP_SEASON, api_pos, FP_SCORING))
     out = []
     for p in data.get("players", []):
         name = p.get("player_name")
@@ -119,14 +147,24 @@ def static_board():
                    "value": -b[3]} for b in BOARD}
 
 def build_value_board():
-    """Live board: BOARD names annotated with FantasyPros ECR + ADP, ordered by
-    VALUE = ADP - ECR (higher = better value: drafted later than experts rank).
+    """Live board: BOARD names annotated with FantasyPros ECR (+ADP if the key's
+    plan exposes it), ordered by value:
+      - ADP available (paid tier): VALUE = ADP - ECR (true value: drafted later
+        than experts rank = best value).
+      - ECR only (free tier):      VALUE = -ECR (best-player-available by expert
+        consensus; higher ECR rank = worse, so we negate).
+    Players we can't match to the feed (e.g. defenses, whose feed uses full team
+    names; or players beyond the free tier's 10-per-position cap) keep their
+    static ADP but are pushed far down the board (value = -(adp+1000)) so they
+    never sort ABOVE a real match.
     Returns None if no key / fetch fails, so the caller falls back to
     static_board()."""
     if not FP_API_KEY:
         log("VALUE_BOARD: no FP_API_KEY -> static BOARD")
         return None
-    fp = {}
+    fp = {}          # name(lower) -> row
+    fp_team = {}     # team(lower) -> row  (defenses match by team id)
+    has_adp = False
     for pos in sorted(set(b[2] for b in BOARD)):
         try:
             rows = fetch_fp_consensus(pos)
@@ -134,20 +172,31 @@ def build_value_board():
             log("VALUE_BOARD: fetch failed (%s) -> static BOARD" % repr(e))
             return None
         for r in rows:
-            fp[r["name"].lower()] = r
+            if r["name"]:
+                fp[r["name"].lower()] = r
+            if r.get("team"):
+                fp_team[r["team"].lower()] = r
+            if r.get("adp") is not None:
+                has_adp = True
     out = {}
     live = 0
     for (name, team, pos, adp) in BOARD:
         r = fp.get(name.lower())
-        if r and r.get("ecr") is not None and r.get("adp") is not None:
+        if r is None and pos == "DEF":        # feed uses full team names
+            r = fp_team.get(team.lower())
+        if r and r.get("ecr") is not None:
+            if r.get("adp") is not None:
+                value = float(r["adp"]) - float(r["ecr"])
+            else:
+                value = -float(r["ecr"])
             out[name] = {"name": name, "team": team, "pos": pos,
-                         "ecr": r["ecr"], "adp": r["adp"],
-                         "value": float(r["adp"]) - float(r["ecr"])}
+                         "ecr": r["ecr"], "adp": r.get("adp"), "value": value}
             live += 1
         else:
             out[name] = {"name": name, "team": team, "pos": pos,
-                         "adp": adp, "value": 0.0}
-    log("VALUE_BOARD: live coverage %d/%d" % (live, len(out)))
+                         "adp": adp, "value": -(float(adp) + 1000.0)}
+    mode = "ADP-ECR (paid tier)" if has_adp else "ECR-only (free tier, BPA)"
+    log("VALUE_BOARD: live coverage %d/%d [%s]" % (live, len(out), mode))
     return out
 
 def connect():

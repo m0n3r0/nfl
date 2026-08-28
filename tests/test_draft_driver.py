@@ -33,8 +33,9 @@ def _install_mock_fp(offsets):
 
     def mock_fp_get(path):
         pos = re.search(r"position=(\w+)", path).group(1)
+        lookup = "DEF" if pos == "DST" else pos   # feed codes defenses as DST
         out = []
-        for i, (name, team, adp) in enumerate(positions.get(pos, [])):
+        for i, (name, team, adp) in enumerate(positions.get(lookup, [])):
             out.append({
                 "player_name": name, "player_team_id": team, "position": pos,
                 "rank_ecr": i + 1,
@@ -88,8 +89,89 @@ def test_build_value_board_static_fallback_without_key():
     assert vb is None
 
 
+def test_build_value_board_ecr_only_when_adp_absent():
+    """Free FantasyPros tier has ECR but no ADP: board must still be live and
+    order by -ECR (best-player-available), not collapse to all-zero value."""
+    def mock_ecr_only(path):
+        # only ECR is present; adp is absent (matches the real free endpoint)
+        pos = re.search(r"position=(\w+)", path).group(1)
+        lookup = "DEF" if pos == "DST" else pos
+        players = [b for b in dd.BOARD if b[2] == lookup]
+        return {"players": [
+            {"player_name": n, "player_team_id": t, "position": pos,
+             "rank_ecr": i + 1, "tier": 1}
+            for i, (n, t, pos2, adp) in enumerate(players)]}
+    dd._fp_get = mock_ecr_only
+    dd.FP_API_KEY = "MOCK"
+    try:
+        vb = dd.build_value_board()
+    finally:
+        dd.FP_API_KEY = None
+    assert vb is not None
+    assert len(vb) == len(dd.BOARD)
+    # every matched player carries ecr and a non-zero, -ecr-based value
+    matched = [row for row in vb.values() if "ecr" in row]
+    assert matched, "no players took the live branch"
+    for row in matched:
+        assert row["value"] == -float(row["ecr"]), row
+    # best available overall should be the #1 ECR player (Jahmyr Gibbs, RB)
+    best = max(vb.values(), key=lambda r: r.get("value", 0.0))
+    assert best["name"] == "Jahmyr Gibbs"
+
+
+def test_build_value_board_matches_def_by_team_id():
+    """FantasyPros defenses come back as full team names ('Houston Texans')
+    with a player_team_id ('HOU'); our BOARD stores the short team ('Hou').
+    The board must match them by team id, not by name."""
+    def mock_mixed(path):
+        pos = re.search(r"position=(\w+)", path).group(1)
+        if pos == "DST":
+            return {"players": [
+                {"player_name": "Houston Texans", "player_team_id": "HOU",
+                 "position": "DST", "rank_ecr": 1, "tier": 1},
+                {"player_name": "Denver Broncos", "player_team_id": "DEN",
+                 "position": "DST", "rank_ecr": 2, "tier": 1}]}
+        players = [b for b in dd.BOARD if b[2] == pos]
+        return {"players": [
+            {"player_name": n, "player_team_id": t, "position": pos,
+             "rank_ecr": i + 1, "tier": 1}
+            for i, (n, t, pos2, adp) in enumerate(players)]}
+    dd._fp_get = mock_mixed
+    dd.FP_API_KEY = "MOCK"
+    try:
+        vb = dd.build_value_board()
+    finally:
+        dd.FP_API_KEY = None
+    assert vb is not None
+    for name in ("Texans", "Broncos"):
+        row = vb[name]
+        assert "ecr" in row and row["ecr"] is not None, name
+
+
+def test_unmatched_players_deprioritized():
+    """Players absent from the feed must sort BELOW every matched player
+    (value ~ -(adp+1000)), never above them."""
+    def mock_qb_only(path):
+        return {"players": [
+            {"player_name": "Josh Allen", "player_team_id": "BUF",
+             "position": "QB", "rank_ecr": 1, "tier": 1}]}
+    dd._fp_get = mock_qb_only
+    dd.FP_API_KEY = "MOCK"
+    try:
+        vb = dd.build_value_board()
+    finally:
+        dd.FP_API_KEY = None
+    matched = [r for r in vb.values() if "ecr" in r]
+    unmatched = [r for r in vb.values() if "ecr" not in r]
+    assert matched and unmatched
+    assert max(r["value"] for r in unmatched) < min(r["value"] for r in matched)
+
+
 if __name__ == "__main__":
     test_fetch_fp_consensus_keeps_zero_adp()
     test_build_value_board_full_coverage_with_zero_adp()
+    test_build_value_board_ecr_only_when_adp_absent()
+    test_build_value_board_matches_def_by_team_id()
+    test_unmatched_players_deprioritized()
     test_build_value_board_static_fallback_without_key()
     print("All draft-driver tests passed.")
