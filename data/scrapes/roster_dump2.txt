@@ -1,0 +1,124 @@
+CURRENT https://football.fantasysports.yahoo.com/f1/1329011/team
+TEAM_LINKS ['/f1/1329011/2', '/f1/1329011/2/playernotes', '/f1/1329011/2/playerswatch', '/f1/1329011/2/teamlog', '/f1/1329011/2/editteaminfo', '/f1/1329011/2/prerank']
+=== NAV /1 title=FD nation - Goal Line Dwayne | Fantasy Football | Yahoo! Sports ===
+NOT_A_TEAM_PAGE (err or empty): Yahoo Sports
+Yahoo Sports
+Search query
+News
+Finance
+Sports
+More
+B
+ Fantasy Football
+Overview
+League
+My Team
+Matchups
+Players
+Research
+Draft
+StatTracker
+…
+Fantasy
+Network
+Fantasy Plus
+FD nation (ID# 13
+=== NAV /2 title=FD nation - Game Plan buy | Fantasy Football | Yahoo! Sports ===
+Yahoo Sports
+Yahoo Sports
+Search query
+News
+Finance
+Sports
+More
+B
+ Fantasy Football
+Overview
+League
+My Team
+Matchups
+Players
+Research
+Draft
+StatTracker
+…
+Fantasy
+Network
+Fantasy Plus
+FD nation (ID# 1329011)
+Yahoo Sports Fantasy Football
+Game Plan buy
+Doge (Since '26)Edit Team Settings
+0-0-0
+Record
+Week 1 vs Take it in the Browns
+ 
+0.00
+0.00
+	vs	
+0.00
+0.00
+ 
+ 
+Your team will include the following roster positions:
+QB
+	
+RB
+	
+WR
+	
+TE
+	
+W-R-T
+	
+K
+	
+DEF
+	
+BN
+	
+IR
+
+
+1
+	
+2
+	
+2
+	
+1
+	
+1
+	
+1
+	
+1
+	
+6
+	
+2
+Legends and Glossaries
+Legend
+
+Stats
+
+Positions
+
+Advanced Stats Glossary
+
+ 
+The Fine Print
+Projections Powered by Rotowire. Week 1 stats may change if Stat corrections are applied by Thursday, Sep 17. All game times are shown in EDT.
+Sit/start suggestions
+Add/drop suggestions
+Trade suggestions
+	
+Yahoo Sports - NBC Sports Network - Paid Fantasy Terms - Feedback - Terms and Privacy Policy - Privacy Dashboard  - About Our Ads - Help
+
+Certain Data by Sportradar, Rotowire, FTN, BAKER Engine and THE BLITZ
+
+Guillotine trademarks are used with Fantasy Life's permission.
+
+© 2026 Yahoo Fantasy Sports LLC. All rights reserved.
+=== ROSTER TABLE ===
+<table class="Table Table-px-xxs Ta-c"><thead><tr class="First Last"><th class="Alt Ta-c"><div>QB</div></th><th class="Ta-c"><div>RB</div></th><th class="Alt Ta-c"><div>WR</div></th><th class="Ta-c"><div>TE</div></th><th class="Alt Ta-c"><div>W-R-T</div></th><th class="Ta-c"><div>K</div></th><th class="Alt Ta-c"><div>DEF</div></th><th class="Last Ta-c"><div>BN</div></th><th class="Alt Ta-c"><div>IR</div></th></tr></thead><tbody><tr class="First Last"><td class="Alt"><div>1</div></td><td class=""><div>2</div></td><td class="Alt"><div>2</div></td><td class=""><div>1</div></td><td class="Alt"><div>1</div></td><td class=""><div>1</div></td><td class="Alt"><div>1</div></td><td class="Last"><div>6</div></td><td class="Alt"><div>2</div></td></tr></tbody></table>

@@ -3,6 +3,47 @@
 Fantasy football toolkit. Ingests public NFL player/stat data, scores it, ranks
 players, and builds a weekly lineup.
 
+> **Two parts, one repo:**
+> 1. **Toolkit** — ingest, score, rank, project, and model NFL players (sections below).
+> 2. **FD nation draft automation** — a self-contained module that auto-drafts a
+>    specific Yahoo league through the Edge browser. See
+>    [FD nation draft automation (module)](#fd-nation-draft-automation-module).
+
+## What is fantasy football? (ELI5)
+
+Imagine you're a coach, not a player. Before the NFL season you "draft" real
+players onto your own fake team. Every week those real players rack up points from
+what they actually do in games — touchdowns, yards, catches, field goals. Your
+team's points go head-to-head against another person's team; the higher score
+wins that week. Do it for ~15 weeks and the best record (or playoff bracket) wins
+the league. It's a season-long game of "which real players will do best?"
+
+## Is money involved?
+
+It depends on the league — this repo doesn't decide that. Many leagues are free
+and just-for-fun among friends; others have a small buy-in or prizes. **This
+codebase is a pure analysis + automation tool**: it builds projections, ranks
+players, and (for FD nation) auto-drafts. It is **not** a betting or gambling
+system and it places no wagers. See the honesty notes under
+[Known limitations](#known-limitations) and
+[FD nation → Honest limitations](#honest-limitations).
+
+## Contents
+
+- [What is fantasy football? (ELI5)](#what-is-fantasy-football-eli5)
+- [Is money involved?](#is-money-involved)
+- [Data source](#data-source)
+- [Setup](#setup)
+- [CLI](#cli)
+- [2026 projection engine](#2026-projection-engine)
+- [Win-probability model](#win-probability-model-predicting-the-winning-team)
+- [Web UI](#web-ui)
+- [Scoring](#scoring)
+- [Tests](#tests)
+- [Known limitations](#known-limitations)
+- [FD nation draft automation (module)](#fd-nation-draft-automation-module)
+- [Data sources & winning strategy](docs/DATA_SOURCES.md)
+
 ## Data source
 
 Player stats, rosters, and schedules are pulled from the public
@@ -144,3 +185,79 @@ rounding and that PPR = standard + receptions.
   rather than fabricating 0-point picks. Feed those datasets in to fill them.
 - The lineup optimizer is a greedy "best available" heuristic, not an optimal
   integer-program solver.
+
+## FD nation draft automation (module)
+
+Yahoo Fantasy Football league **"FD nation"** (ID `1329011`), manager **Doge** (team #2).
+An automated draft driver + read-only scrapers driven via Edge Chrome DevTools
+Protocol (CDP). Lives as a self-contained module alongside the toolkit above.
+
+### Layout
+- `driver/draft_driver.py` — live draft driver (board + guardrails + human-like CDP clicks). Runs on Windows via `py.exe`.
+- `skills/` — Hermes skills (edge-cdp, fantasy-read, fantasy-draft) for reuse in Hermes Desktop.
+- `memory/fantasy_fd_nation.md` — persistent league context for the agent.
+- `data/board/` — draft board + K/DEF ADP (verified Yahoo data).
+- `data/scrapes/` — roster/standings/settings extracts from the live tab.
+- `validation/` — mock-draft + click validation logs (2026-08-21).
+- `logs/draft_log.txt` — created at draft time; every pick decision logged here.
+- `images/` — proof screenshots.
+
+### League facts (verified live 2026-08-28)
+.5 PPR, H2H, 15 rounds, 1 min/pick, snake, **12 teams**. Roster: 1QB/2WR/2RB/1TE/1WRT/1K/1DEF/6BN/2IR.
+Draft: **Tue Sep 1 2026, 5:00pm EDT** (= 2026-09-02 06:00 JST on the machine).
+
+### How to run the draft
+Edge must be open on port 9222, bound to loopback (`--remote-debugging-address=127.0.0.1`), with `--remote-allow-origins=*` and the user logged in. See the security note below for the required firewall restriction.
+
+> **Security note (read before opening the port).** CDP exposes a *full browser-control
+> interface* on the debug port — anyone who can reach `http://127.0.0.1:9222` can drive
+> the browser and read every open tab, **including your logged-in Yahoo session**.
+> - Bind to loopback only: launch Edge with `--remote-debugging-address=127.0.0.1`
+>   (pass it alongside `--remote-debugging-port=9222 --remote-allow-origins=*`).
+> - Ensure **no firewall / port-forward rule** exposes 9222 to the network.
+> - Close Edge (or the port) when you're not drafting.
+> Treat the debug port like an unlocked door to your accounts.
+
+Then on Windows:
+```
+py.exe driver/draft_driver.py
+```
+Or let the scheduled task **FDnationDraftDriver** fire automatically at draft time.
+
+#### Live value board (optional but recommended)
+By default the driver drafts from a fixed board. To draft from live
+[FantasyPros](https://www.fantasypros.com/api-data/) data, provide an API key
+(any of these work — the driver loads `.env` automatically):
+```bat
+setx FP_API_KEY "your-free-key"
+```
+```ini
+# .env  (repo root; already git-ignored)
+FP_API_KEY=your-free-key
+# or the short alias the driver also accepts:
+API=your-free-key
+```
+- **Free key + Yahoo ADP (recommended):** FantasyPros' free tier exposes Expert
+  Consensus Rankings (ECR) but **not ADP** (ADP is gated behind a paid tier).
+  Instead the driver **scrapes Yahoo's own ADP** live from the draft room each
+  turn, so you get the true `VALUE = Yahoo_ADP − FantasyPros_ECR` ("value")
+  metric on the free key. It logs `BOARD_MODE=LIVE(FantasyPros)` with mode
+  `Yahoo_ADP−ECR`.
+- **Free key, no Yahoo ADP shown:** if the draft room doesn't expose ADP for a
+  player, that pick falls back to **best-player-available by ECR** (mode
+  `ECR-only`). Still a strong live strategy.
+- **Paid FantasyPros key (ADP):** if your plan exposes ADP, the driver can also
+  use `VALUE = ADP − ECR` from FantasyPros directly.
+- **No key / fetch failure:** logs `BOARD_MODE=STATIC` and falls back to the
+  fixed board.
+
+See [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md) for the full strategy,
+pricing, and setup.
+
+### Safety net
+Yahoo default pre-rank is the auto-draft fallback if the driver errors.
+
+### Honest limitations
+- Cannot guarantee wins (real NFL games decide outcomes).
+- Live pick→Draft-button flow validated at mechanism level, not end-to-end (Yahoo mock gated).
+- Keep Edge + machine on at draft time.

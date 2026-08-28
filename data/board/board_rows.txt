@@ -1,0 +1,60 @@
+TBODY_ROWS
+Jahmyr Gibbs | Det - RB | 	 | 1 | 	 | 	 | 	 | 100% | 	 | 1.5 | 	 | 1.5 | 	 | 	 | 	 |
+---
+Bijan Robinson | Atl - RB | 	 | 2 | 	 | 	 | 	 | 100% | 	 | 1.9 | 	 | 1.9 | 	 | 	 | 	 |
+---
+Ja'Marr Chase | Cin - WR | 	 | 3 | 	 | 	 | 	 | 100% | 	 | 3.3 | 	 | 3.3 | 	 | 	 | 	 |
+---
+Puka Nacua | LAR - WR | Q | 	 | 4 | 	 | 	 | 	 | 100% | 	 | 4.7 | 	 | 4.7 | 	 | 	 | 	 |
+---
+Christian McCaffrey | SF - RB | Q | 	 | 5 | 	 | 	 | 	 | 100% | 	 | 5.6 | 	 | 5.5 | 	 | 	 | 	 |
+---
+Jaxon Smith-Njigba | Sea - WR | 	 | 7 | 	 | 	 | 	 | 100% | 	 | 6.7 | 	 | 6.6 | 	 | 	 | 	 |
+---
+Jonathan Taylor | Ind - RB | 	 | 8 | 	 | 	 | 	 | 100% | 	 | 7.1 | 	 | 7.1 | 	 | 	 | 	 |
+---
+Amon-Ra St. Brown | Det - WR | 	 | 6 | 	 | 	 | 	 | 100% | 	 | 8.0 | 	 | 8.0 | 	 | 	 | 	 |
+---
+James Cook III | Buf - RB | 	 | 10 | 	 | 	 | 	 | 100% | 	 | 9.9 | 	 | 9.9 | 	 | 	 | 	 |
+---
+CeeDee Lamb | Dal - WR | 	 | 9 | 	 | 	 | 	 | 100% | 	 | 10.2 | 	 | 10.2 | 	 | 	 | 	 |
+---
+Saquon Barkley | Phi - RB | 	 | 11 | 	 | 	 | 	 | 100% | 	 | 12.4 | 	 | 12.4 | 	 | 	 | 	 |
+---
+Justin Jefferson | Min - WR | 	 | 12 | 	 | 	 | 	 | 100% | 	 | 12.4 | 	 | 12.4 | 	 | 	 | 	 |
+---
+Ashton Jeanty | LV - RB | 	 | 14 | 	 | 	 | 	 | 100% | 	 | 14.1 | 	 | 14.0 | 	 | 	 | 	 |
+---
+De'Von Achane | Mia - RB | 	 | 16 | 	 | 	 | 	 | 100% | 	 | 15.7 | 	 | 15.7 | 	 | 	 | 	 |
+---
+Chase Brown | Cin - RB | 	 | 15 | 	 | 	 | 	 | 100% | 	 | 16.6 | 	 | 16.6 | 	 | 	 | 	 |
+---
+Kenneth Walker III | KC - RB | 	 | 13 | 	 | 	 | 	 | 100% | 	 | 17.0 | 	 | 17.1 | 	 | 	 | 	 |
+---
+Derrick Henry | Bal - RB | 	 | 19 | 	 | 	 | 	 | 100% | 	 | 18.2 | 	 | 18.2 | 	 | 	 | 	 |
+---
+Drake London | Atl - WR | 	 | 17 | 	 | 	 | 	 | 100% | 	 | 18.6 | 	 | 18.6 | 	 | 	 | 	 |
+---
+Omarion Hampton | LAC - RB | 	 | 18 | 	 | 	 | 	 | 100% | 	 | 18.7 | 	 | 18.6 | 	 | 	 | 	 |
+---
+Josh Allen | Buf - QB | 	 | 28 | 	 | 	 | 	 | 100% | 	 | 19.6 | 	 | 19.6 | 	 | 	 | 	 |
+---
+Brock Bowers | LV - TE | 	 | 20 | 	 | 	 | 	 | 100% | 	 | 21.1 | 	 | 21.0 | 	 | 	 | 	 |
+---
+Nico Collins | Hou - WR | 	 | 21 | 	 | 	 | 	 | 100% | 	 | 22.2 | 	 | 22.2 | 	 | 	 | 	 |
+---
+George Pickens | Dal - WR | 	 | 22 | 	 | 	 | 	 | 100% | 	 | 22.4 | 	 | 22.4 | 	 | 	 | 	 |
+---
+A.J. Brown | NE - WR | 	 | 23 | 	 | 	 | 	 | 100% | 	 | 25.0 | 	 | 25.0 | 	 | 	 | 	 |
+---
+Trey McBride | Ari - TE | 	 | 32 | 	 | 	 | 	 | 100% | 	 | 25.4 | 	 | 25.4 | 	 | 	 | 	 |
+---
+Jeremiyah Love | Ari - RB | Q | 	 | 26 | 	 | 	 | 	 | 100% | 	 | 27.2 | 	 | 27.2 | 	 | 	 | 	 |
+---
+DeVonta Smith | Phi - WR | Q | 	 | 25 | 	 | 	 | 	 | 100% | 	 | 29.4 | 	 | 29.4 | 	 | 	 | 	 |
+---
+Kyren Williams | LAR - RB | 	 | 31 | 	 | 	 | 	 | 100% | 	 | 29.6 | 	 | 29.5 | 	 | 	 | 	 |
+---
+Josh Jacobs | GB - RB | Q | 	 | 37 | 	 | 	 | 	 | 100% | 	 | 32.8 | 	 | 32.6 | 	 | 	 | 	 |
+---
+Chris Olave | NO - WR | 	 | 34 | 	 | 	 | 	 | 100% | 	 | 33.3 | 	 | 33.2 | 	 | 	 | 	 |

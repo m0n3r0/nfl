@@ -1,0 +1,155 @@
+# STATUS: HISTORICAL/INCOMPLETE capture — reflects only 7 of 10 teams
+# (league was still filling: "7/10 SPOTS FILLED", "7 Confirmed Teams").
+# Conflicts with data/scrapes/2026-08-28_live_state.txt, which reflects all 10 teams.
+# Treat as historical only; do NOT use as the current roster.
+URL https://football.fantasysports.yahoo.com/f1/1329011
+TITLE FD nation | Fantasy Football | Yahoo! Sports
+=== CURRENT PAGE TEXT (first 1500) ===
+Yahoo Sports
+Yahoo Sports
+Search query
+News
+Finance
+Sports
+More
+B
+ Fantasy Football
+Overview
+League
+My Team
+Matchups
+Players
+Research
+Draft
+StatTracker
+…
+Fantasy
+Network
+Get Fantasy Plus
+FD nation (ID# 1329011)
+Yahoo Sports Fantasy Football
+FD nation
+ League Announcements
+Invite friends
+7/10 SPOTS FILLED
+Share League
+More ways to fill your league
+		
+
+Your league has enabled non-commish invites. You (and all league managers) can send invites to your friends to join this league.
+
+	
+Instant Mock Drafts & Draft Kits
+To crush draft prep
+Personalized and built for your league, with expert guidance from our top fantasy analysts.
+
+Subscribe to Unlock
+League Members
+Teams
+ 
+Standings
+ 
+Schedule
+ 
+Ratings & Levels
+7 Confirmed Teams | 3 Available team slots
+	Team	Manager	Joined	Notes
+	Goal Line Dwayne	Dwayne	Aug 13	Created League
+	Game Plan buy	Doge	Aug 13	Joined via invite
+	Take it in the Browns	Ryan	Aug 16	Joined via invite
+	Kwasi's Wins	Kwasi	Yesterday	Joined via invite
+	QB Sneak Christopher	Christopher	Today	Joined via invite
+	Otto-matic Win!	Jason	Today	Joined via invite
+	Neal Before Zod	Neal K	Today	Joined via invite
+Matchups  
+Week 1
+  
+ Week 1 Matchups  Not started yet
+Game Plan buy
+0-0-0
+ 
+ 
+0.00
+0.00
+	vs	
+0.00
+0.00
+ 
+ 
+Take it in the Browns
+0-0-0
+Goal Line Dwayne
+0-0-0
+ 
+ 
+0.00
+0.00
+	vs	
+0.00
+0.00
+ 
+ 
+Otto-matic Win!
+0-0-0
+Kwasi's Wins
+0-0-0
+ 
+ 
+0.00
+0.00
+	vs	Bye
+QB Sneak Christopher
+0-0-0
+ 
+ 
+0.00
+0.00
+	vs	
+0.00
+0.00
+ 
+ 
+Neal Before Zod
+0-0-0
+Recent Transactions
+View A
+=== AFTER NAV URL === https://football.fantasysports.yahoo.com/f1/1329011/team
+=== MY TEAM TEXT (first 2500) ===
+Yahoo Sports
+Yahoo Sports
+Search query
+News
+Finance
+Sports
+More
+B
+ Fantasy Football
+Overview
+League
+My Team
+Matchups
+Players
+Research
+Draft
+StatTracker
+…
+Fantasy
+Network
+Get Fantasy Plus
+FD nation (ID# 1329011)
+Yahoo Sports Fantasy Football
+There was a problem
+This team does not exist. (Error #581)
+
+Back to previous page
+
+	
+Yahoo Sports - NBC Sports Network - Paid Fantasy Terms - Feedback - Terms and Privacy Policy - Privacy Dashboard  - About Our Ads - Help
+
+Certain Data by Sportradar, Rotowire, FTN, BAKER Engine and THE BLITZ
+
+Guillotine trademarks are used with Fantasy Life's permission.
+
+© 2026 Yahoo Fantasy Sports LLC. All rights reserved.
+=== ROSTER TABLE HTML (first 4000) ===
+NO_TABLE
