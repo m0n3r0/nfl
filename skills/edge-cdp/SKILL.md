@@ -59,7 +59,7 @@ def ev(ws, expr):
 
 ## Human-like input (avoid teleporting / bot detection)
 ```python
-import random, math
+import random, math, time
 
 def move_to(ws, x, y, steps=None, jitter=3):
     cur = getattr(move_to, "cur", (x, y))

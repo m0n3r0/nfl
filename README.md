@@ -208,6 +208,16 @@ Draft: **Tue Sep 1 2026, 5:00pm EDT** (= 2026-09-02 06:00 JST on the machine).
 
 ### How to run the draft
 Edge must be open on port 9222 with `--remote-allow-origins=*` and the user logged in.
+
+> **Security note (read before opening the port).** CDP exposes a *full browser-control
+> interface* on the debug port — anyone who can reach `http://127.0.0.1:9222` can drive
+> the browser and read every open tab, **including your logged-in Yahoo session**.
+> - Bind to loopback only: launch Edge with `--remote-debugging-address=127.0.0.1`
+>   (pass it alongside `--remote-debugging-port=9222 --remote-allow-origins=*`).
+> - Ensure **no firewall / port-forward rule** exposes 9222 to the network.
+> - Close Edge (or the port) when you're not drafting.
+> Treat the debug port like an unlocked door to your accounts.
+
 Then on Windows:
 ```
 py.exe driver/draft_driver.py

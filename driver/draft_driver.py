@@ -171,25 +171,31 @@ def static_board():
     return {b[0]: {"name": b[0], "team": b[1], "pos": b[2], "adp": b[3],
                    "value": -b[3]} for b in BOARD}
 
-def _norm_name(full):
+def _norm_name(full, team=None):
     """Normalize a full player name to the FantasyPros Real-Time ADP table key
     format: 'First Last' -> 'F. Last' (first initial + last; apostrophes/dots
-    stripped, trailing generational suffix dropped). This matches the abbreviated
-    names that RT ADP page renders, e.g.:
-        'Jahmyr Gibbs'      -> 'J. Gibbs'
-        "Ja'Marr Chase"     -> 'J. Chase'
-        'Jaxon Smith-Njigba'-> 'J. Smith-Njigba'
-        'Christian McCaffrey'-> 'C. McCaffrey'
-        'James Cook III'    -> 'J. Cook'
-    Applied to BOTH the BOARD full names and the scraped RT rows, so lookups
-    line up regardless of which side the abbreviation comes from."""
+    stripped, trailing generational suffix dropped). When `team` is supplied the
+    key is made UNIQUE as 'F. Last|TEAM' so two players who abbreviate to the
+    same 'Initial. Last' do NOT collide -- e.g. A.J. Brown and Amon-Ra St. Brown
+    both render as 'A. Brown', but 'A. Brown|NE' and 'A. Brown|DET' stay distinct.
+    Examples:
+        _norm_name('Jahmyr Gibbs', 'Det')   -> 'J. Gibbs|DET'
+        "Ja'Marr Chase", 'Cin'              -> 'J. Chase|CIN'
+        'James Cook III', 'Buf'             -> 'J. Cook|BUF'
+    Applied to BOTH the BOARD full names and the scraped RT rows (team parsed
+    from the row's 2nd line), so lookups line up regardless of which side the
+    abbreviation comes from."""
     parts = full.replace("'", "").replace(".", "").split()
     # drop a trailing generational suffix (III / II / IV / Jr / Sr)
     if parts and re.match(r"^(IV|III|II|I|Jr|SR)$", parts[-1], re.I):
         parts = parts[:-1]
     if len(parts) < 2:
-        return full
-    return parts[0][0].upper() + ". " + parts[-1]
+        base = full
+    else:
+        base = parts[0][0].upper() + ". " + parts[-1]
+    if team:
+        return base + "|" + team.upper()
+    return base
 
 def build_value_board(adp_map=None):
     """Live board: BOARD names annotated with FantasyPros ECR combined with ADP,
@@ -224,7 +230,11 @@ def build_value_board(adp_map=None):
         for r in rows:
             if r["name"]:
                 fp[r["name"].lower()] = r
-            if r.get("team"):
+            # Only defenses match by team id (their feed uses full team names
+            # like 'Houston Texans'). Restricting fp_team to DEF rows prevents a
+            # same-team kicker (e.g. Ka'imi Fairbairn / HOU) from overwriting the
+            # Houston Texans DST record keyed by the same team id.
+            if r.get("team") and pos == "DEF":
                 fp_team[r["team"].lower()] = r
             if r.get("ecr") is not None:
                 has_ecr = True
@@ -235,10 +245,14 @@ def build_value_board(adp_map=None):
         r = fp.get(name.lower())
         if r is None and pos == "DEF":        # feed uses full team names
             r = fp_team.get(team.lower())
+        # Prefer the free RT ADP scrape (same source as ECR => consistent);
+        # fall back to the paid API's adp field only if RT didn't cover it.
+        # Join by team-suffixed name first, then by name-only (covers rows whose
+        # team we couldn't parse or where BOARD/RT team codes differ).
+        rt = None
+        if adp_map:
+            rt = adp_map.get(_norm_name(name, team)) or adp_map.get(_norm_name(name))
         if r and r.get("ecr") is not None:
-            # Prefer the free RT ADP scrape (same source as ECR => consistent);
-            # fall back to the paid API's adp field only if RT didn't cover it.
-            rt = adp_map.get(_norm_name(name)) if adp_map else None
             used_adp = rt if rt is not None else r.get("adp")
             if used_adp is not None:
                 value = float(used_adp) - float(r["ecr"])
@@ -249,26 +263,40 @@ def build_value_board(adp_map=None):
             out[name] = {"name": name, "team": team, "pos": pos,
                          "ecr": r["ecr"], "adp": used_adp, "value": value}
             live += 1
+        elif rt is not None:
+            # No ECR (no FP key / all fetches failed) but we DO have the free RT
+            # ADP: rank purely by ADP (lowest first) rather than discarding it.
+            used_rt += 1
+            out[name] = {"name": name, "team": team, "pos": pos,
+                         "adp": float(rt), "value": -float(rt)}
+            live += 1
         else:
             out[name] = {"name": name, "team": team, "pos": pos,
                          "adp": adp, "value": -(float(adp) + 1000.0)}
-    if used_rt:
+    if used_rt and has_ecr:
         mode = "ADP-ECR (FantasyPros real-time scrape)"
     elif has_ecr:
         mode = "ECR-only (free tier, BPA)"   # no ADP source => BPA by ECR
-    else:
+    elif used_rt:
         mode = "ADP-only (RT scrape, no ECR)"
+    else:
+        mode = "STATIC fallback"
     log("VALUE_BOARD: live coverage %d/%d [RT_adp=%d] [%s]"
         % (live, len(out), used_rt, mode))
     return out
 
 def scrape_fp_realtime_adp():
     """Open the FantasyPros Real-Time ADP page in a FRESH Edge tab via CDP and
-    scrape the REAL-TIME column (table index 3) into {norm_name: adp_float}.
-    This is the FREE ADP source (no API key) and uses the same expert pool as the
-    ECR feed, so VALUE = ADP - ECR stays consistent. Returns {} on ANY failure
-    (caller then keeps the Yahoo live patch / ECR-only board). The orphan tab is
-    closed before returning."""
+    scrape the REAL-TIME column (column index 3 of the first table) into
+    {key: adp_float}, keyed by the team-suffixed normalized name ('F. Last|TEAM')
+    so players that abbreviate to the same 'Initial. Last' stay distinct. FREE
+    (no API key); uses the same expert pool as ECR so VALUE = ADP - ECR stays
+    consistent. Returns {} on ANY failure (caller then keeps the Yahoo live patch
+    / ECR-only board). The orphan tab and both sockets are ALWAYS closed (finally
+    block), so a failure never leaves a dangling tab in the Edge instance running
+    the live draft."""
+    pws = nws = None
+    new_id = None
     try:
         targets = json.loads(urllib.request.urlopen(CDP+"/json/list", timeout=8).read())
         page = next((t for t in targets if t.get("type") == "page"), None)
@@ -289,14 +317,14 @@ def scrape_fp_realtime_adp():
                 new_id = o.get("result", {}).get("targetId")
                 break
         if not new_id:
-            log("RT_ADP: createTarget returned no targetId"); pws.close(); return {}
+            log("RT_ADP: createTarget returned no targetId"); return {}
         time.sleep(8)   # let the table render
         targets = json.loads(urllib.request.urlopen(CDP+"/json/list", timeout=8).read())
         # /json/list keys the target id under "id" (the "targetId" field is None
         # there), so match against that.
         ntab = next((t for t in targets if t.get("id") == new_id), None)
         if not ntab:
-            log("RT_ADP: new tab not found in /json/list"); pws.close(); return {}
+            log("RT_ADP: new tab not found in /json/list"); return {}
         nws = websocket.create_connection(ntab["webSocketDebuggerUrl"], timeout=10,
                                           header={"Origin": CDP})
         nws.send(json.dumps({"id": 2, "method": "Runtime.enable", "params": {}}))
@@ -308,38 +336,49 @@ def scrape_fp_realtime_adp():
           for(var i=0;i<trs.length;i++){
             var tds=trs[i].querySelectorAll('td');
             if(tds.length<4) continue;                 // skip header / junk rows
-            var name=tds[1].innerText.trim().split('\\n')[0];   // 1st line = name
-            var adp=tds[3].innerText.trim();           // REAL-TIME column
-            out.push([name, adp]);
+            var lines=tds[1].innerText.trim().split('\\n');
+            var name=lines[0];                         // 1st line = 'J. Gibbs'
+            var tm=(lines[1]||'').match(/([A-Z]{2,4})/); // 2nd line = 'DET (6)'
+            var team=tm?tm[1]:'';
+            var adp=tds[3].innerText.trim();           // REAL-TIME column (idx 3)
+            out.push([name, team, adp]);
           }
           return out;
         })()""")
-        nws.close()
-        pws.close()
-        try:
-            urllib.request.urlopen(CDP + "/json/close/" + new_id, timeout=5).read()
-        except Exception:
-            pass
         out = {}
-        for name, adp in (rows or []):
+        for name, team, adp in (rows or []):
             try:
                 adp = float(adp)
             except (ValueError, TypeError):
                 continue
-            key = _norm_name(name)
-            # The RT table abbreviates to 'Initial. Last', so two different
-            # players can collide (e.g. Bijan Robinson vs Brian Robinson both ->
-            # 'B. Robinson'). We only care about the early-round stud's ADP for
-            # drafting, and the stud always has the SMALLER ADP, so keep the min
-            # on collision. The late player simply loses its exact ADP (rarely
-            # matters -- we draft K/DEF late from the static board anyway).
-            if key not in out or adp < out[key]:
-                out[key] = adp
+            # Team-suffixed key keeps 'A.J. Brown|NE' and 'Amon-Ra St. Brown|DET'
+            # distinct. The team-less key is a fallback for rows whose team we
+            # couldn't parse (or BOARD/RT team-code mismatches), with a min-dedup
+            # as a last-resort guard against same-name collisions.
+            if team:
+                k = _norm_name(name, team)
+                if k not in out or adp < out[k]:
+                    out[k] = adp
+            k0 = _norm_name(name)
+            if k0 not in out or adp < out[k0]:
+                out[k0] = adp
         log("RT_ADP: scraped %d rows" % len(out))
         return out
     except Exception as e:
         log("RT_ADP: scrape failed (%s) -> {}" % repr(e))
         return {}
+    finally:
+        for sock in (nws, pws):
+            if sock is not None:
+                try:
+                    sock.close()
+                except Exception as e:
+                    log("RT_ADP: socket close failed (%s)" % repr(e))
+        if new_id:
+            try:
+                urllib.request.urlopen(CDP + "/json/close/" + new_id, timeout=5).read()
+            except Exception as e:
+                log("RT_ADP: tab close failed (%s)" % repr(e))
 
 def connect():
     targets = http_get("/json/list")

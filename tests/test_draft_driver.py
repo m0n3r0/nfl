@@ -122,7 +122,9 @@ def test_build_value_board_ecr_only_when_adp_absent():
 def test_build_value_board_matches_def_by_team_id():
     """FantasyPros defenses come back as full team names ('Houston Texans')
     with a player_team_id ('HOU'); our BOARD stores the short team ('Hou').
-    The board must match them by team id, not by name."""
+    The board must match them by team id, not by name. Also: a SAME-TEAM
+    kicker (Ka'imi Fairbairn / HOU) must NOT overwrite the Houston Texans DST
+    ECR record, so fp_team is keyed ONLY from DEF rows (see build_value_board)."""
     def mock_mixed(path):
         pos = re.search(r"position=(\w+)", path).group(1)
         if pos == "DST":
@@ -132,10 +134,15 @@ def test_build_value_board_matches_def_by_team_id():
                 {"player_name": "Denver Broncos", "player_team_id": "DEN",
                  "position": "DST", "rank_ecr": 2, "tier": 1}]}
         players = [b for b in dd.BOARD if b[2] == pos]
-        return {"players": [
-            {"player_name": n, "player_team_id": t, "position": pos,
-             "rank_ecr": i + 1, "tier": 1}
-            for i, (n, t, pos2, adp) in enumerate(players)]}
+        out = [{"player_name": n, "player_team_id": t, "position": pos,
+                "rank_ecr": i + 1, "tier": 1}
+               for i, (n, t, pos2, adp) in enumerate(players)]
+        # Inject a same-team kicker: if fp_team were keyed from every row that
+        # carries a team, this HOU kicker would clobber the Texans DST ECR below.
+        if pos == "K":
+            out.append({"player_name": "Ka'imi Fairbairn", "player_team_id": "HOU",
+                        "position": "K", "rank_ecr": 99, "tier": 1})
+        return {"players": out}
     dd._fp_get = mock_mixed
     dd.FP_API_KEY = "MOCK"
     try:
@@ -143,9 +150,11 @@ def test_build_value_board_matches_def_by_team_id():
     finally:
         dd.FP_API_KEY = None
     assert vb is not None
-    for name in ("Texans", "Broncos"):
-        row = vb[name]
-        assert "ecr" in row and row["ecr"] is not None, name
+    # DST matched by team_id with the expected ECR (NOT clobbered by the kicker).
+    texans = vb["Texans"]
+    assert "ecr" in texans and texans["ecr"] == 1, "Texans DST ECR overwritten by same-team kicker"
+    broncos = vb["Broncos"]
+    assert "ecr" in broncos and broncos["ecr"] == 2, "Broncos DST ECR missing"
 
 
 def test_unmatched_players_deprioritized():
@@ -197,9 +206,11 @@ def test_choose_pick_uses_yahoo_adp():
 
 def test_build_value_board_uses_realtime_adp():
     """The FREE Real-Time ADP scrape (RT_ADP_URL) combined with the free ECR feed
-    must yield VALUE = RT_ADP - ECR for covered players, using the normalized
-    name as the join key. This is the path that makes the paid ADP tier
-    unnecessary."""
+    must yield VALUE = RT_ADP - ECR for covered players. The join key is the
+    team-suffixed normalized name ('F. Last|TEAM') so two players who abbreviate
+    to the same 'Initial. Last' -- A.J. Brown and Amon-Ra St. Brown both render
+    as 'A. Brown' -- resolve to DISTINCT adps instead of colliding. This is the
+    path that makes the paid ADP tier unnecessary."""
     def mock_ecr(path):
         pos = re.search(r"position=(\w+)", path).group(1)
         lookup = "DEF" if pos == "DST" else pos
@@ -210,9 +221,13 @@ def test_build_value_board_uses_realtime_adp():
             for i, (n, t, pos2, adp) in enumerate(players)]}
     dd._fp_get = mock_ecr
     dd.FP_API_KEY = "MOCK"
-    # Keys are the NORMALIZED names (initial + last) the RT page renders.
-    adp_map = {"J. Gibbs": 1.2, "B. Robinson": 2.2,
-               "J. Chase": 3.8, "C. McCaffrey": 6.0}
+    # Team-suffixed normalized names (initial+last|TEAM) the RT page renders.
+    # A.J. Brown (NE) and Amon-Ra St. Brown (DET) both abbreviate to 'A. Brown',
+    # so they MUST be keyed distinctly or the collision makes one overwrite the
+    # other.
+    adp_map = {"J. Gibbs|DET": 1.2, "B. Robinson|ATL": 2.2,
+               "J. Chase|CIN": 3.8, "C. McCaffrey|SF": 6.0,
+               "A. Brown|NE": 7.8, "A. Brown|DET": 18.6}
     try:
         vb = dd.build_value_board(adp_map=adp_map)
     finally:
@@ -221,13 +236,23 @@ def test_build_value_board_uses_realtime_adp():
     # Jahmyr Gibbs is BOARD[0] (1st RB) -> mock ECR=1; RT adp 1.2 -> value 0.2
     row = vb["Jahmyr Gibbs"]
     assert row["adp"] == 1.2
-    assert row["value"] == 1.2 - 1.0
+    assert row["value"] == 1.2 - float(row["ecr"])
     # Bijan Robinson is BOARD[1] (2nd RB) -> mock ECR=2; RT adp 2.2 -> value 0.2
     row2 = vb["Bijan Robinson"]
     assert row2["adp"] == 2.2
-    assert row2["value"] == 2.2 - 2.0
+    assert row2["value"] == 2.2 - float(row2["ecr"])
+    # Collision check: the two 'A. Brown' players resolve to DISTINCT adps and
+    # values (proves the team suffix kept them separate).
+    aj = vb["A.J. Brown"]            # NE -> 7.8
+    amsr = vb["Amon-Ra St. Brown"]   # DET -> 18.6
+    assert aj["adp"] == 7.8
+    assert amsr["adp"] == 18.6
+    assert aj["value"] == 7.8 - float(aj["ecr"])
+    assert amsr["value"] == 18.6 - float(amsr["ecr"])
     # A player without an RT entry keeps its ECR-only value (-ECR).
-    assert vb["Amon-Ra St. Brown"]["value"] == -float(vb["Amon-Ra St. Brown"]["ecr"])
+    ceedee = vb["CeeDee Lamb"]
+    assert ceedee["adp"] is None
+    assert ceedee["value"] == -float(ceedee["ecr"])
 
 
 def _board(*rows):

@@ -1,4 +1,4 @@
-CLICK_HREF https://football.fantasysports.yahoo.com/f1/mock_create?baselid=1329011&source_game_id=470&crumb=.RA14XEjEip&pspid=782205259&activity=try-3-rounds-free
+CLICK_HREF https://football.fantasysports.yahoo.com/f1/mock_create?baselid=1329011&source_game_id=470&crumb=<REDACTED>&pspid=782205259&activity=try-3-rounds-free
 URL_NOW https://football.fantasysports.yahoo.com/f1/1329011/mock_lobby?lobby=standard
 ROOM {"plinks":1,"body":"Yahoo Sports\nYahoo Sports\nSearch query\nB\n Fantasy Football\nOverview\nLeague\nMy Team\nMatchups\nPlayers\nResearch\nDraft\nStatTracker\nFD nation (ID# 1329011)\nYahoo Sports Fantasy Football\nFantasy Football Mock Drafts\nInstant Mock Drafts\nInstant Mock Drafts\nto skip the wait\nDraft immediately against our algorithms, no more lobbies, no more dropouts.\n\nSubscribe to Unlock\nGame Plan buy\nFD nation · 8 Teams · 15 Rounds · 1 minute\n\nTry 3 Rounds Free\n\nInstant Mock Draft Preview\nFD nation\n\nSnake\n\nDrafting","mentions":true}
 AVAILABLE_SAMPLE ['Players']
