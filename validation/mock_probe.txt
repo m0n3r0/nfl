@@ -1,0 +1,1 @@
+MOCK_ENTRY {"mock_links":["Mock Drafts => https://football.fantasysports.yahoo.com/f1/1329011/mock_lobby?lobby=standard"],"mock_btns":[],"url":"https://football.fantasysports.yahoo.com/f1/1329011/draft"}

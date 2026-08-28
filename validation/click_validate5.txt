@@ -1,0 +1,4 @@
+TARGET {'name': 'Jahmyr Gibbs', 'x': 635, 'y': 277, 'w': 1135, 'h': 53}
+ELEMENT_BEFORE TD Ta(end) P(8px) Fz(14px) Lh(17px) Fw(400) Fv($numer
+AFTER_CLICK {"sel":"","hl":null}
+URL_AFTER https://football.fantasysports.yahoo.com/f1/1329011/draftanalysis
