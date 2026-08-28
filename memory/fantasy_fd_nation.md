@@ -22,7 +22,7 @@ the user mentions fantasy football, their league, the draft, lineup, waivers, or
   soft +8 value premium to RBs we still need (anchors them early despite the
   crowd's RB inflation) and (b) hard-forces slots by `ANCHOR_BY_ROUND`: 1st RB by
   R3, 2nd RB by R5, WR by R5/R9, TE by R7, QB by R10, K/DEF by R14.
-- BOARD depth for 12-team: ~54 players (12 TEs, 4 QBs, 8 K, 9 DEF) so a required
+- BOARD depth for 12-team: ~75 players (12 QBs, 12 TEs, 12 Ks, 12 DEFs) so a required
   slot is never stranded if the crowd snipes the top names before our anchor turn.
 - Other guardrails: no QB before round 10; K/DEF only last 2 rounds; don't double
   a position past its slot count; ADP sanity window (don't reach absurdly above ADP).
@@ -31,6 +31,7 @@ the user mentions fantasy football, their league, the draft, lineup, waivers, or
 
 ## Engineering setup (verified working)
 - Edge launched by user on **port 9222** with `--remote-allow-origins=*` (and the original `--user-data-dir=C:\edge-debug-profile`). This is REQUIRED for CDP WebSocket control. Without the flag, Edge rejects WS with 403.
+- **Security:** the CDP debug port (9222) is a full browser-control interface. Bind Edge to loopback only (`--remote-debugging-address=127.0.0.1`) and ensure no firewall/port-forward exposes 9222 to the network — anyone who reaches it can drive the browser and read the logged-in Yahoo session. Close Edge when not drafting.
 - Control from WSL is NOT possible directly (WSL2 separate netns). Driver runs on the **Windows side via `py.exe`** where `websocket-client` 1.9.0 is installed (pip into Windows Python 3.13).
 - Windows Python launcher: `py.exe` = C:\Users\user\AppData\Local\Programs\Python\Python313-32\python.exe. `websocket-client` installed there.
 - Output/artifacts dir on Windows: `C:\edge-debug-profile\`.

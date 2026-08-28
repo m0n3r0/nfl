@@ -20,6 +20,10 @@ controlling a user's Yahoo Fantasy Football tab from this Windows machine.
 - Edge MUST be launched with `--remote-debugging-port=PORT --remote-allow-origins=*`.
   Without `--remote-allow-origins=*`, the WebSocket control channel is rejected
   with HTTP 403 even though the `/json` HTTP endpoints work.
+- **Security:** bind CDP to loopback only (`--remote-debugging-address=127.0.0.1`) and
+  make sure no firewall/port-forward exposes the debug port to the network — anyone who
+  can reach `http://127.0.0.1:PORT` can drive the browser and read logged-in tabs
+  (including the Yahoo session). Close Edge when not automating.
 - From WSL2 you CANNOT reach Edge directly (separate network namespace). Run the
   driver on the WINDOWS side via `py.exe` (where `websocket-client` is installed).
 - `pip install websocket-client` into the Windows Python (py.exe), NOT WSL python3.

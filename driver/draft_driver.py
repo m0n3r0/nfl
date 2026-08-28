@@ -78,20 +78,31 @@ BOARD = [
     ("De'Von Achane","Mia","RB",15.7),("Kenneth Walker III","KC","RB",17.0),
     ("Derrick Henry","Bal","RB",18.2),("Drake London","Atl","WR",18.6),
     ("Omarion Hampton","LAC","RB",18.7),("Josh Allen","Buf","QB",19.6),("Lamar Jackson","Bal","QB",30.0),("Jayden Daniels","Wsh","QB",35.0),("Joe Burrow","Cin","QB",45.0),
+    ("Justin Herbert","LAC","QB",55.0),("Patrick Mahomes","KC","QB",60.0),("Jalen Hurts","Phi","QB",65.0),("Dak Prescott","Dal","QB",70.0),
+    ("Baker Mayfield","TB","QB",80.0),("Bo Nix","Den","QB",90.0),("Jordan Love","GB","QB",100.0),("Trevor Lawrence","Jax","QB",110.0),
     ("Brock Bowers","LV","TE",21.1),("Nico Collins","Hou","WR",22.2),
     ("George Pickens","Dal","WR",22.4),("A.J. Brown","NE","WR",25.0),
-    ("Trey McBride","Ari","TE",25.4),("Travis Kelce","KC","TE",35.0),("George Kittle","SF","TE",40.0),("Sam LaPorta","Det","TE",45.0),("T.J. Hockenson","Min","TE",55.0),("Mark Andrews","Bal","TE",70.0),("Kyle Pitts","Atl","TE",80.0),("Jeremiyah Love","Ari","RB",27.2),
+    ("Trey McBride","Ari","TE",25.4),("Travis Kelce","KC","TE",35.0),("George Kittle","SF","TE",40.0),("Sam LaPorta","Det","TE",45.0),("T.J. Hockenson","Min","TE",55.0),("Mark Andrews","Bal","TE",70.0),("Kyle Pitts","Atl","TE",80.0),("David Njoku","Cle","TE",85.0),("Tucker Kraft","GB","TE",90.0),("Zach Ertz","Was","TE",95.0),("Dalton Kincaid","Buf","TE",100.0),("Jeremiyah Love","Ari","RB",27.2),
     ("DeVonta Smith","Phi","WR",29.4),("Kyren Williams","LAR","RB",29.6),
     ("Josh Jacobs","GB","RB",32.8),("Chris Olave","NO","WR",34.0),
-    # K tier (draft only last rounds)
+    # K tier (draft only last rounds) -- 12 for 12-team depth
     ("Brandon Aubrey","Dal","K",85.0),("Ka'imi Fairbairn","Hou","K",119.0),
     ("Cameron Dicker","LAC","K",123.0),("Jason Myers","Sea","K",124.0),
     ("Cam Little","Jax","K",129.0),("Harrison Butker","KC","K",115.0),("Justin Tucker","Bal","K",135.0),
-    # DEF tier (draft only last rounds)
+    ("Jake Elliott","Phi","K",140.0),("Younghoe Koo","Atl","K",145.0),("Wil Lutz","Den","K",150.0),
+    ("Chris Boswell","Pit","K",155.0),("Eddy Pineiro","Car","K",160.0),
+    # DEF tier (draft only last rounds) -- 12 for 12-team depth
     ("Rams","LAR","DEF",89.0),("Texans","Hou","DEF",93.0),
     ("Broncos","Den","DEF",101.0),("Seahawks","Sea","DEF",107.0),
     ("Eagles","Phi","DEF",123.0),("Patriots","NE","DEF",127.0),("Bills","Buf","DEF",115.0),("49ers","SF","DEF",120.0),
+    ("Steelers","Pit","DEF",125.0),("Packers","GB","DEF",130.0),("Ravens","Bal","DEF",135.0),("Buccaneers","TB","DEF",140.0),
 ]
+
+# Map a Yahoo team-defense code to the BOARD's short DEF key, so a defense
+# shown as 'Los Angeles Rams LAR - DEF' (or 'Rams LAR - DEF') resolves to the
+# BOARD key 'Rams' and choose_pick can match it. Built from BOARD so it stays
+# in sync if the DEF list changes.
+DEF_CODE_TO_NAME = {t.upper(): n for (n, t, p, a) in BOARD if p == "DEF"}
 
 # Required starting slots (filled by deadline); bench fills the rest.
 REQUIRED = {"QB":1, "RB":2, "WR":2, "TE":1, "K":1, "DEF":1}
@@ -441,11 +452,31 @@ def read_available(ws):
       for(var i=0;i<rows.length;i++){
         var t=rows[i].innerText.replace(/\\s+/g,' ').trim();
         // player name pattern: "First Last" followed by "TEAM - POS"
-        var m=t.match(/([A-Z][a-z]+(?:['’]\\w+)?\\.?[ -][A-Z][a-z]+(?:['’]\\w+)?(?:[ -][A-Z][a-z]+)?)\\s+(?:[A-Z]{2,4}\\s*-\\s*(?:QB|RB|WR|TE|K|DEF|DST))/);
-        if(m && !seen[m[1]]){ seen[m[1]]=1; out.push([m[1], t]); }
+        var m=t.match(/([A-Z][a-z]+(?:['’]\\w+)?\\.?[ -][A-Z][a-z]+(?:['’]\\w+)?(?:[ -][A-Z][a-z]+)?)\\s+(?:[A-Z]{2,4}\\s*-\\s*(QB|RB|WR|TE|K|DEF|DST))/);
+        if(m && !seen[m[1]]){ seen[m[1]]=1; out.push([m[1], m[2], m[3], t]); }
       }
       return out.slice(0,40);
     })()""")
+
+def normalize_available(raw):
+    """Convert read_available() rows ([name, code, pos, text]) into the form
+    choose_pick expects. Team defenses are keyed by their short BOARD name
+    (e.g. 'LAR' -> 'Rams') so the forced DEF pick can match them; a one-token or
+    city-prefixed Yahoo DEF label such as 'Rams LAR - DEF' / 'Los Angeles Rams
+    LAR - DEF' would otherwise never equal the BOARD key 'Rams'. Returns
+    (names, adp_map) where adp_map keys the (normalized) lowercased name to the
+    Yahoo ADP parsed from that row's text."""
+    names, adp_map = [], {}
+    for row in raw:
+        parts = list(row) + [None, None, None, None]
+        name, code, pos, text = parts[0], parts[1], parts[2], parts[3]
+        if pos in ("DEF", "DST"):
+            name = DEF_CODE_TO_NAME.get((code or "").upper(), name)
+        names.append(name)
+        a = parse_adp(text)
+        if a is not None:
+            adp_map[name.lower()] = a
+    return names, adp_map
 
 def is_my_pick(ws):
     return ev(ws,"""(function(){
@@ -554,10 +585,57 @@ def click_player(ws,name):
         return True
     return False
 
+def verify_session(ws):
+    """Best-effort pre-draft guard. Confirms we're on the FD nation (league
+    1329011) / Doge draft before any click. Returns False only on a CLEAR
+    mismatch (login wall or a different league) so the bot aborts into Yahoo's
+    default auto-draft rather than drafting the wrong room. Inconclusive reads
+    return True so a page-layout change can't disable the bot."""
+    try:
+        body = ev(ws, "document.body?document.body.innerText:''") or ""
+    except Exception as e:
+        log("VERIFY: body read failed (%s) -> proceed" % repr(e))
+        return True
+    low = body.lower()
+    if "sign in" in low or "log in" in low or "please log in" in low:
+        log("VERIFY: login wall detected -> abort")
+        return False
+    if "1329011" not in body and "fd nation" not in low and "fantasy" in low:
+        log("VERIFY: FD nation / league 1329011 not detected -> abort")
+        return False
+    return True
+
+
+def _confirm_pick(ws, name, timeout=8):
+    """Best-effort confirmation that a pick registered: wait (bounded) for our
+    turn to end (is_my_pick False) and the player to leave the available list.
+    Returns True if observed, False on timeout. Never raises; a detection
+    failure yields False and the caller proceeds (transparent log)."""
+    deadline = time.time() + timeout
+    low = name.lower()
+    while time.time() < deadline:
+        try:
+            if not is_my_pick(ws):
+                av = read_available(ws)
+                names = [r[0].lower() for r in av]
+                if low not in names:
+                    return True
+        except Exception:
+            pass
+        time.sleep(0.5)
+    return False
+
+
 def run_draft():
     log("DRAFT_DRIVER_START team="+TEAM_ID)
     ws=connect()
     navigate(ws,"https://football.fantasysports.yahoo.com/f1/%s/draft"%LEAGUE)
+    # Guard: confirm we're on the FD nation / Doge draft before any click. A clear
+    # mismatch (login wall, wrong league) aborts so we fall back to Yahoo's default
+    # auto-draft instead of drafting into the wrong room.
+    if not verify_session(ws):
+        log("DRAFT_DRIVER_ABORT: session verification failed (see VERIFY log)")
+        return
     # Build the value board once: live FantasyPros ECR, with ADP taken from the
     # free Real-Time ADP scrape (same source as ECR => consistent VALUE=ADP-ECR).
     # Falls back to static BOARD if neither an FP key nor RT ADP is available.
@@ -573,15 +651,9 @@ def run_draft():
     while time.time()<deadline and picks_made<TOTAL_ROUNDS:
         try:
             if is_my_pick(ws):
-                raw_avail = read_available(ws)
-                available = [n for n, _ in raw_avail]
-                # Yahoo ADP (Average Draft Position) per available player, scraped
-                # live from the draft-room row. Drives true VALUE = ADP - ECR.
-                adp_map = {}
-                for n, text in raw_avail:
-                    a = parse_adp(text)
-                    if a is not None:
-                        adp_map[n.lower()] = a
+                # read_available returns [name, code, pos, text]; normalize maps
+                # DEF codes to BOARD keys and parses live Yahoo ADP per row.
+                available, adp_map = normalize_available(read_available(ws))
                 log("MY_PICK round="+str(round_num)+" avail="+str(len(available))
                     + " yahoo_adp="+str(len(adp_map)))
                 pick=choose_pick(available,drafted,round_num,board,adp_map=adp_map)
@@ -589,6 +661,14 @@ def run_draft():
                     name,team,pos,adp=pick
                     ok=click_player(ws,name)
                     if ok:
+                        # Best-effort confirmation: wait (bounded) for the pick to
+                        # register before advancing local state, so a missed click
+                        # doesn't silently diverge our roster from Yahoo's. Never
+                        # blocks past the timeout; on uncertainty we proceed (logged).
+                        if _confirm_pick(ws, name):
+                            log("PICK_CONFIRMED round="+str(round_num)+" "+name)
+                        else:
+                            log("PICK_CONFIRM_TIMEOUT round="+str(round_num)+" "+name+" (proceeding)")
                         drafted[pos]=drafted.get(pos,0)+1
                         picks_made+=1
                         log("PICKED round="+str(round_num)+" "+name+" ("+pos+") ADP="+str(adp))

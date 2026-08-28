@@ -1,3 +1,7 @@
+# STATUS: HISTORICAL/INCOMPLETE capture — reflects only 7 of 10 teams
+# (league was still filling: "7/10 SPOTS FILLED", "7 Confirmed Teams").
+# Conflicts with data/scrapes/2026-08-28_live_state.txt, which reflects all 10 teams.
+# Treat as historical only; do NOT use as the current roster.
 URL https://football.fantasysports.yahoo.com/f1/1329011
 TITLE FD nation | Fantasy Football | Yahoo! Sports
 === CURRENT PAGE TEXT (first 1500) ===

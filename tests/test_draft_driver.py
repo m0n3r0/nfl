@@ -283,6 +283,32 @@ def test_anchor_forces_rb_on_schedule():
     assert dd.choose_pick(["RB A", "WR A"], {"RB": 1}, 5, board)[0] == "RB A"
 
 
+def test_normalize_available_maps_def_code_to_board_name():
+    """read_available returns [name, code, pos, text]; DEF rows must resolve to
+    the BOARD's short DEF key (e.g. 'LAR' -> 'Rams') so choose_pick can match
+    them, and Yahoo ADP must key off the normalized name."""
+    raw = [
+        ["Los Angeles Rams", "LAR", "DEF", "Los Angeles Rams LAR - DEF ADP 12.5 extra"],
+        ["Jahmyr Gibbs", "DET", "RB", "Jahmyr Gibbs DET - RB ADP 1.5"],
+        ["A.J. Brown", "NE", "WR", "A.J. Brown NE - WR ADP 25.0"],
+    ]
+    names, adp_map = dd.normalize_available(raw)
+    assert names == ["Rams", "Jahmyr Gibbs", "A.J. Brown"], names
+    assert adp_map["rams"] == 12.5
+    assert adp_map["jahmyr gibbs"] == 1.5
+    assert adp_map["a.j. brown"] == 25.0
+
+
+def test_board_has_enough_candidates_per_required_position():
+    """12-team draft: each forced one-slot position (QB, TE, K, DEF) needs >=12
+    BOARD candidates so the anchor-driven forced pick can always fill the slot
+    even if rivals snipe the top names before our anchor round."""
+    from collections import Counter
+    counts = Counter(pos for (_, _, pos, _) in dd.BOARD)
+    for pos in ("QB", "TE", "K", "DEF"):
+        assert counts[pos] >= 12, "%s has only %d candidates (<12 for 12-team)" % (pos, counts[pos])
+
+
 if __name__ == "__main__":
     test_fetch_fp_consensus_keeps_zero_adp()
     test_build_value_board_full_coverage_with_zero_adp()
@@ -295,4 +321,6 @@ if __name__ == "__main__":
     test_anchor_forces_rb_on_schedule()
     test_build_value_board_static_fallback_without_key()
     test_build_value_board_uses_realtime_adp()
+    test_normalize_available_maps_def_code_to_board_name()
+    test_board_has_enough_candidates_per_required_position()
     print("All draft-driver tests passed.")
