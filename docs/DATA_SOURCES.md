@@ -23,7 +23,13 @@ driver reads that JSON with stdlib `json` only (it cannot import `src`).
 
 Each board entry carries `value = projected 2026 fantasy points`; the driver drafts
 best-player-available by that value, still applying the 10-team scarcity premium and
-anchor guardrails. This is the **default** board whenever `FP_API_KEY` is not set.
+anchor guardrails.
+
+**This is the hard default engine.** `driver/draft_driver.py` selects it whenever the
+board JSON is present — the mere presence of `FP_API_KEY` no longer switches engines
+(it used to, which silently overrode the original method whenever a `.env` carrying the
+key was on the working path). FantasyPros is only used if `DRAFT_ENGINE=fantasypros` is
+set explicitly (and a key is present). See `run_draft`'s engine-selection block.
 
 **Honest trade-off:** without a crowd signal we lose `VALUE = ADP − ECR` — the
 ability to exploit opponents' drafting errors (snagging players the crowd
@@ -31,8 +37,8 @@ undervalues). The original engine instead maximizes **our own expected points**
 (BPA by our projection + scarcity/need overlay). That is the correct reading of "an
 original engine that does not depend on others": we are no longer leaning on
 anyone else's rankings, at the cost of forfeiting the crowd-arbitrage edge.
-FantasyPros/Yahoo below are now an **optional, opt-in legacy cross-check** (only when
-`FP_API_KEY` is configured), not the primary input.
+FantasyPros/Yahoo below are an **optional, opt-in legacy cross-check** (only when
+`DRAFT_ENGINE=fantasypros` is set), not the primary input.
 
 ## What actually wins (the honest version)
 
