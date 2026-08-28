@@ -93,9 +93,21 @@ def fetch_fp_consensus(position):
         name = p.get("player_name")
         if not name:
             continue
-        ecr = p.get("rank_ecr") or p.get("ecr") or p.get("rank")
-        adp = (p.get("adp") or p.get("rank_adp") or p.get("avg_adp")
-               or p.get("adp_rank"))
+        # Use explicit None checks: `or` coalescing would treat a legitimate
+        # adp/ecr of 0 (e.g. undrafted rookies, or any player the API scores 0)
+        # as missing and drop the player from the live board.
+        ecr = p.get("rank_ecr")
+        if ecr is None:
+            ecr = p.get("ecr")
+        if ecr is None:
+            ecr = p.get("rank")
+        adp = p.get("adp")
+        if adp is None:
+            adp = p.get("rank_adp")
+        if adp is None:
+            adp = p.get("avg_adp")
+        if adp is None:
+            adp = p.get("adp_rank")
         out.append({"name": name, "team": p.get("player_team_id"),
                     "pos": position, "ecr": ecr, "adp": adp})
     return out
