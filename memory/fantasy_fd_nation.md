@@ -5,10 +5,10 @@ the user mentions fantasy football, their league, the draft, lineup, waivers, or
 
 ## League facts (verified 2026-08-20 via live Edge CDP)
 - Platform: Yahoo Fantasy Football, league ID **1329011**, name **"FD nation"**.
-- Manager: user is **"Doge"**, team **#2** (URL team id = 2). Other teams: Goal Line Dwayne (commish), Game Plan buy, Take it in the Browns, Kwasi's Wins, QB Sneak Christopher, Otto-matic Win!, Neal Before Zod. 7 of 10 spots filled.
+- Manager: user is **"Doge"**, team **#2** (URL team id = 2). Other teams: Goal Line Dwayne (commish), Game Plan buy, Take it in the Browns, Kwasi's Wins, QB Sneak Christopher, Otto-matic Win!, Neal Before Zod. All 10 spots filled (verified live 2026-08-28; was 7 of 10 on 2026-08-20).
 - Format: Head-to-Head, **.5 PPR** (Receptions = 0.5), fractional points ON, negative points ON.
 - Roster: 1 QB, 2 WR, 2 RB, 1 TE, 1 W/R/T (flex), 1 K, 1 DEF, 6 BN, 2 IR (15 total).
-- Draft: **Live Standard snake**, 15 rounds, **1 minute per pick**, scheduled **Fri Aug 28 2026, 6:00pm EDT** (= 2026-08-29 07:00 JST on this machine).
+- Draft: **Live Standard snake**, 15 rounds, **1 minute per pick**, scheduled **Tue Sep 1 2026, 5:00pm EDT** (= 2026-09-02 06:00 JST on this machine). *Corrected 2026-08-28 from the live Yahoo tab — repo had Aug 28; actual draft is Sep 1.*
 - Not a cash league. Playoffs top 4, Weeks 16-17.
 - Waiver: 2-day rolling list; trade review by league vote; max acquisitions unlimited.
 
@@ -30,7 +30,7 @@ the user mentions fantasy football, their league, the draft, lineup, waivers, or
 
 ## Live draft driver (deployed)
 - Script: `C:\edge-debug-profile\draft_driver.py` (also at /home/eml/draft_driver.py).
-- Scheduled Windows task **"FDnationDraftDriver"**: fires 2026-08-28 18:00 EDT, runs `py.exe C:\edge-debug-profile\draft_driver.py`.
+- Scheduled Windows task **"FDnationDraftDriver"**: fires **2026-09-01 17:00 EDT (= 2026-09-02 06:00 JST)**, runs `py.exe C:\edge-debug-profile\draft_driver.py`. Rescheduled 2026-08-28 after the live tab showed Sep 1 (was Aug 28).
 - Decision log: `C:\edge-debug-profile\draft_log.txt` (created at first run).
 - CRITICAL dependency: Edge must be OPEN on 9222 with --remote-allow-origins=* at draft time, or the driver errors and Yahoo default auto-draft takes over.
 
