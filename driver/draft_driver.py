@@ -6,7 +6,7 @@ Guarantees a legal lineup: required slots (QB,2RB,2WR,TE,K,DEF) filled by
 their deadlines, bench (6 BN) filled with best available afterwards.
 All decisions logged to C:\edge-debug-profile\draft_log.txt
 """
-import json, urllib.request, websocket, time, random, math, sys, io, datetime
+import json, os, urllib.request, websocket, time, random, math, sys, io, datetime
 
 CDP = "http://127.0.0.1:9222"
 LEAGUE = "1329011"
@@ -16,6 +16,18 @@ TOTAL_ROUNDS = 15
 MY_PICK_ROUNDS_QB = 10      # don't take QB before this round
 K_DEF_LAST_ROUNDS = 2       # K/DEF only in last N rounds
 ADP_WINDOW = 40              # reach guard: skip board pick if ADP >> board rank
+
+# ---- Live value board (FantasyPros API) -------------------------------------
+# Instead of drafting from a fixed list, we pull live Expert Consensus Rankings
+# (ECR) + ADP from FantasyPros and draft by VALUE = ADP - ECR
+# (players the experts rank well above where the crowd is drafting = best value).
+# Requires a FREE API key (https://www.fantasypros.com/api-data/) in FP_API_KEY.
+# If the key is missing or the fetch fails, we fall back to the static BOARD
+# (original behaviour). Set FP_SCORING to match your league (.5 PPR -> HALF).
+FP_API_KEY = os.environ.get("FP_API_KEY")
+FP_BASE = "https://api.fantasypros.com/public/v2/json"
+FP_SEASON = 2026
+FP_SCORING = "HALF"          # FD nation is .5 PPR
 
 # ---- Pre-built board: (name, team, pos, adp) from verified Yahoo ADP scrape ----
 # Skill + K/DEF tiers added 2026-08-21 after mock-draft validation found the
@@ -62,6 +74,69 @@ def log(s):
 def http_get(path):
     with urllib.request.urlopen(CDP+path,timeout=8) as r:
         return json.loads(r.read().decode())
+
+# ---- Live value board -------------------------------------------------------
+def _fp_get(path):
+    url = FP_BASE + path
+    req = urllib.request.Request(url, headers={
+        "x-api-key": FP_API_KEY, "User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=12) as r:
+        return json.loads(r.read().decode())
+
+def fetch_fp_consensus(position):
+    """Pull FantasyPros consensus rankings (ECR + ADP) for one position.
+    Returns a list of dicts with name/team/pos/ecr/adp (adp may be None)."""
+    data = _fp_get("/nfl/%d/consensus-rankings?position=%s&scoring=%s"
+                   % (FP_SEASON, position, FP_SCORING))
+    out = []
+    for p in data.get("players", []):
+        name = p.get("player_name")
+        if not name:
+            continue
+        ecr = p.get("rank_ecr") or p.get("ecr") or p.get("rank")
+        adp = (p.get("adp") or p.get("rank_adp") or p.get("avg_adp")
+               or p.get("adp_rank"))
+        out.append({"name": name, "team": p.get("player_team_id"),
+                    "pos": position, "ecr": ecr, "adp": adp})
+    return out
+
+def static_board():
+    """Fallback board: same universe as BOARD, ordered by static ADP.
+    value = -adp so sorting desc drafts lowest ADP first (original behaviour)."""
+    return {b[0]: {"name": b[0], "team": b[1], "pos": b[2], "adp": b[3],
+                   "value": -b[3]} for b in BOARD}
+
+def build_value_board():
+    """Live board: BOARD names annotated with FantasyPros ECR + ADP, ordered by
+    VALUE = ADP - ECR (higher = better value: drafted later than experts rank).
+    Returns None if no key / fetch fails, so the caller falls back to
+    static_board()."""
+    if not FP_API_KEY:
+        log("VALUE_BOARD: no FP_API_KEY -> static BOARD")
+        return None
+    fp = {}
+    for pos in sorted(set(b[2] for b in BOARD)):
+        try:
+            rows = fetch_fp_consensus(pos)
+        except Exception as e:
+            log("VALUE_BOARD: fetch failed (%s) -> static BOARD" % repr(e))
+            return None
+        for r in rows:
+            fp[r["name"].lower()] = r
+    out = {}
+    live = 0
+    for (name, team, pos, adp) in BOARD:
+        r = fp.get(name.lower())
+        if r and r.get("ecr") is not None and r.get("adp") is not None:
+            out[name] = {"name": name, "team": team, "pos": pos,
+                         "ecr": r["ecr"], "adp": r["adp"],
+                         "value": float(r["adp"]) - float(r["ecr"])}
+            live += 1
+        else:
+            out[name] = {"name": name, "team": team, "pos": pos,
+                         "adp": adp, "value": 0.0}
+    log("VALUE_BOARD: live coverage %d/%d" % (live, len(out)))
+    return out
 
 def connect():
     targets = http_get("/json/list")
@@ -129,43 +204,46 @@ def is_my_pick(ws):
       return false;
     })()""")
 
-def choose_pick(available, drafted, round_num):
-    """Position-target-aware pick.
+def choose_pick(available, drafted, round_num, board):
+    """Position-target-aware pick driven by a value board.
+
+    `board` is a dict name -> {name, team, pos, adp, value}. Candidates are the
+    board entries whose name is still available, sorted by VALUE desc (highest
+    value = drafted later than experts rank them = best pick).
     1) If a REQUIRED slot is still unfilled AND we're at/past its FORCE_BY_ROUND,
-       force the best available player at that position.
-    2) Otherwise pick highest board player available respecting timing guards.
-    3) Fallback: best available by board ignoring need (still respect timing)."""
-    avail_lower = set(n.lower() for n in available)
-    def on_board(name): return name.lower() in avail_lower
+       force the highest-value available player at that position.
+    2) Otherwise pick the highest-value available player respecting timing guards.
+    3) Fallback: best available ignoring need (still respect timing)."""
+    avail_lower = {n.lower() for n in available}
+    cands = [v for v in board.values() if v["name"].lower() in avail_lower]
+    cands.sort(key=lambda v: v.get("value", 0.0), reverse=True)
 
     # 1) forced fills for required slots past deadline
     for pos, need in REQUIRED.items():
-        have = drafted.get(pos,0)
-        if have < need and round_num >= FORCE_BY_ROUND.get(pos, 99):
-            # best available at this pos by board order
-            cand = [b for b in BOARD if b[2]==pos and on_board(b[0])]
-            if cand:
-                return cand[0]  # BOARD already sorted by ADP/priority
+        if drafted.get(pos, 0) < need and round_num >= FORCE_BY_ROUND.get(pos, 99):
+            for c in cands:
+                if c["pos"] == pos:
+                    return (c["name"], c.get("team"), pos, c.get("adp") or 0)
 
-    # 2) highest board player available, with timing guards + need awareness
-    for name,team,pos,adp in BOARD:
-        if not on_board(name): continue
-        if pos in ("K","DEF") and round_num < (TOTAL_ROUNDS - K_DEF_LAST_ROUNDS + 1): continue
-        if pos=="QB" and round_num < MY_PICK_ROUNDS_QB: continue
-        # need guard: don't take a 3rd RB/WR etc. unless required slots still open elsewhere
-        have = drafted.get(pos,0)
-        if pos in REQUIRED and have >= REQUIRED[pos]:
-            # already have enough of this starting slot; only take as bench if board says clearly best
-            # allow bench-fill only after skill starters secured -> handled by fallback
+    # 2) highest value available, with timing guards + need awareness
+    for c in cands:
+        pos = c["pos"]
+        if pos in ("K", "DEF") and round_num < (TOTAL_ROUNDS - K_DEF_LAST_ROUNDS + 1):
             continue
-        return (name,team,pos,adp)
+        if pos == "QB" and round_num < MY_PICK_ROUNDS_QB:
+            continue
+        if pos in REQUIRED and drafted.get(pos, 0) >= REQUIRED[pos]:
+            continue
+        return (c["name"], c.get("team"), pos, c.get("adp") or 0)
 
-    # 3) fallback: best available by board ignoring need (still respect timing guards)
-    for name,team,pos,adp in BOARD:
-        if not on_board(name): continue
-        if pos in ("K","DEF") and round_num < (TOTAL_ROUNDS - K_DEF_LAST_ROUNDS + 1): continue
-        if pos=="QB" and round_num < MY_PICK_ROUNDS_QB: continue
-        return (name,team,pos,adp)
+    # 3) fallback: best available by value ignoring need (still respect timing)
+    for c in cands:
+        pos = c["pos"]
+        if pos in ("K", "DEF") and round_num < (TOTAL_ROUNDS - K_DEF_LAST_ROUNDS + 1):
+            continue
+        if pos == "QB" and round_num < MY_PICK_ROUNDS_QB:
+            continue
+        return (c["name"], c.get("team"), pos, c.get("adp") or 0)
     return None
 
 def click_player(ws,name):
@@ -203,6 +281,10 @@ def run_draft():
     log("DRAFT_DRIVER_START team="+TEAM_ID)
     ws=connect()
     navigate(ws,"https://football.fantasysports.yahoo.com/f1/%s/draft"%LEAGUE)
+    # Build the value board once: live (FantasyPros) if possible, else static BOARD.
+    vb = build_value_board()
+    board = vb if vb else static_board()
+    log("BOARD_MODE=" + ("LIVE(FantasyPros)" if vb else "STATIC"))
     drafted={}
     round_num=1
     picks_made=0
@@ -212,7 +294,7 @@ def run_draft():
             if is_my_pick(ws):
                 available=read_available(ws)
                 log("MY_PICK round="+str(round_num)+" avail="+str(len(available)))
-                pick=choose_pick(available,drafted,round_num)
+                pick=choose_pick(available,drafted,round_num,board)
                 if pick:
                     name,team,pos,adp=pick
                     ok=click_player(ws,name)

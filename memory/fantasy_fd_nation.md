@@ -13,7 +13,9 @@ the user mentions fantasy football, their league, the draft, lineup, waivers, or
 - Waiver: 2-day rolling list; trade review by league vote; max acquisitions unlimited.
 
 ## Draft strategy (user-approved)
-- Approach: pick by pre-built ADP board (verified top-30), with automatic guardrails:
+- Approach: draft by **value = expert rank − ADP** when a live FantasyPros feed is
+  available (set `FP_API_KEY` for the free API); otherwise fall back to the
+  pre-built ADP board (verified top-30). Automatic guardrails apply either way:
   - No QB before round 10.
   - K and DEF only in the last 2 rounds.
   - Don't double a position that's already filled to its slot count.

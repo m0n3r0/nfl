@@ -42,6 +42,7 @@ system and it places no wagers. See the honesty notes under
 - [Tests](#tests)
 - [Known limitations](#known-limitations)
 - [FD nation draft automation (module)](#fd-nation-draft-automation-module)
+- [Data sources & winning strategy](docs/DATA_SOURCES.md)
 
 ## Data source
 
@@ -212,6 +213,19 @@ Then on Windows:
 py.exe driver/draft_driver.py
 ```
 Or let the scheduled task **FDnationDraftDriver** fire automatically at draft time.
+
+#### Live value board (optional but recommended)
+By default the driver drafts from a fixed board. To draft by **value** (expert
+rank − ADP) using live [FantasyPros](https://www.fantasypros.com/api-data/)
+data, set a free API key before the draft:
+```bat
+setx FP_API_KEY "your-free-key"
+```
+With the key, the driver logs `BOARD_MODE=LIVE(FantasyPros)` and picks the
+highest-value available player each turn; without it (or on any fetch failure)
+it logs `BOARD_MODE=STATIC` and falls back to the fixed board. See
+[docs/DATA_SOURCES.md](docs/DATA_SOURCES.md) for the full strategy, pricing, and
+setup.
 
 ### Safety net
 Yahoo default pre-rank is the auto-draft fallback if the driver errors.
