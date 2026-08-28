@@ -203,7 +203,7 @@ Protocol (CDP). Lives as a self-contained module alongside the toolkit above.
 - `images/` — proof screenshots.
 
 ### League facts (verified live 2026-08-28)
-.5 PPR, H2H, 15 rounds, 1 min/pick, snake, **12 teams**. Roster: 1QB/2WR/2RB/1TE/1WRT/1K/1DEF/6BN/2IR.
+.5 PPR, H2H, 15 rounds, 1 min/pick, snake, **10 teams**. Roster: 1QB/2WR/2RB/1TE/1WRT/1K/1DEF/6BN/2IR.
 Draft: **Tue Sep 1 2026, 5:00pm EDT** (= 2026-09-02 06:00 JST on the machine).
 
 ### How to run the draft
