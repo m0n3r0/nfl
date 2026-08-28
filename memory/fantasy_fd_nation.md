@@ -55,34 +55,63 @@ real Yahoo room opens on Sep 1. Driven through the **live Edge on 127.0.0.1:9222
 in a NEW CDP tab (user's Yahoo tab untouched) against a Yahoo-style mock room
 (`tools/mock_draft_room.html`) that exposes a `window.MockDraft` API.
 
-Method: `tools/mock_draft_run.py` injects the REAL 119-player original board +
-filler, runs a full 15-round snake for team #2, and calls the DEPLOYED driver's
-REAL functions on every turn (no reimplementation). Opponents are simulated
-(biased to snipe board players) so scarcity/anchor guardrails are exercised.
+Method: `tools/mock_draft_run.py` injects the REAL original board + filler, runs a
+full 15-round snake for team #2, and calls the DEPLOYED driver's REAL functions on
+every turn (no reimplementation). Opponents are simulated (skill players only, so
+K/DEF are left for the bot's late rounds) so scarcity/anchor guardrails AND the
+K/DEF-last / QB-round contract are exercised. The harness also asserts the draft
+CONTRACT: K/DEF only in rounds 14-15, QB not before R10, every required slot filled
+by its anchor deadline.
 
-**Result: 15/15 picks clicked + confirmed via CDP; final roster LEGAL
-(QB=4 RB=6 WR=2 TE=1 K=1 DEF=1); `NO_FAILURES`.**
-
-Bugs the mock caught and were fixed in `driver/draft_driver.py` (all real, would
-have broken the live draft):
+### Round 1 validation (PR #5, 3b7786a) — 3 real bugs found & fixed
 1. **`click_player` clicked the first enabled "Draft" button on the page, not the
-   chosen player's row button.** The displayed list is Yahoo-sorted (ADP/board
-   order), so our value pick is rarely the top row → the bot drafted the WRONG
-   players. Fixed: scope the button search to the chosen player's own row.
-2. **`read_available` regex required a two-word name, so single-word team-defense
-   names ("Ravens BAL - DEF") never parsed** → the bot could NEVER draft a defense
-   → illegal lineup. Fixed: allow 1-3 word names.
-3. **`choose_pick` had no bench phase** (returned `None` once REQUIRED slots were
+   chosen player's row button.** Yahoo-sorts the list, so our value pick is rarely
+   the top row → the bot drafted the WRONG players. Fixed: scope the button search
+   to the chosen player's own row.
+2. **`choose_pick` had no bench phase** (returned `None` once REQUIRED slots were
    filled) → bot made only 7 of 15 picks. Fixed: fallback now drafts best-available
    for bench (still respecting K/DEF-last + QB-round timing guards).
-4. (mock-only) drafted players were rendered as `<li>`, so `read_available`'s
+3. (mock-only) drafted players were rendered as `<li>`, so `read_available`'s
    `tr,li` scan re-scanned them as available and the bot tried to re-draft them.
    Fixed in the mock: drafted list uses `<div>`.
+
+**Result (R1): 15/15 picks clicked + confirmed via CDP; roster LEGAL; NO_FAILURES.**
+(Correction of an earlier doc claim: "single-word defense names never parsed" was
+wrong — the original regex already allowed 1-3 word names and the deployed board
+uses all-caps team codes, so defenses parsed fine. The real DEF gap was the
+team-CODE capture, fixed below.)
+
+### CodeRabbit review on PR #5 — regex / harness hardening (this session)
+CodeRabbit flagged 3 Major issues; fixing them surfaced a 4th (critical) bug:
+- **Stray `)` in the `read_available` regex** introduced while adding the team-code
+  capture group → the whole regex was a JS syntax error → `read_available` threw
+  inside the CDP eval and returned `None`. Fixed (removed the extra paren).
+- **Team-code not captured** (CodeRabbit): the regex captured only name + position,
+  not the team code, so `normalize_available` couldn't map a defense label like
+  `"Los Angeles Rams LAR - DEF"` to the board key `"Rams"`. Fixed: capture the team
+  code as its own group; `normalize_available` maps `LAR → Rams`.
+- **Filler names unparseable** (CodeRabbit): `"Fantasy Stash 0 BUF ..."` contains a
+  digit, which the name regex rejects → the mock couldn't supply 150 bodies.
+  Fixed: filler names are now 1-2 alphabetic words, no digits.
+- **Opponent K/DEF filtering guessed position** (CodeRabbit): `simulate_opponents`
+  called `_pos_of()` on a bare name (always `""`), so K/DEF were eligible for
+  opponent snipes → nondeterministic roster. Fixed: the mock now exposes
+  `availablePlayers()` (name + pos); opponents filter on real `pos` and never take
+  K/DEF.
+- Hardening found while fixing: the team-code class is now `[A-Za-z]{2,4}` (Yahoo
+  team codes can be mixed-case, e.g. `Det`), and the name pattern now consumes an
+  optional generational suffix (`III`, `Jr.`) and up to 4 tokens
+  (e.g. `Amon-Ra St. Brown`). Verified: **119/119 board rows parse**, including
+  `Ja'Marr Chase`, `James Cook III`, `Amon-Ra St. Brown`, `Brian Thomas Jr.`.
+
+**Result (rerun, this session): 15/15 picks clicked + confirmed via CDP; roster
+LEGAL (QB=3 RB=5 WR=4 TE=1 K=1 DEF=1); contract held; NO_FAILURES.**
 
 Honest remaining gap: the mock validates the driver's click/confirm *mechanics*
 using the real deployed functions against a Yahoo-style DOM. The REAL Yahoo room's
 exact markup (draft-button label/position, live ADP parsing) can only be confirmed
-on Sep 1 — but the logic that finds, clicks, and confirms a pick is now proven.
+on Sep 1 — but the logic that finds, clicks, and confirms a pick is now proven, and
+the parser handles every board name format we know of.
 
 ## Proven skills (see /home/eml/.hermes/skills/)
 - `edge-cdp`: connect to Edge 9222, human-like input helpers.

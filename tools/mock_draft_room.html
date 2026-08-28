@@ -89,6 +89,10 @@
         if (i >= 0) { avail.splice(i, 1); render(); }
       },
       availableNames: function () { return avail.map(function (p) { return p.name; }); },
+      // Expose full player objects (with pos) so the harness can filter
+      // opponents by position (e.g. keep K/DEF for the bot's late rounds)
+      // instead of guessing position from a bare name.
+      availablePlayers: function () { return avail.map(function (p) { return {name: p.name, pos: p.pos}; }); },
       drafted: function () { return drafted.slice(); },
       clear: function () { avail = []; drafted = []; render(); }
     };

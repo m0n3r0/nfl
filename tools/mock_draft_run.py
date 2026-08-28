@@ -2,19 +2,23 @@
 
 Goal: prove the previously-untested CDP PICK-CLICK path works end to end
 (read_available -> choose_pick -> click_player -> _confirm_pick) BEFORE the
-real Yahoo draft room opens on Sep 1.
+real Yahoo draft room opens on Sep 1. It also asserts the draft CONTRACT:
+K/DEF only in the last two rounds, QB not before round 10, every required
+slot filled by its anchor deadline, and every chosen player actually clicked
+and confirmed.
 
 How it works (all against the LIVE Edge on 127.0.0.1:9222):
   - opens the Yahoo-style mock room (tools/mock_draft_room.html) in a NEW tab
     via CDP Target.createTarget + attachToTarget (sessionId model, so your real
     Yahoo tab is never touched and we don't depend on /json/list);
-  - injects the REAL original board (119 players) + ~90 filler players so the
+  - injects the REAL original board (119 players) + filler players so the
     10-team league has enough bodies for 150 picks;
   - runs a full 15-round snake for team #2, calling the DEPLOYED driver's real
     functions on every turn (no reimplementation);
-  - between the bot's turns it simulates the other 9 teams drafting (biased
-    toward sniping board players), so scarcity/anchor guardrails are exercised;
-  - verifies the final roster is legal and closes the tab.
+  - between the bot's turns it simulates the other 9 teams drafting skill
+    players only (opponents leave K/DEF for the bot's late rounds), so the
+    scarcity/anchor guardrails and the K/DEF-last contract are exercised;
+  - verifies the final roster is legal AND the contract held, then closes tab.
 
 This is validation only -- it performs real CDP mouse clicks inside the mock
 page but never touches Yahoo, your league, or a real draft.
@@ -42,8 +46,33 @@ N_TEAMS = 10
 TOTAL_ROUNDS = 15
 REQUIRED = {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "K": 1, "DEF": 1}
 
+# Anchor deadline mirror of driver/draft_driver.py ANCHOR_BY_ROUND: the latest
+# round by which the REQUIRED count for a position must be met. K and DEF share
+# the last-two-rounds window (14-15); the driver fills K at R14 and DEF at R15,
+# so their effective deadline is the final round (15). Used by the contract
+# assertions below -- if the driver regresses, the run fails loudly.
+ANCHOR_DEADLINE = {"RB": 5, "WR": 9, "TE": 7, "QB": 10, "K": 15, "DEF": 15}
+K_DEF_FIRST_ROUND = TOTAL_ROUNDS - 2 + 1   # K/DEF only from this round on (=14)
+QB_FIRST_ROUND = 10                         # QB not before this round
+
+# Filler name pools: 1-2 alphabetic words, NO digits, so the deployed
+# read_available() regex parses every filler row. Skills enough combos for ~160
+# unique fillers (47 first x 35 last).
+_FILLER_FIRST = ["Ace", "Bay", "Cole", "Dane", "Eli", "Finn", "Gage", "Hugo", "Ike",
+                 "Jax", "Kai", "Lane", "Max", "Nash", "Owen", "Pace", "Quinn",
+                 "Reed", "Slade", "Tate", "Vance", "Wade", "Xan", "York", "Zane",
+                 "Beck", "Cruz", "Drew", "Ezra", "Fox", "Grey", "Hale", "Ivo",
+                 "Jude", "Knox", "Luca", "Milo", "Nate", "Otis", "Pax", "Rhett",
+                 "Sawyer", "Theo", "Vik", "Wren", "Xer", "Yael", "Zed"]
+_FILLER_LAST = ["Ash", "Birch", "Crest", "Dale", "East", "Frost", "Grove", "Hale",
+                "Isle", "Jade", "Knoll", "Lyn", "Marsh", "North", "Oak", "Pike",
+                "Quay", "Reef", "Stone", "Vale", "West", "Yew", "Zorn", "Brook",
+                "Cove", "Dune", "Field", "Glass", "Heath", "Lake", "Moor", "Park",
+                "Ridge", "Shore", "Wood"]
+
 
 def log(s):
+    """Append a timestamped line to the mock log and echo it to stdout."""
     line = time.strftime("%H:%M:%S") + " " + str(s)
     print(line)
     with open(LOG, "a", encoding="utf-8") as f:
@@ -51,6 +80,8 @@ def log(s):
 
 
 def load_deployed():
+    """Import the DEPLOYED driver module (C:\\edge-debug-profile\\draft_driver.py)
+    by absolute path so the harness tests the real file, not a copy."""
     spec = importlib.util.spec_from_file_location("dd", DEPLOYED)
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
@@ -58,15 +89,19 @@ def load_deployed():
 
 
 def http_get(p):
+    """GET a JSON endpoint from the local CDP HTTP interface."""
     with urllib.request.urlopen(CDP + p, timeout=8) as r:
         return json.loads(r.read().decode())
 
 
 def ws_connect(url):
+    """Open a websocket to a CDP endpoint with the localhost Origin header."""
     return websocket.create_connection(url, timeout=15, header={"Origin": CDP})
 
 
 def send(ws, method, params=None, session_id=None, rid=None):
+    """Send a CDP command; returns the id used (so the caller can match the
+    response). Injects sessionId when given."""
     rid = rid or random.randint(100000, 999999)
     msg = {"id": rid, "method": method, "params": params or {}}
     if session_id is not None:
@@ -76,6 +111,7 @@ def send(ws, method, params=None, session_id=None, rid=None):
 
 
 def recv_id(ws, rid, timeout=20):
+    """Block until a CDP response with the given id arrives; raise on error."""
     deadline = time.time() + timeout
     while time.time() < deadline:
         o = json.loads(ws.recv())
@@ -87,10 +123,12 @@ def recv_id(ws, rid, timeout=20):
 
 
 def browser_ws():
+    """Open a websocket to the browser-level CDP target."""
     return ws_connect(http_get("/json/version")["webSocketDebuggerUrl"])
 
 
 def peval(ws, expr, session_id=None, timeout=20):
+    """Evaluate a JS expression in the given CDP session; return its value."""
     rid = send(ws, "Runtime.evaluate",
                {"expression": expr, "returnByValue": True, "awaitPromise": True},
                session_id=session_id)
@@ -98,6 +136,7 @@ def peval(ws, expr, session_id=None, timeout=20):
 
 
 def wait_for(ws, expr, session_id=None, tries=40, delay=0.3):
+    """Poll a JS predicate until true or tries exhausted; return bool."""
     for _ in range(tries):
         try:
             if peval(ws, expr, session_id):
@@ -109,6 +148,8 @@ def wait_for(ws, expr, session_id=None, tries=40, delay=0.3):
 
 
 def open_mock_tab(url):
+    """Open url in a NEW Edge tab via CDP, attach, force a real viewport, and
+    bring it to the foreground. Returns (targetId, browser_ws, sessionId)."""
     bws = browser_ws()
     rid = send(bws, "Target.createTarget", {"url": url})
     tid = recv_id(bws, rid)["targetId"]
@@ -134,6 +175,7 @@ def open_mock_tab(url):
 
 
 def close_tab(bws, tid):
+    """Close a target, swallowing any CDP error."""
     try:
         send(bws, "Target.closeTarget", {"targetId": tid})
     except Exception as e:
@@ -167,6 +209,7 @@ def start_server():
     class _H(http.server.SimpleHTTPRequestHandler):
         def __init__(self, *a, **k):
             super().__init__(*a, directory=os.path.dirname(HTML), **k)
+
         def log_message(self, *a):
             pass
     srv = socketserver.TCPServer(("127.0.0.1", MOCK_PORT), _H)
@@ -175,6 +218,9 @@ def start_server():
 
 
 def build_players(mod):
+    """Build the injected player list: the REAL original board plus parser
+    -compatible filler to reach ~210 bodies. Defenses are relabeled to their
+    CITY-PREFIXED form so the read_available team-code capture is exercised."""
     board = mod.load_original_board()
     rows = sorted(board.values(), key=lambda v: v["value"], reverse=True)
     players = [{"name": b["name"], "team": b["team"], "pos": b["pos"]}
@@ -189,24 +235,20 @@ def build_players(mod):
     while len(players) < 210:           # ~150 draft slots + buffer
         t = teams[i % len(teams)]
         p = positions[(i // len(teams)) % len(positions)]
-        players.append({"name": "Fantasy Stash %d %s" % (i, t),
-                        "team": t, "pos": p})
+        # 1-2 alphabetic words, NO digits -> read_available() accepts every row.
+        name = "%s %s" % (_FILLER_FIRST[i % len(_FILLER_FIRST)],
+                          _FILLER_LAST[(i // len(_FILLER_FIRST)) % len(_FILLER_LAST)])
+        players.append({"name": name, "team": t, "pos": p})
         i += 1
     return players, board_names
 
 
-def _pos_of(name):
-    # name format is "First Last TEAM - POS"
-    if " - " in name:
-        return name.rsplit(" - ", 1)[1].strip()
-    return ""
-
-
 def simulate_opponents(ws, n, board_names):
-    names = peval(ws, "window.MockDraft.availableNames()") or []
-    # Real drafters leave K/DEF for the last rounds, so opponents only take
-    # skill players -- otherwise the bot's K/DEF anchor rounds find nothing.
-    skill = [x for x in names if _pos_of(x) not in ("K", "DEF")]
+    """Simulate n opponent picks, taking SKILL players only (opponents leave
+    K/DEF for the bot's late rounds). Filters on each available player's real
+    pos (from window.MockDraft.availablePlayers), not a guessed position."""
+    objs = peval(ws, "window.MockDraft.availablePlayers()") or []
+    skill = [o["name"] for o in objs if o.get("pos") not in ("K", "DEF")]
     board_side = [x for x in skill if x in board_names]
     other = [x for x in skill if x not in board_names]
     for _ in range(n):
@@ -216,6 +258,22 @@ def simulate_opponents(ws, n, board_names):
         pick = random.choice(pool)
         peval(ws, "window.MockDraft.removePlayer(%s)" % json.dumps(pick))
         (board_side if pick in board_names else other).remove(pick)
+
+
+def check_contract(pick_log, fails):
+    """Assert the draft CONTRACT against the recorded pick log. Appends human
+    -readable violations to `fails`. Returns True when the contract holds."""
+    ok = True
+    for rnd, name, pos in pick_log:
+        if pos in ("K", "DEF") and rnd < K_DEF_FIRST_ROUND:
+            fails.append("CONTRACT: %s drafted round %d (must be >= %d)"
+                         % (pos, rnd, K_DEF_FIRST_ROUND))
+            ok = False
+        if pos == "QB" and rnd < QB_FIRST_ROUND:
+            fails.append("CONTRACT: QB drafted round %d (must be >= %d)"
+                         % (rnd, QB_FIRST_ROUND))
+            ok = False
+    return ok
 
 
 def main():
@@ -241,6 +299,8 @@ def main():
 
         drafted = {}
         picks, fails = [], []
+        pick_log = []          # (round, name, pos) for contract assertions
+        filled_round = {}      # pos -> round its REQUIRED count was reached
         for rnd in range(1, TOTAL_ROUNDS + 1):
             peval(wsw, "window.MockDraft.setTurn(true)")
             raw = mod.read_available(wsw)
@@ -264,6 +324,10 @@ def main():
             if ok and confirmed:
                 drafted[pos] = drafted.get(pos, 0) + 1
                 picks.append((rnd, name, pos))
+                pick_log.append((rnd, name, pos))
+                if pos in REQUIRED and pos not in filled_round \
+                        and drafted[pos] >= REQUIRED[pos]:
+                    filled_round[pos] = rnd
                 log("R%-2d PICKED %-22s %s" % (rnd, name, pos))
             else:
                 fails.append("R%d: CLICK_FAIL %s (ok=%s confirmed=%s)"
@@ -282,10 +346,23 @@ def main():
                                        for k in ("QB", "RB", "WR", "TE", "K", "DEF")))
         legal = all(counts.get(k, 0) >= v for k, v in REQUIRED.items())
         log("ROSTER_LEGAL=%s" % legal)
+
+        # Contract: every required slot met by its anchor deadline.
+        for pos, need in REQUIRED.items():
+            if counts.get(pos, 0) < need:
+                continue
+            met = filled_round.get(pos)
+            if met is None:
+                continue
+            if met > ANCHOR_DEADLINE[pos]:
+                fails.append("CONTRACT: %s filled round %d (deadline R%d)"
+                             % (pos, met, ANCHOR_DEADLINE[pos]))
+        check_contract(pick_log, fails)
+
         if fails:
             log("FAILURES: %s" % " | ".join(fails))
         else:
-            log("NO_FAILURES: all 15 picks clicked + confirmed via CDP")
+            log("NO_FAILURES: all 15 picks clicked + confirmed via CDP; contract held")
         return 0 if (legal and not fails) else 1
     finally:
         close_tab(bws, tid)
