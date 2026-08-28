@@ -4,7 +4,7 @@ Runs against Edge on ws://127.0.0.1:9222 (launched with --remote-allow-origins=*
 Strategy: position-target-aware board picking with guardrails.
 Guarantees a legal lineup: required slots (QB,2RB,2WR,TE,K,DEF) filled by
 their deadlines, bench (6 BN) filled with best available afterwards.
-All decisions logged to C:\edge-debug-profile\draft_log.txt
+All decisions logged to C:\\edge-debug-profile\\draft_log.txt
 """
 import json, os, re, urllib.request, websocket, time, random, math, sys, io, datetime
 
@@ -54,6 +54,14 @@ FP_API_KEY = os.environ.get("FP_API_KEY") or os.environ.get("API")
 FP_BASE = "https://api.fantasypros.com/public/v2/json"
 FP_SEASON = 2026
 FP_SCORING = "HALF"          # FD nation is .5 PPR
+
+# FantasyPros Real-Time ADP page: the FREE ADP source (no API key). It renders a
+# live "REAL-TIME" ADP column derived from the same expert pool as the ECR feed,
+# so we can compute true VALUE = ADP - ECR without paying for the ADP API tier.
+# We scrape it from a fresh Edge tab via CDP at draft start (see
+# scrape_fp_realtime_adp). The "YAHOO" column on that same page is a useful
+# cross-platform sanity check but we standardize on the REAL-TIME column.
+RT_ADP_URL = "https://www.fantasypros.com/nfl/real-time-adp/"
 
 # ---- Pre-built board: (name, team, pos, adp) from verified Yahoo ADP scrape ----
 # Skill + K/DEF tiers added 2026-08-21 after mock-draft validation found the
@@ -163,58 +171,175 @@ def static_board():
     return {b[0]: {"name": b[0], "team": b[1], "pos": b[2], "adp": b[3],
                    "value": -b[3]} for b in BOARD}
 
-def build_value_board():
-    """Live board: BOARD names annotated with FantasyPros ECR (+ADP if the key's
-    plan exposes it), ordered by value:
-      - ADP available (paid tier): VALUE = ADP - ECR (true value: drafted later
-        than experts rank = best value).
-      - ECR only (free tier):      VALUE = -ECR (best-player-available by expert
-        consensus; higher ECR rank = worse, so we negate).
+def _norm_name(full):
+    """Normalize a full player name to the FantasyPros Real-Time ADP table key
+    format: 'First Last' -> 'F. Last' (first initial + last; apostrophes/dots
+    stripped, trailing generational suffix dropped). This matches the abbreviated
+    names that RT ADP page renders, e.g.:
+        'Jahmyr Gibbs'      -> 'J. Gibbs'
+        "Ja'Marr Chase"     -> 'J. Chase'
+        'Jaxon Smith-Njigba'-> 'J. Smith-Njigba'
+        'Christian McCaffrey'-> 'C. McCaffrey'
+        'James Cook III'    -> 'J. Cook'
+    Applied to BOTH the BOARD full names and the scraped RT rows, so lookups
+    line up regardless of which side the abbreviation comes from."""
+    parts = full.replace("'", "").replace(".", "").split()
+    # drop a trailing generational suffix (III / II / IV / Jr / Sr)
+    if parts and re.match(r"^(IV|III|II|I|Jr|SR)$", parts[-1], re.I):
+        parts = parts[:-1]
+    if len(parts) < 2:
+        return full
+    return parts[0][0].upper() + ". " + parts[-1]
+
+def build_value_board(adp_map=None):
+    """Live board: BOARD names annotated with FantasyPros ECR combined with ADP,
+    ordered by value. ADP comes from (in priority order):
+      (a) the Real-Time ADP scrape of fantasypros.com/nfl/real-time-adp/ (free,
+          no key) passed in via adp_map={norm_name: adp_float}, OR
+      (b) the paid FantasyPros API tier (adp field on the consensus response).
+    VALUE = ADP - ECR when an ADP is available (true value: drafted later than
+    the experts rank = best value); otherwise VALUE = -ECR (best-player-available
+    by expert consensus; higher ECR rank = worse, so we negate).
     Players we can't match to the feed (e.g. defenses, whose feed uses full team
-    names; or players beyond the free tier's 10-per-position cap) keep their
-    static ADP but are pushed far down the board (value = -(adp+1000)) so they
-    never sort ABOVE a real match.
-    Returns None if no key / fetch fails, so the caller falls back to
-    static_board()."""
-    if not FP_API_KEY:
-        log("VALUE_BOARD: no FP_API_KEY -> static BOARD")
+    names; or players beyond the free tier's per-position cap) keep their static
+    ADP but are pushed far down the board (value = -(adp+1000)) so they never
+    sort ABOVE a real match.
+    Returns None (caller falls back to static_board) only when we have NEITHER an
+    FP key (no ECR) NOR any RT ADP to build a live board from."""
+    adp_map = adp_map or {}
+    if not FP_API_KEY and not adp_map:
+        log("VALUE_BOARD: no FP_API_KEY and no RT adp -> static BOARD")
         return None
     fp = {}          # name(lower) -> row
     fp_team = {}     # team(lower) -> row  (defenses match by team id)
-    has_adp = False
+    has_ecr = False
     for pos in sorted(set(b[2] for b in BOARD)):
         try:
             rows = fetch_fp_consensus(pos)
         except Exception as e:
-            log("VALUE_BOARD: fetch failed (%s) -> static BOARD" % repr(e))
-            return None
+            if not adp_map:
+                log("VALUE_BOARD: fetch failed (%s) -> static BOARD" % repr(e))
+                return None
+            rows = []   # no ECR for this pos; RT adp (if any) still drives it
         for r in rows:
             if r["name"]:
                 fp[r["name"].lower()] = r
             if r.get("team"):
                 fp_team[r["team"].lower()] = r
-            if r.get("adp") is not None:
-                has_adp = True
+            if r.get("ecr") is not None:
+                has_ecr = True
     out = {}
     live = 0
+    used_rt = 0
     for (name, team, pos, adp) in BOARD:
         r = fp.get(name.lower())
         if r is None and pos == "DEF":        # feed uses full team names
             r = fp_team.get(team.lower())
         if r and r.get("ecr") is not None:
-            if r.get("adp") is not None:
-                value = float(r["adp"]) - float(r["ecr"])
+            # Prefer the free RT ADP scrape (same source as ECR => consistent);
+            # fall back to the paid API's adp field only if RT didn't cover it.
+            rt = adp_map.get(_norm_name(name)) if adp_map else None
+            used_adp = rt if rt is not None else r.get("adp")
+            if used_adp is not None:
+                value = float(used_adp) - float(r["ecr"])
+                if rt is not None:
+                    used_rt += 1
             else:
                 value = -float(r["ecr"])
             out[name] = {"name": name, "team": team, "pos": pos,
-                         "ecr": r["ecr"], "adp": r.get("adp"), "value": value}
+                         "ecr": r["ecr"], "adp": used_adp, "value": value}
             live += 1
         else:
             out[name] = {"name": name, "team": team, "pos": pos,
                          "adp": adp, "value": -(float(adp) + 1000.0)}
-    mode = "ADP-ECR (paid tier)" if has_adp else "ECR-only (free tier, BPA)"
-    log("VALUE_BOARD: live coverage %d/%d [%s]" % (live, len(out), mode))
+    if used_rt:
+        mode = "ADP-ECR (FantasyPros real-time scrape)"
+    elif has_ecr:
+        mode = "ECR-only (free tier, BPA)"   # no ADP source => BPA by ECR
+    else:
+        mode = "ADP-only (RT scrape, no ECR)"
+    log("VALUE_BOARD: live coverage %d/%d [RT_adp=%d] [%s]"
+        % (live, len(out), used_rt, mode))
     return out
+
+def scrape_fp_realtime_adp():
+    """Open the FantasyPros Real-Time ADP page in a FRESH Edge tab via CDP and
+    scrape the REAL-TIME column (table index 3) into {norm_name: adp_float}.
+    This is the FREE ADP source (no API key) and uses the same expert pool as the
+    ECR feed, so VALUE = ADP - ECR stays consistent. Returns {} on ANY failure
+    (caller then keeps the Yahoo live patch / ECR-only board). The orphan tab is
+    closed before returning."""
+    try:
+        targets = json.loads(urllib.request.urlopen(CDP+"/json/list", timeout=8).read())
+        page = next((t for t in targets if t.get("type") == "page"), None)
+        if not page:
+            log("RT_ADP: no page target in /json/list"); return {}
+        pws = websocket.create_connection(page["webSocketDebuggerUrl"], timeout=10,
+                                          header={"Origin": CDP})
+        pws.send(json.dumps({"id": 1, "method": "Target.enable", "params": {}}))
+        # Open a dedicated tab for the RT ADP page so we never disturb the live
+        # draft tab/session.
+        wid = random.randint(100, 99999)
+        pws.send(json.dumps({"id": wid, "method": "Target.createTarget",
+                             "params": {"url": RT_ADP_URL}}))
+        new_id = None
+        while True:
+            o = json.loads(pws.recv())
+            if o.get("id") == wid:
+                new_id = o.get("result", {}).get("targetId")
+                break
+        if not new_id:
+            log("RT_ADP: createTarget returned no targetId"); pws.close(); return {}
+        time.sleep(8)   # let the table render
+        targets = json.loads(urllib.request.urlopen(CDP+"/json/list", timeout=8).read())
+        # /json/list keys the target id under "id" (the "targetId" field is None
+        # there), so match against that.
+        ntab = next((t for t in targets if t.get("id") == new_id), None)
+        if not ntab:
+            log("RT_ADP: new tab not found in /json/list"); pws.close(); return {}
+        nws = websocket.create_connection(ntab["webSocketDebuggerUrl"], timeout=10,
+                                          header={"Origin": CDP})
+        nws.send(json.dumps({"id": 2, "method": "Runtime.enable", "params": {}}))
+        rows = ev(nws, """(function(){
+          var out=[];
+          var tbls=document.querySelectorAll('table');
+          if(!tbls.length) return out;
+          var trs=tbls[0].querySelectorAll('tr');
+          for(var i=0;i<trs.length;i++){
+            var tds=trs[i].querySelectorAll('td');
+            if(tds.length<4) continue;                 // skip header / junk rows
+            var name=tds[1].innerText.trim().split('\\n')[0];   // 1st line = name
+            var adp=tds[3].innerText.trim();           // REAL-TIME column
+            out.push([name, adp]);
+          }
+          return out;
+        })()""")
+        nws.close()
+        pws.close()
+        try:
+            urllib.request.urlopen(CDP + "/json/close/" + new_id, timeout=5).read()
+        except Exception:
+            pass
+        out = {}
+        for name, adp in (rows or []):
+            try:
+                adp = float(adp)
+            except (ValueError, TypeError):
+                continue
+            key = _norm_name(name)
+            # The RT table abbreviates to 'Initial. Last', so two different
+            # players can collide (e.g. Bijan Robinson vs Brian Robinson both ->
+            # 'B. Robinson'). We only care about the early-round stud's ADP for
+            # drafting, and the stud always has the SMALLER ADP, so keep the min
+            # on collision. The late player simply loses its exact ADP (rarely
+            # matters -- we draft K/DEF late from the static board anyway).
+            if key not in out or adp < out[key]:
+                out[key] = adp
+        log("RT_ADP: scraped %d rows" % len(out))
+        return out
+    except Exception as e:
+        log("RT_ADP: scrape failed (%s) -> {}" % repr(e))
+        return {}
 
 def connect():
     targets = http_get("/json/list")
@@ -394,9 +519,13 @@ def run_draft():
     log("DRAFT_DRIVER_START team="+TEAM_ID)
     ws=connect()
     navigate(ws,"https://football.fantasysports.yahoo.com/f1/%s/draft"%LEAGUE)
-    # Build the value board once: live (FantasyPros) if possible, else static BOARD.
-    vb = build_value_board()
+    # Build the value board once: live FantasyPros ECR, with ADP taken from the
+    # free Real-Time ADP scrape (same source as ECR => consistent VALUE=ADP-ECR).
+    # Falls back to static BOARD if neither an FP key nor RT ADP is available.
+    rt_adp = scrape_fp_realtime_adp()
+    vb = build_value_board(adp_map=rt_adp)
     board = vb if vb else static_board()
+    log("ADP_SOURCE=" + ("FANTASYPROS_REALTIME" if rt_adp else "NONE"))
     log("BOARD_MODE=" + ("LIVE(FantasyPros)" if vb else "STATIC"))
     drafted={}
     round_num=1

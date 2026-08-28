@@ -195,6 +195,41 @@ def test_choose_pick_uses_yahoo_adp():
     assert p_yes[0] == "Value Guy"
 
 
+def test_build_value_board_uses_realtime_adp():
+    """The FREE Real-Time ADP scrape (RT_ADP_URL) combined with the free ECR feed
+    must yield VALUE = RT_ADP - ECR for covered players, using the normalized
+    name as the join key. This is the path that makes the paid ADP tier
+    unnecessary."""
+    def mock_ecr(path):
+        pos = re.search(r"position=(\w+)", path).group(1)
+        lookup = "DEF" if pos == "DST" else pos
+        players = [b for b in dd.BOARD if b[2] == lookup]
+        return {"players": [
+            {"player_name": n, "player_team_id": t, "position": pos,
+             "rank_ecr": i + 1, "tier": 1}
+            for i, (n, t, pos2, adp) in enumerate(players)]}
+    dd._fp_get = mock_ecr
+    dd.FP_API_KEY = "MOCK"
+    # Keys are the NORMALIZED names (initial + last) the RT page renders.
+    adp_map = {"J. Gibbs": 1.2, "B. Robinson": 2.2,
+               "J. Chase": 3.8, "C. McCaffrey": 6.0}
+    try:
+        vb = dd.build_value_board(adp_map=adp_map)
+    finally:
+        dd.FP_API_KEY = None
+    assert vb is not None, "expected a live board"
+    # Jahmyr Gibbs is BOARD[0] (1st RB) -> mock ECR=1; RT adp 1.2 -> value 0.2
+    row = vb["Jahmyr Gibbs"]
+    assert row["adp"] == 1.2
+    assert row["value"] == 1.2 - 1.0
+    # Bijan Robinson is BOARD[1] (2nd RB) -> mock ECR=2; RT adp 2.2 -> value 0.2
+    row2 = vb["Bijan Robinson"]
+    assert row2["adp"] == 2.2
+    assert row2["value"] == 2.2 - 2.0
+    # A player without an RT entry keeps its ECR-only value (-ECR).
+    assert vb["Amon-Ra St. Brown"]["value"] == -float(vb["Amon-Ra St. Brown"]["ecr"])
+
+
 def _board(*rows):
     """rows: (name, pos, value) -> board dict the driver understands."""
     return {n: {"name": n, "team": "T", "pos": p, "adp": None, "value": v}
@@ -234,4 +269,5 @@ if __name__ == "__main__":
     test_scarcity_premium_anchors_rb_over_higher_value_wr()
     test_anchor_forces_rb_on_schedule()
     test_build_value_board_static_fallback_without_key()
+    test_build_value_board_uses_realtime_adp()
     print("All draft-driver tests passed.")

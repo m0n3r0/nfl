@@ -30,6 +30,7 @@ stats feed. Three real levers, in order of impact:
 | --- | --- | --- |
 | [nflverse-data](https://github.com/nflverse/nflverse-data) | Historical + weekly player/stat data, schedules, rosters | Toolkit ingest/scoring/projections (already used) |
 | [FantasyPros API](https://www.fantasypros.com/api-data/) — **free key** | Expert Consensus Rankings (ECR) only; ADP/projections gated behind paid tier | **Live value board** (ECR best-player-available; see below) |
+| [FantasyPros Real-Time ADP](https://www.fantasypros.com/nfl/real-time-adp/) — **free, no key** | Live "REAL-TIME" ADP column, from the *same* expert pool as ECR | **Primary ADP source** for `VALUE = ADP − ECR` (scraped from a fresh Edge tab; see below) |
 | [Sleeper](https://sleeper.com) | League host; public player API | Reference (note: `adp` field is null pre-season, so not used live) |
 | [NFL Next Gen Stats](https://nextgenstats.nfl.com) | Routes run, separation, air-yard share | In-season opportunity reads |
 | Official NFL injury report | Verified injury/designation status | Waiver/start-sit timing |
@@ -53,16 +54,17 @@ sourced where linked.
 ### Recommendation for *this* project
 
 For a "serious project," the free FantasyPros key **delivers live ECR** (expert
-consensus) — enough for a strong live best-player-available board. What it does
-**not** give is **ADP**: the `adp` and `ros-rankings` endpoints return
-`403 Missing Authentication Token` on the free key, so the true `VALUE = ADP − ECR`
-metric requires either a paid FantasyPros tier **or** Yahoo's own ADP (scraped
-from the draft room via the existing Edge automation). The paid tiers mostly add
-ADP, rate limits, in-season news, and convenience. So:
+consensus) — enough for a strong live best-player-available board. The `adp` and
+`ros-rankings` endpoints return `403 Missing Authentication Token` on the free
+key, **but** the separate **Real-Time ADP page** is free and exposes ADP from the
+*same* expert pool as ECR, so the true `VALUE = ADP − ECR` value metric costs
+**$0** — no paid tier needed. Yahoo's own ADP (scraped live) is kept only as a
+per-turn patch for the handful of names the RT scrape doesn't cover. So:
 
-- **Start at $0** with the FantasyPros free prototype key (ECR best-player-available).
-- **Want true value (ADP−ECR)?** Upgrade to HOF (~$8.99/mo) **or** wire Yahoo
-  ADP — both expose ADP the free key hides.
+- **Start at $0** with the FantasyPros free prototype key (ECR) **plus** the free
+  Real-Time ADP scrape (ADP) → full `VALUE = ADP − ECR` board, no payment.
+- **Upgrade to HOF (~$8.99/mo) only if** we hit the free-tier ECR call limit
+  (unlikely: ~6 calls/draft) or want in-season news.
 - The free call volume is tiny (~6 calls/draft, one per position), so rate limits
   are a non-issue.
 
@@ -75,18 +77,26 @@ The driver no longer drafts from a fixed list. At draft start it builds a
 **value board**:
 
 ```
-VALUE = Yahoo_ADP − FantasyPros_ECR   # recommended: Yahoo ADP scraped live + FP ECR
-     = FantasyPros_ADP − ECR          # if a paid FP key exposes ADP
-     = −ECR                           # fallback when no ADP is available
+VALUE = FantasyPros_RT_ADP − FantasyPros_ECR   # PRIMARY (free): RT scrape + ECR
+     = Yahoo_ADP − FantasyPros_ECR             # per-turn patch for uncovered players
+     = FantasyPros_ADP − ECR                  # if a paid FP key exposes ADP
+     = −ECR                                   # fallback when no ADP is available
 ```
 
-- **Recommended (free key + Yahoo ADP):** FantasyPros' free tier gives ECR but
-  hides ADP, so we **scrape Yahoo's own ADP** live from the draft room each turn
-  (Yahoo ADP is the real "crowd" for *this* league). `VALUE = Yahoo_ADP −
-  FantasyPros_ECR` is the true value metric — a player experts rank #5 but the
-  Yahoo crowd drafts at #20 has `VALUE = +15` (great). We pick the **highest
-  VALUE** available player.
-- **Paid FantasyPros tier (ADP present):** `VALUE = FantasyPros_ADP − ECR`.
+- **Recommended (free key + FantasyPros Real-Time ADP):** FantasyPros' free tier
+  gives ECR but hides ADP behind a paid tier. The **Real-Time ADP page** is a
+  *separate, free* page that renders a live "REAL-TIME" ADP column from the
+  **same expert pool as ECR**, so `VALUE = FantasyPros_RT_ADP − ECR` is the true
+  value metric at **$0** — a player experts rank #5 but the crowd drafts at #20
+  has `VALUE = +15` (great). We scrape it from a fresh Edge tab at draft start
+  (`scrape_fp_realtime_adp`) and join it to `BOARD` by normalized name. This is
+  now the **primary** ADP source — no paid tier required.
+- **Yahoo ADP (per-turn patch):** scraped live from the draft room each turn for
+  the *available* players; it only overrides a player's value when the RT scrape
+  didn't cover that name (rare — ~53/54 BOARD names match). Cross-platform sanity
+  check, not the primary feed.
+- **Paid FantasyPros tier (ADP present):** `VALUE = FantasyPros_ADP − ECR` (used
+  only as a fallback when the RT scrape misses a name).
 - **No ADP available:** we draft **best-player-available by ECR** (`VALUE = −ECR`,
   lowest expert rank first). Still a strong live strategy.
 - All modes respect the same position/timing guardrails (required slots forced
@@ -118,16 +128,25 @@ this (both in `choose_pick`):
   `rank_ecr` (+ `tier`, consensus spread) per player; **`adp` is absent** (the
   ADP route is paid). Defenses are requested as `position=DST` and matched back
   to `BOARD` by `player_team_id`.
-- **ADP:** **Yahoo's own Average Draft Position**, scraped live from the draft
-  room each turn via the existing Edge automation (`read_available` reads the
-  ADP label off each available player's row; `parse_adp` extracts it). This is
-  the most relevant ADP for a Yahoo league and needs no paid key. *(The exact
-  row selector should be confirmed with a 30-second look at the live draft room
-  on draft day — Sep 1; if Yahoo doesn't render the `ADP` label, the driver
-  transparently falls back to ECR best-player-available.)*
-- **Fallback:** if `FP_API_KEY` is missing **or** any fetch fails, the driver
-  silently falls back to the static `BOARD` (original ADP-ordered behaviour) and
-  logs `BOARD_MODE=STATIC`. The draft never breaks.
+- **ADP (primary, free):** the **[FantasyPros Real-Time ADP](https://www.fantasypros.com/nfl/real-time-adp/)
+  page**, scraped from a *fresh* Edge tab at draft start via CDP
+  (`scrape_fp_realtime_adp` → `RT_ADP_URL`). The "REAL-TIME" column (table index
+  3) is the ADP; it comes from the same expert pool as ECR, so `VALUE = ADP − ECR`
+  stays consistent. No key required. The orphan tab is created and closed inside
+  the scrape so the live draft tab is never disturbed. If the scrape fails for
+  any reason it returns `{}` and the driver transparently falls back to the
+  Yahoo per-turn patch / ECR-only board.
+- **ADP (per-turn patch):** **Yahoo's own Average Draft Position**, scraped live
+  from the draft room each turn for the *available* players (`read_available`
+  reads the ADP label off each row; `parse_adp` extracts it). Used only to
+  override a player's value when the RT scrape didn't cover that name. *(The
+  exact row selector should be confirmed with a 30-second look at the live draft
+  room on draft day — Sep 1; if Yahoo doesn't render the `ADP` label, this patch
+  is simply skipped.)*
+- **Fallback:** if `FP_API_KEY` is missing **and** the RT scrape returns nothing
+  (or any fetch fails), the driver silently falls back to the static `BOARD`
+  (original ADP-ordered behaviour) and logs `BOARD_MODE=STATIC`. The draft never
+  breaks.
 
 ### Setup
 
@@ -157,15 +176,28 @@ FantasyPros doesn't return (e.g. defenses, whose feed uses full team names like
 "Houston Texans"; or players beyond the free tier's ~10-per-position cap) keep
 their static ADP but are **deprioritized** (`VALUE = −(adp + 1000)`) so they
 sort *below* every matched player instead of above. Coverage is logged as
-`VALUE_BOARD: live coverage N/M [MODE]` where MODE is `ADP-ECR (paid tier)` or
+`VALUE_BOARD: live coverage N/M [RT_adp=K] [MODE]` where MODE is
+`ADP-ECR (FantasyPros real-time scrape)`, `ADP-only (RT scrape, no ECR)`, or
 `ECR-only (free tier, BPA)`.
+
+### Name-matching note (RT ADP join)
+
+The RT page abbreviates names to `Initial. Last` (e.g. `J. Gibbs`, `J. Chase`,
+`J. Smith-Njigba`), so `_norm_name()` normalizes both the `BOARD` full names and
+the scraped rows to that same form (apostrophes/dots stripped, trailing
+generational suffix like `III` dropped) for the join. Because the abbreviation
+isn't unique, two real players can collide (e.g. Bijan Robinson vs Brian
+Robinson both → `B. Robinson`); on collision the **smaller** ADP wins, which
+keeps the early-round stud's ADP (the one we actually draft) correct. This
+yields ~53/54 BOARD-name coverage with the free RT scrape.
 
 ## Caveats
 
 - Fantasy has real variance — no source *guarantees* a winning team. The goal is
   to maximize expected value and minimize busts.
-- The live path is implemented but **only exercised with a valid `FP_API_KEY`**;
-  without one it is untested beyond the graceful fallback (verified: returns
-  `None`, driver uses static board). Validate once with a real key before the
-  draft if you intend to use it.
+- The live path is implemented and exercised: the RT ADP scrape drives `VALUE =
+  ADP − ECR` with **no paid key** (verified live: 276 rows scraped, 53/54 BOARD
+  names matched), the ECR fetch is covered by unit tests with a mock key, and the
+  graceful fallback (returns `None` → static board) is verified when neither key
+  nor RT ADP is present. Validate once against the live draft room on Sep 1.
 - All dollar figures above are 2026 estimates — confirm on each vendor's site.

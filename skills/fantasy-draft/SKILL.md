@@ -43,6 +43,13 @@ Saquon, Jefferson, Jeanty, Achane, ChaseBrown, K.Walker, Henry, London, Hampton,
 Allen(QB), Bowers(TE), Nico, Pickens, A.J.Brown, McBride(TE), Love, DeVonta,
 Kyren, Jacobs, Olave.
 
+## Value metric (live board)
+`VALUE = FantasyPros_RT_ADP − FantasyPros_ECR` — RT ADP from the free
+fantasypros.com/nfl/real-time-adp/ scrape, ECR from the free FP key (full
+`ADP−ECR` value at $0, no paid tier). Yahoo ADP is scraped live per turn only as
+a patch for names the RT scrape misses. Falls back to the static ADP board if
+no key / scrape fails. Full detail in `docs/DATA_SOURCES.md`.
+
 ## Run it manually (Windows)
 ```
 py.exe C:\edge-debug-profile\draft_driver.py
