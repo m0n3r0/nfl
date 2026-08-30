@@ -175,8 +175,25 @@ See `src/config.py` for the full weight table.
 python -m pytest tests/ -q
 ```
 
-`tests/test_scoring.py` asserts our scoring reproduces nflverse's numbers within
-rounding and that PPR = standard + receptions.
+Five test files:
+
+| File | Covers |
+|---|---|
+| `tests/test_scoring.py` | our scoring reproduces nflverse's numbers within rounding; PPR = standard + receptions |
+| `tests/test_projections.py` | 2026 projection engine (corpus, weighting, consistency, SOS) |
+| `tests/test_model.py` | win-probability model, calibration, time-based split |
+| `tests/test_original_board.py` | nflverse draft board: shape, depth, and the size invariant |
+| `tests/test_draft_driver.py` | driver pick logic: guardrails, DEF name mapping, off-board fallback |
+
+The full suite takes several minutes (`test_scoring.py` and `test_model.py` load the
+~95 MB PBP corpus). To iterate quickly, run a single file:
+
+```bash
+python -m pytest tests/test_draft_driver.py -q
+```
+
+`tests/test_original_board.py` and `tests/test_draft_driver.py` are the two that gate
+draft-day changes; together they run in about 10 seconds.
 
 ## Known limitations
 
@@ -193,13 +210,22 @@ An automated draft driver + read-only scrapers driven via Edge Chrome DevTools
 Protocol (CDP). Lives as a self-contained module alongside the toolkit above.
 
 ### Layout
-- `driver/draft_driver.py` — live draft driver (board + guardrails + human-like CDP clicks). Runs on Windows via `py.exe`.
-- `skills/` — Hermes skills (edge-cdp, fantasy-read, fantasy-draft) for reuse in Hermes Desktop.
+- `driver/draft_driver.py` — live draft driver (board + guardrails + human-like CDP clicks). Runs on Windows via `py.exe`. **This is the only copy in the repo.**
+- `skills/` — Hermes skills (edge-cdp, fantasy-read, fantasy-draft) for reuse in Hermes Desktop. Documentation only; they point at the deployed driver, they do not bundle one.
 - `memory/fantasy_fd_nation.md` — persistent league context for the agent.
-- `data/board/` — original draft board (`original_board.json`, nflverse-derived, zero external deps) + K/DEF ADP reference.
+- `data/board/` — original draft board (`original_board.json`, nflverse-derived, zero external deps, **250 players**) + K/DEF ADP reference.
 - `data/scrapes/` — roster/standings/settings extracts from the live tab.
 - `validation/` — mock-draft + click validation logs (2026-08-21).
-- `logs/draft_log.txt` — created at draft time; every pick decision logged here.
+- `docs/REMEDIATION.md` — phase-by-phase log of the 2026-08-31 review.
+
+**Deploy target:** the driver does not run from the repo. Copy it and the board to
+`C:\edge-debug-profile\` (the driver resolves `original_board.json` next to itself).
+A change to either file is not live until it is copied there — see "How to run the
+draft" below.
+- **Log file** — created at draft time; every pick decision logged here. Resolved in
+  this order: `$FD_DRAFT_LOG` → Windows default `C:\edge-debug-profile\draft_log.txt`
+  → other platforms `./draft_log.txt`. (`.gitignore` covers `logs/draft_log.txt`; if
+  you point `FD_DRAFT_LOG` somewhere else, keep it out of git.)
 - `images/` — proof screenshots.
 
 ### League facts (verified live 2026-08-28)

@@ -202,15 +202,39 @@ def _board_list_to_map(board_list):
             for b in board_list}
 
 
+def _board_search_paths():
+    """Candidate locations for original_board.json, most specific first.
+
+    The deployed driver sits in C:\\edge-debug-profile\\ with the board beside it,
+    but the README also tells you to run `py.exe driver/draft_driver.py` straight
+    from the repo -- where the board actually lives in data/board/. It used to
+    look ONLY next to itself, so that documented command silently fell back to
+    the built-in 30-player static board. Searching both layouts means neither
+    documented invocation can silently downgrade the board.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    return [
+        os.path.join(here, "original_board.json"),                    # deploy layout
+        os.path.join(here, os.pardir, "data", "board",
+                     "original_board.json"),                          # repo layout
+        os.path.join(os.getcwd(), "data", "board",
+                     "original_board.json"),                          # repo root CWD
+    ]
+
+
 def load_original_board(path=None):
     """Load the original nflverse-only board from JSON. Returns the driver board
-    map, or None if the file is missing/unreadable. When `path` is None the file
-    is looked up next to this script (the deployment layout)."""
+    map, or None if the file is missing/unreadable. With no `path`, the known
+    locations are searched in order (see _board_search_paths)."""
     if path is None:
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                            "original_board.json")
-    if not os.path.exists(path):
-        return None
+        for candidate in _board_search_paths():
+            if os.path.exists(candidate):
+                path = candidate
+                break
+        else:
+            log("ORIGINAL_BOARD: not found in any of: %s"
+                % ", ".join(_board_search_paths()))
+            return None
     try:
         with io.open(path, "r", encoding="utf-8") as f:
             board_list = json.load(f)
@@ -511,7 +535,12 @@ def normalize_available(raw, def_map=None):
     `def_map` is the team-code -> short-name map to use. It MUST be derived from
     the ACTIVE board, not the static BOARD tuple -- otherwise defenses that only
     exist on the original nflverse board (BAL/CHI/KC/LAC/TB) can never resolve.
-    Defaults to the module-level map for backwards compatibility.
+
+    It is layered ON TOP of the static map rather than replacing it, so the two
+    failure modes cancel: a code missing from the active board still resolves via
+    the static tuple, and a board with no DEF rows at all does not silently
+    degrade to an empty map (an empty dict is falsy but not None, which would
+    otherwise defeat the fallback entirely).
 
     Returns (names, adp_map, pos_map):
       names    - normalized names in Yahoo's display order
@@ -519,7 +548,10 @@ def normalize_available(raw, def_map=None):
       pos_map  - lowercased name -> position Yahoo reported, so the off-board
                  fallback in choose_pick can respect slot needs
     """
-    def_map = DEF_CODE_TO_NAME if def_map is None else def_map
+    merged_map = dict(DEF_CODE_TO_NAME)
+    if def_map:
+        merged_map.update(def_map)
+    def_map = merged_map
     names, adp_map, pos_map = [], {}, {}
     for row in raw:
         parts = list(row) + [None, None, None, None]

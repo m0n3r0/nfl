@@ -99,6 +99,52 @@ The simulation reported `QB under-filled` and `4 TEs drafted`. That is not a Pha
 regression — it is the missing VOR normalisation (#20): raw projected points are
 QB-inflated, so rivals hoard quarterbacks and TEs outrank remaining WRs. Fixed in Phase 2.
 
+### Deep pass (second look, same day)
+
+Re-reviewing the three fixes turned up four more problems, all now fixed.
+
+**1. The deploy was stale — which made every fix above theoretical.** The skill runs
+`C:\edge-debug-profile\draft_driver.py`, not the repo copy, and it was still the old
+driver with the old 121-player board (12,417 vs 24,911 bytes). Backed up to
+`C:\edge-debug-profile\backup_pre_phase1_*\`, deployed both, and verified by importing
+the *deployed* path. **A driver or board change is not live until it is copied there.**
+
+**2. `def_map` could degrade to worse than the bug it replaced.** `run_draft()` builds the
+map with a comprehension over the active board, so a board with no `DEF` rows yields `{}`
+— falsy but not `None` — and the old `if def_map is None` check would have honoured it,
+leaving *every* defense unresolved. The supplied map is now layered **on top of** the
+static one, so the two failure modes cancel: a code missing from the active board still
+resolves via the static tuple. Regression test:
+`test_normalize_available_empty_def_map_falls_back_to_static`.
+
+**3. The README's own run command silently downgraded the board.** It documented
+`py.exe driver/draft_driver.py`, but `load_original_board()` only looked next to the
+script, and the board lives in `data/board/` — so that command fell back to the built-in
+**30-player** static board. `load_original_board()` now searches the deploy layout, the
+repo layout, and the CWD, logging which one it used.
+
+**4. A third, stale copy of the driver.** `skills/fantasy-draft/scripts/draft_driver.py`
+was a 36,621-byte pre-Phase-1 snapshot: it still had the #10 bare-name assignment and
+lacked `_fallback_pick` entirely. Nothing referenced it (the skill points at the deployed
+path), but three divergent copies is precisely what caused #10. Removed; the repo driver
+is now the only copy.
+
+### Documentation corrected
+
+- Board size: three docs still said "~67 players" (and the SKILL.md said the board was
+  *embedded in the script*, contradicting the paragraph beneath it). Now says 250 and
+  names the JSON path.
+- Log path: the README said `logs/draft_log.txt`. The driver actually resolves
+  `$FD_DRAFT_LOG` → `C:\edge-debug-profile\draft_log.txt` (Windows) → `./draft_log.txt`.
+- Tests section: listed only `test_scoring.py`; now covers all five files, and flags the
+  two fast ones that gate draft-day changes.
+- Deploy step: the README and SKILL.md now state plainly that the driver runs from
+  `C:\edge-debug-profile\`, not the repo.
+- Removed the duplicate `__pycache__/` entry in `.gitignore`.
+- The SKILL.md validation section described the 2026-08-21 static-board era as if it were
+  current; superseded sections are now labelled historical and the 2026-08-31 simulation
+  results documented.
+
 ---
 
 ## Phase 2 — correctness (planned, not started)
