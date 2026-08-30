@@ -23,7 +23,7 @@ import pandas as pd
 from pathlib import Path
 
 from . import ingest
-from .config import PBP_SEASONS, SCHEDULE_SEASON, STATS_SEASON
+from .config import PBP_SEASONS
 
 PROCESSED = ingest.RAW_DIR.parent / "processed"
 PROCESSED.mkdir(parents=True, exist_ok=True)
@@ -92,16 +92,37 @@ def _team_efficiency_from_plays(plays: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def prior_season(season: int) -> int | None:
+    """Most recent season we have PBP for that is STRICTLY before `season`.
+
+    Returns None when no such season exists (e.g. season=2022, the first year we
+    have play-by-play for). Callers MUST treat None as "no leakage-free prior"
+    and drop the game -- never substitute a newer season, which would leak
+    future results into the training features. See issue #17.
+
+    This is deliberately a separate pure function (no PBP load) so the leakage
+    rule can be unit-tested without downloading ~95 MB per season.
+    """
+    priors = [s for s in PBP_SEASONS if s < season]
+    return max(priors) if priors else None
+
+
 def team_ratings_asof(season: int, week: int, refresh: bool = False) -> pd.DataFrame:
     """Per-team efficiency 'as of' (season, week): uses weeks 1..week-1.
 
-    Week 1 uses the prior completed season's full-year efficiency. Cached to
-    data/processed/team_ratings_{season}_w{week}.parquet.
+    Week 1 uses the most recent **strictly-prior** season's full-year efficiency.
+    Returns an EMPTY DataFrame when no strictly-prior season exists (e.g. 2022
+    week 1), so callers drop those games instead of rating them on future data.
+
+    Cached to data/processed/team_ratings_{season}_w{week}.csv.gz. The empty
+    case is deliberately NOT cached.
     """
+    if week < 1:
+        raise ValueError(f"week must be >= 1, got {week}")
+
     cache = PROCESSED / f"team_ratings_{season}_w{week}.csv.gz"
     if cache.exists() and not refresh:
         return pd.read_csv(cache, low_memory=False)
-
 
     if week > 1:
         pbp = ingest.load_pbp(season)
@@ -109,8 +130,20 @@ def team_ratings_asof(season: int, week: int, refresh: bool = False) -> pd.DataF
         plays = _offense_plays(pbp)
         ratings = _team_efficiency_from_plays(plays)
     else:
-        # use prior season's full year as the preseason prior
-        prev = max([s for s in PBP_SEASONS if s < season] + [STATS_SEASON])
+        # Preseason prior: the most recent STRICTLY-prior season.
+        #
+        # This used to be max([s for s in PBP_SEASONS if s < season] + [STATS_SEASON]).
+        # Because STATS_SEASON (2025) is the newest season in PBP_SEASONS, that
+        # max() returned 2025 for EVERY season <= 2025 -- so a 2022 week-1 game was
+        # rated on full-year 2025 efficiency. Concretely, the 2022_w1 and 2024_w1
+        # caches were byte-identical: the same 2025 data labelled two different
+        # seasons. That leaks up to four years of future results into BOTH the
+        # train split (2022-23) and the test split (2024-25). See issue #17.
+        prev = prior_season(season)
+        if prev is None:
+            # No leakage-free prior exists. Returning empty (rather than reaching
+            # forward to STATS_SEASON) means build_model_frame() drops the game.
+            return pd.DataFrame()
         pbp = ingest.load_pbp(prev)
         plays = _offense_plays(pbp)
         ratings = _team_efficiency_from_plays(plays)
@@ -133,7 +166,12 @@ def build_model_frame(seasons, refresh: bool = False) -> pd.DataFrame:
     rows = []
     for _, g in games.iterrows():
         season, week = int(g["season"]), int(g["week"])
-        rt = team_ratings_asof(season, week, refresh=refresh).set_index("team")
+        ratings_df = team_ratings_asof(season, week, refresh=refresh)
+        if ratings_df is None or ratings_df.empty:
+            # No leakage-free prior for this game (e.g. 2022 week 1, the first
+            # season we have PBP for). Drop it rather than substitute future data.
+            continue
+        rt = ratings_df.set_index("team")
         ht, at = g["home_team"], g["away_team"]
         if ht not in rt.index or at not in rt.index:
             continue

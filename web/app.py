@@ -119,13 +119,25 @@ def sos():
 def ratings():
     season = request.args.get("season", default=STATS_SEASON, type=int)
     week = request.args.get("week", default=1, type=int)
+    # STATS_SEASON (2025) is already the last entry of PBP_SEASONS, so a plain
+    # concatenation put 2025 in the dropdown twice. Dedupe + sort.
+    seasons = sorted(set(list(PBP_SEASONS) + [STATS_SEASON]))
     rt = features.team_ratings_asof(season, week, refresh=False)
+    if rt is None or rt.empty:
+        # Week 1 of the earliest PBP season has no strictly-prior season to build
+        # a prior from. team_ratings_asof() returns empty instead of reaching
+        # forward into the future, so explain it rather than returning a 500.
+        return render_template(
+            "ratings.html", ratings=[], season=season, week=week, seasons=seasons,
+            notice=(f"No ratings for {season} week {week}: week 1 needs play-by-play "
+                    f"from a season before {season}, and {min(PBP_SEASONS)} is the "
+                    f"earliest available."),
+        )
     rt = rt.sort_values("off_epa_per_play", ascending=False)
     return render_template(
         "ratings.html",
         ratings=rt.fillna(0).round(3).to_dict("records"),
-        season=season, week=week,
-        seasons=list(PBP_SEASONS) + [STATS_SEASON],
+        season=season, week=week, seasons=seasons, notice=None,
     )
 
 
