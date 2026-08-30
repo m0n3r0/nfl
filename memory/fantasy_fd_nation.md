@@ -125,3 +125,40 @@ the parser handles every board name format we know of.
   the mock proves the click/confirm *mechanics* via the real deployed functions.
 - I cannot guarantee wins — real NFL games decide outcomes. The system maximizes expected value and avoids timer-expiry/panic mistakes.
 - WSL↔Windows: /mnt/c is unreliable from this shell; use `py.exe -` (stdin) and PowerShell base64 round-trips to move data reliably.
+
+## Session recovery + pre-draft intel (2026-08-30, ~2 days before draft)
+- WSL crashed; recovery verified: Windows driver intact (`C:\edge-debug-profile\draft_driver.py`), scheduled task `FDnationDraftDriver` confirmed next run **2026/09/02 06:00 JST**. WSL `.venv` is a WINDOWS venv (Scripts/Lib) — run tools via `py.exe C:\nfl-win\tools\<x>.py`, NOT the WSL venv (WSL system python has no websocket-client).
+- Live check: session alive (Doge visible), countdown "Live League Draft in 2 days", draft time confirmed **Tue Sep 1 5:00pm EDT**.
+- **Draft order: commissioner generated RANDOM order** — order/slot NOT visible pre-draft anywhere on Yahoo (Draft Central/Draft pages don't show it). Bot is BPA + anchors, so slot-agnostic; order reveals when room opens Sep 1.
+- **League ADP captured** (previously forfeited crowd signal): `data/scrapes/yahoo_league_adp.json` — 30 players from Yahoo Draft Analysis (`/f1/1329011/draftanalysis`, no clicks needed). Top: Gibbs 1.4, Bijan 2.0, Chase 3.5 (tagged Q), Nacua 4.9 (Q), CMC 5.7 (Q), Taylor 6.7, JSN 7.1, St. Brown 7.9, Cook 9.6, Lamb 10.8, Saquon 11.7, Jefferson 13.1. Injury tags (Q/O/IR) captured per player. Default page shows ~30 rows; depth limited without pagination (risky clicks — see below).
+- ⚠️ Yahoo trap: clicking "View All" on Draft Central navigated the tab to login.yahoo.com (transient logout scare; navigating back restored session). NEVER click UI elements on these pages via CDP — navigate + parse text only.
+- The `/f1/<id>/draftorder` URL is a 404 (dead URL guess). Real pages: `/draft` (Draft Central, needs ~14s JS wait), `/draftanalysis` (ADP table, ~12s wait).
+- Console is cp932 (Japanese Windows): run probes with `set PYTHONIOENCODING=utf-8&&`; Windows python can't write /mnt/c paths — use `C:\nfl-win\...`.
+- Tool scripts added: `tools/scrape_league_adp.py` (league ADP), `tools/check_draft_state.py`, `tools/dump_draft_page*.py`, `tools/back_to_league.py`.
+
+## ADP merged into the original board + reach guard wired (2026-08-30)
+- **ADP now flows into the DEFAULT original engine.** `cli.py original-board` merges
+  `data/scrapes/yahoo_league_adp.json` into every board row via
+  `src/draft_board.load_league_adp` (team-code alias LAR->LA etc) + `merge_league_adp`
+  (name-only fallback when the name uniquely matches but the team changed).
+- **Live-verified trades caught by the merge:** `A.J. Brown PHI->NE` and `Kenneth
+  Walker III SEA->KC` (verified on Yahoo Draft Analysis 2026-08-30; both flagged
+  `adp_team_changed=True` in the board JSON so the row keeps its board team but
+  inherits the crowd ADP). Board rebuild -> 28/30 active players carry league ADP.
+- **Driver reach guard live** (`driver/draft_driver.py`): `_crowd_reach(c, round_num)`
+  skips a board pick whose league ADP is > ADP_WINDOW (40) picks past the current
+  round window unless an anchor forces it or nothing else is available (step-4
+  bypass + anchor bypass logged). Deprecates the previously dead ADP_WINDOW constant.
+- **Validation:** `tools/mock_draft_run.py` full 15-round run through the DEPLOYED
+  driver (`C:\edge-debug-profile\draft_driver.py`, loaded new board) ->
+  `15/15 picks clicked + confirmed; ROSTER_LEGAL=True; NO_FAILURES` (R1-9 skill,
+  R10-13 QB per contract, R14 K, R15 DEF). `pytest tests/test_original_board.py
+  tests/test_draft_driver.py` -> **24 passed**. Both driver copies + board deployed
+  to `C:\edge-debug-profile\`.
+- Reach guard did NOT fire in the mock (expected): by R10 every known-ADP player is
+  far past the crowd window so `adp - window < 40`. It exists for post-scrape ADP
+  crashes (injury news) — only confirmable against the live room.
+- Mock roster artifact (QB=4/RB=6) is an artifact of simulated opponents never
+  drafting QBs; real-room opponents take QBs so the board won't dump 4 QBs on us.
+- Remaining pre-draft steps: re-scrape ADP + rebuild board the morning of Sep 1
+  (new injuries/cuts), and ensure Edge is open on 9222 at 5pm EDT.

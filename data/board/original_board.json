@@ -3,7 +3,8 @@
     "name": "Josh Allen",
     "team": "BUF",
     "pos": "QB",
-    "value": 392.8
+    "value": 392.8,
+    "adp": 20.0
   },
   {
     "name": "Jalen Hurts",
@@ -21,7 +22,8 @@
     "name": "Christian McCaffrey",
     "team": "SF",
     "pos": "RB",
-    "value": 350.6
+    "value": 350.6,
+    "adp": 5.7
   },
   {
     "name": "Jayden Daniels",
@@ -45,7 +47,8 @@
     "name": "Jahmyr Gibbs",
     "team": "DET",
     "pos": "RB",
-    "value": 312.4
+    "value": 312.4,
+    "adp": 1.4
   },
   {
     "name": "Dak Prescott",
@@ -69,7 +72,8 @@
     "name": "Derrick Henry",
     "team": "BAL",
     "pos": "RB",
-    "value": 300.2
+    "value": 300.2,
+    "adp": 17.5
   },
   {
     "name": "Drake Maye",
@@ -81,7 +85,8 @@
     "name": "Saquon Barkley",
     "team": "PHI",
     "pos": "RB",
-    "value": 296.8
+    "value": 296.8,
+    "adp": 11.7
   },
   {
     "name": "Brock Purdy",
@@ -105,7 +110,8 @@
     "name": "Puka Nacua",
     "team": "LA",
     "pos": "WR",
-    "value": 292.2
+    "value": 292.2,
+    "adp": 4.9
   },
   {
     "name": "Matthew Stafford",
@@ -123,43 +129,50 @@
     "name": "Ja'Marr Chase",
     "team": "CIN",
     "pos": "WR",
-    "value": 275.1
+    "value": 275.1,
+    "adp": 3.5
   },
   {
     "name": "Bijan Robinson",
     "team": "ATL",
     "pos": "RB",
-    "value": 273.8
+    "value": 273.8,
+    "adp": 2.0
   },
   {
     "name": "Jonathan Taylor",
     "team": "IND",
     "pos": "RB",
-    "value": 272.0
+    "value": 272.0,
+    "adp": 6.7
   },
   {
     "name": "De'Von Achane",
     "team": "MIA",
     "pos": "RB",
-    "value": 268.1
+    "value": 268.1,
+    "adp": 15.5
   },
   {
     "name": "Amon-Ra St. Brown",
     "team": "DET",
     "pos": "WR",
-    "value": 261.5
+    "value": 261.5,
+    "adp": 7.9
   },
   {
     "name": "Kyren Williams",
     "team": "LA",
     "pos": "RB",
-    "value": 255.3
+    "value": 255.3,
+    "adp": 28.6
   },
   {
     "name": "CeeDee Lamb",
     "team": "DAL",
     "pos": "WR",
-    "value": 255.3
+    "value": 255.3,
+    "adp": 10.8
   },
   {
     "name": "Josh Jacobs",
@@ -171,19 +184,22 @@
     "name": "James Cook",
     "team": "BUF",
     "pos": "RB",
-    "value": 230.6
+    "value": 230.6,
+    "adp": 9.6
   },
   {
     "name": "Jaxon Smith-Njigba",
     "team": "SEA",
     "pos": "WR",
-    "value": 223.6
+    "value": 223.6,
+    "adp": 7.1
   },
   {
     "name": "Justin Jefferson",
     "team": "MIN",
     "pos": "WR",
-    "value": 223.4
+    "value": 223.4,
+    "adp": 13.1
   },
   {
     "name": "Mike Evans",
@@ -195,13 +211,16 @@
     "name": "Nico Collins",
     "team": "HOU",
     "pos": "WR",
-    "value": 219.7
+    "value": 219.7,
+    "adp": 22.2
   },
   {
     "name": "A.J. Brown",
     "team": "PHI",
     "pos": "WR",
-    "value": 219.1
+    "value": 219.1,
+    "adp_team_changed": true,
+    "adp": 24.3
   },
   {
     "name": "Rashee Rice",
@@ -213,7 +232,9 @@
     "name": "Kenneth Walker III",
     "team": "SEA",
     "pos": "RB",
-    "value": 218.1
+    "value": 218.1,
+    "adp_team_changed": true,
+    "adp": 15.9
   },
   {
     "name": "Breece Hall",
@@ -261,7 +282,8 @@
     "name": "Ashton Jeanty",
     "team": "LV",
     "pos": "RB",
-    "value": 196.2
+    "value": 196.2,
+    "adp": 16.1
   },
   {
     "name": "George Kittle",
@@ -279,7 +301,8 @@
     "name": "Chase Brown",
     "team": "CIN",
     "pos": "RB",
-    "value": 194.4
+    "value": 194.4,
+    "adp": 16.1
   },
   {
     "name": "Rhamondre Stevenson",
@@ -291,7 +314,8 @@
     "name": "Brock Bowers",
     "team": "LV",
     "pos": "TE",
-    "value": 188.4
+    "value": 188.4,
+    "adp": 21.2
   },
   {
     "name": "Chris Olave",
@@ -303,7 +327,8 @@
     "name": "Drake London",
     "team": "ATL",
     "pos": "WR",
-    "value": 186.6
+    "value": 186.6,
+    "adp": 19.5
   },
   {
     "name": "DJ Moore",
@@ -333,7 +358,8 @@
     "name": "Trey McBride",
     "team": "ARI",
     "pos": "TE",
-    "value": 179.6
+    "value": 179.6,
+    "adp": 26.5
   },
   {
     "name": "Brian Thomas Jr.",
@@ -453,7 +479,8 @@
     "name": "Omarion Hampton",
     "team": "LAC",
     "pos": "RB",
-    "value": 145.7
+    "value": 145.7,
+    "adp": 18.6
   },
   {
     "name": "Brandon Aubrey",
@@ -609,7 +636,8 @@
     "name": "George Pickens",
     "team": "DAL",
     "pos": "WR",
-    "value": 91.3
+    "value": 91.3,
+    "adp": 22.4
   },
   {
     "name": "Tee Higgins",
@@ -621,7 +649,8 @@
     "name": "DeVonta Smith",
     "team": "PHI",
     "pos": "WR",
-    "value": 78.9
+    "value": 78.9,
+    "adp": 29.6
   },
   {
     "name": "Malik Washington",
@@ -639,7 +668,8 @@
     "name": "Jeremiyah Love",
     "team": "ARI",
     "pos": "RB",
-    "value": 73.2
+    "value": 73.2,
+    "adp": 29.6
   },
   {
     "name": "Jayden Reed",
