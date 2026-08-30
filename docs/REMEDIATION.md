@@ -147,23 +147,72 @@ is now the only copy.
 
 ---
 
-## Phase 2 — correctness (planned, not started)
+## Phase 2 — correctness (in progress)
 
-### #17 Leakage in `team_ratings_asof()`
+### #17 Leakage in `team_ratings_asof()` — **fixed**
 
-`src/features.py:113` appends `STATS_SEASON` (2025) unconditionally to the prior-season
-candidate list, so `max()` returns 2025 for **every** season <= 2025. All 64 week-1 games
-across 2022-2025 are rated on full-year 2025 data, contaminating both the train split
-(2022-23) and the test split (2024-25).
+`src/features.py` appended `STATS_SEASON` (2025) unconditionally to the prior-season
+candidate list:
 
-Planned fix:
+```python
+prev = max([s for s in PBP_SEASONS if s < season] + [STATS_SEASON])
+```
 
-- Use only strictly-prior seasons; return an empty frame when there is none (2022 week 1
-  has no valid prior, so those games get excluded from the model frame instead of being
-  rated on future data).
-- Delete the stale `data/processed/team_ratings_*_w1.csv.gz` caches.
-- Re-measure the README accuracy figures afterwards (#31) — the current numbers are
-  optimistic because they are measured on leaked data.
+Because `STATS_SEASON` (2025) is itself the newest entry in `PBP_SEASONS`, that `max()`
+returned **2025 for every season <= 2025**. A 2022 week-1 game was rated on full-year
+2025 efficiency. The proof: the `team_ratings_2022_w1` and `team_ratings_2024_w1` caches
+were byte-identical — the same 2025 data written under two season labels. Every week-1
+game in both the train split (2022-23) and the test split (2024-25) was contaminated.
+
+Fix:
+
+- The prior-season choice is now a separate pure function, `prior_season(season)`, which
+  returns the newest *strictly-earlier* season or `None`. It takes no PBP load, so the
+  leakage rule is unit-testable in milliseconds instead of requiring a 95 MB download.
+- `team_ratings_asof()` returns an **empty DataFrame** when there is no prior, and that
+  empty result is deliberately **not** cached (it is a "no data" signal, not data).
+- `build_model_frame()` skips games with no prior. 2022 week 1 is the only affected
+  window — 16 games out of 1,090 across 2022-2025 are dropped.
+- Two other call sites assumed a non-empty result and would have thrown:
+  `model.predict_2026()` now raises an explicit `RuntimeError`, and `web/app.py:/ratings`
+  renders an explanatory notice. `/ratings` also had `2025` twice in its season dropdown
+  (`list(PBP_SEASONS) + [STATS_SEASON]`); it is now `sorted(set(...))`.
+- The four poisoned caches (2022-2025 w1) are quarantined in
+  `data/processed/_poisoned_w1_backup/`. `data/processed/` is gitignored, so this is a
+  local-only artefact. `team_ratings_2026_w1` was left in place: 2025 *is* strictly prior
+  to 2026, so it was never poisoned.
+
+Regression tests in `tests/test_model.py` (all fast, no PBP load):
+`test_prior_season_is_strictly_prior`, `test_prior_season_never_returns_future`,
+`test_week1_of_first_pbp_season_has_no_ratings`. Verified they fail against the old
+expression — `prior_season(2022)` returned `2025` instead of `None`, and 2023/2024/2025
+all returned a prior that was not strictly earlier. The last of the three also refuses to
+pass if a poisoned `team_ratings_<first>_w1` cache is ever restored, since the cache is
+read before the prior logic runs.
+
+> The pre-existing `test_features_asof_no_leakage()` did **not** catch this: it only
+> asserted 32 rows for 2025 week 3, and week 3 was never poisoned.
+
+**Re-measured accuracy** (train 2022–23 = 527 games, test 2024–25 = 544, 1,071 retained
+of 1,087):
+
+| | Before (leaked) | After (honest) | Delta |
+|---|---|---|---|
+| Model WITHOUT spread | 60.9% | **61.2%** | +0.3pp |
+| Model WITH spread | 68.2% | **68.0%** | −0.2pp |
+| Vegas baseline | 68.4% | **68.4%** | 0.0pp |
+| Time-series CV mean | 67.0% | **66.3%** | −0.7pp |
+
+Worth being straight about: the fix made the headline numbers *very slightly worse*, not
+better, and the movement is under 1pp everywhere. The bug was serious in kind — up to
+four years of future results in the features of 64 week-1 games — but week 1 is only 5.9%
+of the corpus, so it moved the aggregate very little. The reason to fix it was never the
+scoreboard; it was that the reported numbers were measuring something the model cannot
+actually know at prediction time.
+
+Sanity check that the rebuilt caches are genuinely distinct: the top-3 offences by EPA/play
+are now KC/PHI/BUF for 2023 w1 (from 2022), SF/BUF/DAL for 2024 w1 (from 2023), and
+BAL/BUF/DET for 2025 w1 (from 2024) — each matching its actual prior season.
 
 ### #18 `predict_2026()` never used the trained model
 
@@ -256,12 +305,17 @@ landed; this entry stays open until the phase is committed as a whole.
 
 ### #31 README corrections
 
-- Board path: the README says to copy the board next to the deployed driver, but
-  `load_original_board()` resolves against the driver's own directory. Either fix the
-  documented layout or make the driver also check `data/board/`.
-- Log path: correct to the real `FD_DRAFT_LOG` / Windows defaults.
-- Model section: stop implying `cli.py predict` output comes from the model (true only
-  after #18).
-- Accuracy figures: re-measure after the leakage fix (#17).
+- [x] **Board path** — fixed in Phase 1. `load_original_board()` now searches the deploy
+  layout, the repo layout, and the CWD, so the documented `py.exe driver/draft_driver.py`
+  finds the 250-player board instead of silently falling back to the 30-player static one.
+- [x] **Log path** — fixed in Phase 1 (`$FD_DRAFT_LOG` → Windows
+  `C:\edge-debug-profile\draft_log.txt` → other platforms `./draft_log.txt`).
+- [x] **Accuracy figures** — re-measured on 2026-08-31 after #17 (see that entry for the
+  numbers). Replaced the four bare figures with a table including Brier and per-fold CV.
+- [x] **Leakage claim** — the README asserted "No future games leak into a game's
+  features", which was false at the time. Now states the strictly-prior rule and that
+  16 of 1,087 games are dropped for having no leakage-free prior.
+- [ ] **Model section** — still implies `cli.py predict` output comes from the trained
+  model. True only after #18.
 - Tests section: list all five test files.
 - `.gitignore`: remove the duplicate `__pycache__/` entry.

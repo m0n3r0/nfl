@@ -12,6 +12,7 @@
   <button type="submit">Go</button>
 </form>
 <p class="muted">As-of-week ratings use only prior games that season (no future leakage). Week 1 uses the prior completed season. Higher EPA/play = better.</p>
+{% if notice %}<p class="notice"><b>No data:</b> {{ notice }}</p>{% endif %}
 <table>
   <tr><th>Team</th><th>Off EPA/play</th><th>Def EPA/play (allowed)</th><th>Red-zone TD%</th><th>3rd-down EPA/play</th><th>Pass EPA/play</th><th>Rush EPA/play</th></tr>
   {% for r in ratings %}

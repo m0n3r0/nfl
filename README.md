@@ -120,9 +120,16 @@ summaries) with strict leakage control.
 - Team efficiency is computed from play-by-play (offense/defense EPA per play,
   success rate, red-zone TD rate, 3rd-down EPA, pass/rush EPA split).
 - Ratings are **as-of** each (season, week): a game in week W uses team ratings
-  built only from weeks 1..W-1 of that season (week 1 uses the prior completed
-  season). No future games leak into a game's features.
+  built only from weeks 1..W-1 of that season; week 1 uses the most recent
+  **strictly-prior** season's full-year efficiency. No future games leak into a
+  game's features.
+- When no leakage-free prior exists — 2022 week 1, the first season we hold PBP
+  for — the game is **dropped** rather than rated on a future season. That costs
+  16 of 1,087 games (2022–2025). See `docs/REMEDIATION.md` #17: this was a real
+  bug until 2026-08-31, when `max([...prior seasons] + [STATS_SEASON])` rated
+  every week-1 game from 2022 to 2025 on full-year **2025** data.
 - Results are cached to `data/processed/` (csv.gz) for fast, reproducible reads.
+  Delete a cache (or pass `refresh=True`) after changing the window logic.
 
 ### Model evaluation (`src/model.py`)
 - Strict time-based train/test split (train 2022–23, test 2024–25).
@@ -130,10 +137,24 @@ summaries) with strict leakage control.
 - Probability calibration (Platt) + accuracy / log-loss / Brier reported.
 - Reported **both with and without** the Vegas spread as a feature.
 
-Real results (2022–2025 PBP):
-- Model WITHOUT spread ≈ **60.9%** acc (EPA features alone beat a coin flip).
-- Model WITH spread ≈ **68.2%** acc, log-loss 0.62.
-- Vegas-favorite baseline ≈ **68.4%** acc. Time-series CV mean ≈ **67.0%**.
+Real results (2022–2025 PBP, 1,071 games after dropping the 16 with no
+leakage-free prior; train 2022–23 = 527, test 2024–25 = 544):
+
+| | Accuracy | Log-loss | Brier |
+|---|---|---|---|
+| Model WITHOUT spread | **61.2%** | 0.654 | 0.231 |
+| Model WITH spread | **68.0%** | 0.616 | 0.214 |
+| Vegas-favorite baseline | **68.4%** | — | — |
+
+Time-series CV (expanding window): 2023 63.2%, 2024 69.5%, 2025 66.2%,
+**mean 66.3%**.
+
+These figures were re-measured on 2026-08-31 after fixing the week-1 leakage bug
+(#17). The previously published numbers (60.9 / 68.2 / 68.4 / 67.0) were measured
+on leaked features; the honest numbers are within ~0.7pp of them. The bug was
+severe in principle — every week-1 game from 2022 to 2025 was rated on full-year
+2025 data — but week 1 is only 64 of 1,087 games, so the headline accuracy barely
+moved. Detail in `docs/REMEDIATION.md`.
 
 Beating the closing spread is genuinely hard, so the model is built to *match* it
 and is reported honestly — not overstated. Analytical tool, not a betting system.

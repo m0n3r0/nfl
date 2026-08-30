@@ -121,7 +121,16 @@ def time_series_cv(seasons, refresh: bool = False) -> dict:
 def predict_2026(week: int = None) -> pd.DataFrame:
     """2026 win probabilities using as-of-week-1 2026 ratings (prior season)."""
     # 2026 week 1 uses 2025 full-year ratings (leakage-safe: prior completed season)
-    rt = features.team_ratings_asof(SCHEDULE_SEASON, 1, refresh=False).set_index("team")
+    ratings = features.team_ratings_asof(SCHEDULE_SEASON, 1, refresh=False)
+    if ratings is None or ratings.empty:
+        # team_ratings_asof() returns empty rather than leaking a FUTURE season in
+        # as a stand-in prior. Fail loudly instead of silently producing junk.
+        raise RuntimeError(
+            f"No leakage-free team ratings for {SCHEDULE_SEASON} week 1. Week 1 needs "
+            f"play-by-play for a season strictly before {SCHEDULE_SEASON}; "
+            f"PBP_SEASONS={list(PBP_SEASONS)}. Run the ingest for prior seasons first."
+        )
+    rt = ratings.set_index("team")
     sched = ingest.load_schedule(season=SCHEDULE_SEASON)
     if week is not None:
         sched = sched[sched["week"] == week]
