@@ -214,13 +214,68 @@ Sanity check that the rebuilt caches are genuinely distinct: the top-3 offences 
 are now KC/PHI/BUF for 2023 w1 (from 2022), SF/BUF/DAL for 2024 w1 (from 2023), and
 BAL/BUF/DET for 2025 w1 (from 2024) — each matching its actual prior season.
 
-### #18 `predict_2026()` never used the trained model
+### #18 `predict_2026()` never used the trained model — **fixed**
 
-It uses a hardcoded `0.5 + 1.2 * epa_diff` instead of the fitted pipeline.
+It scored every game with `0.5 + 1.2 * epa_diff`: one hand-tuned number. The model was
+fitted on 14 standardized features. Those are different functions, so the published
+"model predictions" were never model output at all — the README and the `/predictions`
+page were presenting a formula as a fitted result.
 
-Planned fix: fit a `CalibratedClassifierCV` over the same 14 features on all completed
-seasons, persist it, and have `predict_2026()` load it and call `predict_proba()`, falling
-back to the linear formula only if the artifact is missing.
+Fix:
+
+- The feature row is now built in exactly one place, `features.game_feature_row()`,
+  used by **both** `build_model_frame()` (training) and `predict_2026()` (inference).
+  That is the actual fix — sharing the builder is what makes train/predict drift
+  impossible rather than merely unlikely.
+- The canonical column list (`FEATURE_COLS`) lives in `features.py`, because
+  `model.py` imports `features` and not the reverse. `model._feature_cols()` now just
+  returns it.
+- `train_and_persist()` fits **both** variants over all completed seasons and saves them
+  to `data/processed/win_prob_model.joblib` (gitignored build artifact):
+  - `no_spread` — the 14 EPA/rest features
+  - `with_spread` — those plus the Vegas spread (68.0% vs 61.2% accuracy)
+- `predict_2026()` uses `with_spread` where the spread is already published and
+  `no_spread` otherwise, and records which one in a new `model` column so the output
+  can never be mistaken for something it is not. The old linear formula survives only
+  as `_linear_fallback()`, used when the artifact is missing, and tags its rows
+  `model="fallback_linear"`.
+- Each game is now scored with ratings **as of its own week**. Previously the whole
+  schedule was scored on week-1 ratings, so a week-12 game was predicted from
+  week-1 knowledge.
+
+Verified the refactor is data-neutral: the training frame is unchanged at 1,071 rows,
+with every one of the 14 feature means and standard deviations identical to
+pre-refactor (e.g. `home_off_epa_pp` mean −0.007736, std 0.116088; `home_rest` mean
+7.425770).
+
+**Four further bugs found while fixing this:**
+
+- `team_ratings_asof(2026, 2)` did not return empty — it tried to download
+  `play_by_play_2026.csv` and raised an unhandled `HTTPError: 404`. Any future season
+  crashed, including `/ratings?season=2026`. Now `_load_pbp_or_empty()` treats a season
+  outside `PBP_SEASONS` as unrated and warns once per season (17 identical warnings
+  otherwise). Seasons *inside* `PBP_SEASONS` still re-raise, so a genuine download
+  failure during training can never be silently swallowed into dropped rows.
+- The membership check runs **before** any network call. Without it, asking for a full
+  season meant 17 doomed HTTP requests — `/predictions` took 45 s and mostly waited on
+  404s. Now 12 s on a cold process, 1.2 s warm.
+- `cli.py predict` with no week asks for all 272 games. Under the strict version that
+  raised on week 2, breaking the documented default command. Unavailable weeks are now
+  skipped with a warning; it raises only if *nothing* is computable.
+- `web/templates/predictions.html` rendered a **"TO diff"** column from `g.to_diff`,
+  a field `predict_2026()` has never produced — a permanently empty column with a
+  header. Replaced with the `spread` and `model` columns the function actually returns,
+  and the stale caption ("from 2025 team efficiency (EPA differential)") was corrected
+  since the output is model output now.
+
+Also: `load_model()` re-unpickled the bundle on every call, ~9 s of sklearn import and
+deserialization per web request. The bundle is now memoized (9 s → 0.006 s on repeat).
+
+Week 1 2026 output (16 games, all `with_spread`, since week-1 spreads are published):
+probabilities range 0.399–0.801, mean 0.583. The with-spread model sides with the Vegas
+favourite on 16/16 — expected, since the spread dominates that variant. The EPA features
+move the *magnitude*, not the sign. The `no_spread` variant is the one that expresses an
+independent opinion, at 61.2% accuracy.
 
 ### #19 + #20 Value scales and VOR
 
@@ -315,7 +370,7 @@ landed; this entry stays open until the phase is committed as a whole.
 - [x] **Leakage claim** — the README asserted "No future games leak into a game's
   features", which was false at the time. Now states the strictly-prior rule and that
   16 of 1,087 games are dropped for having no leakage-free prior.
-- [ ] **Model section** — still implies `cli.py predict` output comes from the trained
-  model. True only after #18.
+- [x] **Model section** — `cli.py predict` genuinely produces model output now that #18
+  has landed.
 - Tests section: list all five test files.
 - `.gitignore`: remove the duplicate `__pycache__/` entry.

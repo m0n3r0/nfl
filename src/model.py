@@ -14,6 +14,9 @@ is genuinely hard; we report results honestly rather than overstating them.
 
 from __future__ import annotations
 
+import warnings
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -22,15 +25,9 @@ from .config import PBP_SEASONS, SCHEDULE_SEASON, STATS_SEASON
 
 
 def _feature_cols():
-    return [
-        "home_off_epa_pp", "away_off_epa_pp",
-        "home_def_epa_pp", "away_def_epa_pp",
-        "home_rz_td", "away_rz_td",
-        "home_3d_epa_pp", "away_3d_epa_pp",
-        "home_pass_epa_pp", "away_pass_epa_pp",
-        "home_rush_epa_pp", "away_rush_epa_pp",
-        "home_rest", "away_rest",
-    ]
+    # Canonical list lives in features.py so the training frame and the
+    # inference frame are built from the same definition.
+    return list(features.FEATURE_COLS)
 
 
 def build_frame(seasons, refresh: bool = False) -> pd.DataFrame:
@@ -39,6 +36,96 @@ def build_frame(seasons, refresh: bool = False) -> pd.DataFrame:
     # model-only features exclude the spread; model+spread includes it
     mf["epa_diff"] = (mf["home_off_epa_pp"] - mf["away_off_epa_pp"]) - (mf["home_def_epa_pp"] - mf["away_def_epa_pp"])
     return mf
+
+
+# Persisted fitted models. Lives under data/processed/ (gitignored, like the
+# rating caches) -- it is a build artifact, not source.
+MODEL_PATH = features.PROCESSED / "win_prob_model.joblib"
+
+# Fallback only, when the fitted artifact is unavailable. Kept so predict_2026()
+# degrades to the old behaviour instead of raising, but it is NOT the model.
+_LINEAR_FALLBACK_SLOPE = 1.2
+_LINEAR_FALLBACK_CLIP = (0.05, 0.95)
+
+
+def _make_estimator():
+    """Calibrated (Platt) logistic regression on standardized features."""
+    from sklearn.calibration import CalibratedClassifierCV
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import StandardScaler
+
+    base = Pipeline([("scaler", StandardScaler()),
+                     ("lr", LogisticRegression(max_iter=2000))])
+    return CalibratedClassifierCV(base, method="sigmoid", cv=5)
+
+
+def train_and_persist(seasons=None, path=MODEL_PATH, refresh: bool = False) -> dict:
+    """Fit both model variants on all completed seasons and save them.
+
+    Trains two estimators over the SAME leakage-safe features:
+      * `no_spread`    -- the 14 EPA/rest features only
+      * `with_spread`  -- those plus the Vegas spread (more accurate, but only
+        usable for games whose spread is already published)
+    Returns the in-memory bundle; it is also written to `path`.
+    """
+    seasons = tuple(seasons) if seasons is not None else tuple(PBP_SEASONS)
+    data = build_frame(seasons, refresh=refresh)
+    if data.empty:
+        raise RuntimeError(f"no training rows for seasons {seasons}")
+
+    feat = _feature_cols()
+    y = data["home_win"].values
+
+    est_no = _make_estimator()
+    est_no.fit(data[feat].values, y)
+
+    feat_s = feat + ["spread"]
+    est_yes = _make_estimator()
+    est_yes.fit(data[feat_s].values, y)
+
+    bundle = {
+        "no_spread": est_no,
+        "with_spread": est_yes,
+        "features": feat,
+        "features_with_spread": feat_s,
+        "seasons": list(seasons),
+        "n_train": int(len(data)),
+    }
+
+    import joblib
+    path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(bundle, path)
+    bundle["path"] = str(path)
+    # serve the freshly fitted model from cache too
+    _MODEL_CACHE[str(Path(path).resolve())] = bundle
+    return bundle
+
+
+# Deserializing the two calibrated estimators costs ~2s and importing joblib
+# several more, so the bundle is memoized. Without this every web request
+# re-unpickled the model for no reason.
+_MODEL_CACHE: dict[str, dict | None] = {}
+
+
+def load_model(path=MODEL_PATH):
+    """Return the persisted bundle, or None if it has not been trained yet."""
+    key = str(Path(path).resolve())
+    if key in _MODEL_CACHE:
+        return _MODEL_CACHE[key]
+
+    import joblib
+    if not Path(path).exists():
+        _MODEL_CACHE[key] = None
+        return None
+    try:
+        bundle = joblib.load(path)
+    except Exception:
+        # A half-written or version-incompatible artifact must not brick the CLI;
+        # callers fall back to the linear formula.
+        bundle = None
+    _MODEL_CACHE[key] = bundle
+    return bundle
 
 
 def _metrics(y_true, proba):
@@ -118,34 +205,109 @@ def time_series_cv(seasons, refresh: bool = False) -> dict:
     return {"folds": rows, "mean_accuracy": round(float(np.mean([r["accuracy"] for r in rows])), 4)}
 
 
-def predict_2026(week: int = None) -> pd.DataFrame:
-    """2026 win probabilities using as-of-week-1 2026 ratings (prior season)."""
-    # 2026 week 1 uses 2025 full-year ratings (leakage-safe: prior completed season)
-    ratings = features.team_ratings_asof(SCHEDULE_SEASON, 1, refresh=False)
-    if ratings is None or ratings.empty:
-        # team_ratings_asof() returns empty rather than leaking a FUTURE season in
-        # as a stand-in prior. Fail loudly instead of silently producing junk.
-        raise RuntimeError(
-            f"No leakage-free team ratings for {SCHEDULE_SEASON} week 1. Week 1 needs "
-            f"play-by-play for a season strictly before {SCHEDULE_SEASON}; "
-            f"PBP_SEASONS={list(PBP_SEASONS)}. Run the ingest for prior seasons first."
-        )
-    rt = ratings.set_index("team")
+def _linear_fallback(epa_diff: float) -> float:
+    """Old hand-rolled formula. Used ONLY when the fitted artifact is missing.
+
+    It is a function of one number and is not the trained model -- every row it
+    produces is tagged `model="fallback_linear"` so it can never be mistaken
+    for a real prediction.
+    """
+    lo, hi = _LINEAR_FALLBACK_CLIP
+    return float(np.clip(0.5 + _LINEAR_FALLBACK_SLOPE * epa_diff, lo, hi))
+
+
+def predict_2026(week: int = None, auto_train: bool = True) -> pd.DataFrame:
+    """2026 win probabilities from the trained, calibrated model.
+
+    Each game is scored with ratings **as of that game's own week**, using the
+    same 14 leakage-safe features the model was fitted on (see
+    `features.game_feature_row`). Rows whose spread is already published use the
+    more accurate with-spread variant; the rest use the EPA-only variant. The
+    `model` column records which one produced each row.
+
+    Only week 1 is computable before the season starts: weeks 2+ need in-season
+    2026 play-by-play to build as-of ratings, and `team_ratings_asof()` returns
+    empty rather than reaching forward into the future.
+    """
     sched = ingest.load_schedule(season=SCHEDULE_SEASON)
     if week is not None:
         sched = sched[sched["week"] == week]
+    if sched.empty:
+        return pd.DataFrame()
+
+    bundle = load_model()
+    if bundle is None and auto_train:
+        bundle = train_and_persist()
+
     rows = []
-    for _, g in sched.iterrows():
-        ht, at = g["home_team"], g["away_team"]
-        if ht not in rt.index or at not in rt.index:
+    skipped_weeks = []
+    # One ratings lookup per week, not per game (issue #24), and each week gets
+    # its own as-of ratings rather than reusing week 1's for the whole season.
+    for wk, group in sched.groupby("week"):
+        wk = int(wk)
+        ratings = features.team_ratings_asof(SCHEDULE_SEASON, wk, refresh=False)
+        if ratings is None or ratings.empty:
+            # Before the season starts only week 1 is computable: it uses the
+            # prior season, while later weeks need in-season play-by-play that
+            # does not exist yet. Skip them rather than scoring a week-12 game
+            # on week-1 knowledge, but say so loudly.
+            skipped_weeks.append(wk)
             continue
-        h, a = rt.loc[ht], rt.loc[at]
-        epa_diff = (h["off_epa_per_play"] - a["off_epa_per_play"]) - (h["def_epa_allowed_per_play"] - a["def_epa_allowed_per_play"])
-        rows.append({
-            "week": int(g["week"]), "home_team": ht, "away_team": at,
-            "home_win_prob": float(np.clip(0.5 + 1.2 * epa_diff, 0.05, 0.95)),
-            "epa_diff": round(float(epa_diff), 3),
-        })
+        rt = ratings.set_index("team")
+
+        for _, g in group.iterrows():
+            ht, at = g["home_team"], g["away_team"]
+            feats = features.game_feature_row(
+                rt, ht, at,
+                g.get("home_rest", features.DEFAULT_REST),
+                g.get("away_rest", features.DEFAULT_REST),
+            )
+            if feats is None:
+                continue
+
+            epa_diff = ((feats["home_off_epa_pp"] - feats["away_off_epa_pp"])
+                        - (feats["home_def_epa_pp"] - feats["away_def_epa_pp"]))
+            spread = g.get("spread_line")
+
+            if bundle is not None and pd.notna(spread):
+                est, cols, used = bundle["with_spread"], bundle["features_with_spread"], "with_spread"
+                x = dict(feats, spread=float(spread))
+            elif bundle is not None:
+                est, cols, used = bundle["no_spread"], bundle["features"], "no_spread"
+                x = feats
+            else:
+                est, cols, x, used = None, None, None, "fallback_linear"
+
+            if est is not None:
+                prob = float(est.predict_proba(np.array([[x[c] for c in cols]],
+                                                        dtype=float))[:, 1][0])
+            else:
+                prob = _linear_fallback(epa_diff)
+
+            rows.append({
+                "week": wk, "home_team": ht, "away_team": at,
+                "home_win_prob": round(prob, 4),
+                "epa_diff": round(float(epa_diff), 3),
+                "spread": None if pd.isna(spread) else float(spread),
+                "model": used,
+            })
+
+    if skipped_weeks and not rows:
+        raise RuntimeError(
+            f"No leakage-free team ratings for {SCHEDULE_SEASON} week(s) "
+            f"{sorted(skipped_weeks)}. Week 1 uses the prior season "
+            f"({features.prior_season(SCHEDULE_SEASON)}); later weeks need in-season "
+            f"{SCHEDULE_SEASON} play-by-play, which does not exist yet. "
+            f"PBP_SEASONS={list(PBP_SEASONS)}."
+        )
+    if skipped_weeks:
+        warnings.warn(
+            f"skipped {SCHEDULE_SEASON} week(s) {sorted(skipped_weeks)}: no in-season "
+            f"play-by-play yet, so no as-of ratings. Showing the "
+            f"{len({r['week'] for r in rows})} week(s) that are computable.",
+            stacklevel=2,
+        )
+
     out = pd.DataFrame(rows)
     if not out.empty:
         out = out.sort_values("home_win_prob", ascending=False).reset_index(drop=True)

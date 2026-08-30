@@ -159,7 +159,23 @@ moved. Detail in `docs/REMEDIATION.md`.
 Beating the closing spread is genuinely hard, so the model is built to *match* it
 and is reported honestly — not overstated. Analytical tool, not a betting system.
 
-Run `python cli.py predict` for 2026 win probabilities.
+Run `python cli.py predict` for 2026 win probabilities (add a week number, e.g.
+`predict 1`, to narrow it).
+
+Two calibrated variants are fitted on the completed seasons and cached to
+`data/processed/win_prob_model.joblib`; predictions use whichever applies and
+record it in a `model` column:
+
+- `with_spread` — used when the game's spread is already published. More
+  accurate, but it largely tracks Vegas (on 2026 week 1 it picks the same
+  favourite in 16/16 games).
+- `no_spread` — EPA and rest only. Less accurate (61.2%) but it is the variant
+  that expresses an independent opinion rather than echoing the line.
+
+Before the season starts only week 1 is computable: later weeks need in-season
+2026 play-by-play to build as-of ratings, and `team_ratings_asof()` returns empty
+rather than scoring a week-12 game on week-1 knowledge. `cli.py predict` skips
+those weeks with a warning.
 
 ### Game-strategy analysis (`src/features.py: strategy_breakdown`)
 Situation-level splits per team from PBP: overall, red-zone, 3rd-down, pass vs

@@ -19,6 +19,8 @@ Outputs:
 
 from __future__ import annotations
 
+import warnings
+
 import pandas as pd
 from pathlib import Path
 
@@ -107,12 +109,98 @@ def prior_season(season: int) -> int | None:
     return max(priors) if priors else None
 
 
+# ---------- model feature columns ----------
+# Defined here (not in model.py) because features.py is the lower layer: model.py
+# imports features, so the canonical column list has to live on this side for both
+# the training frame and the inference frame to use it.
+EPA_FEATURE_COLS = [
+    "home_off_epa_pp", "away_off_epa_pp",
+    "home_def_epa_pp", "away_def_epa_pp",
+    "home_rz_td", "away_rz_td",
+    "home_3d_epa_pp", "away_3d_epa_pp",
+    "home_pass_epa_pp", "away_pass_epa_pp",
+    "home_rush_epa_pp", "away_rush_epa_pp",
+]
+REST_FEATURE_COLS = ["home_rest", "away_rest"]
+FEATURE_COLS = EPA_FEATURE_COLS + REST_FEATURE_COLS
+
+# Only used if the schedule has no rest columns at all. Historical schedules
+# always carry them (mean ~7.4 days, never null), so this is defensive.
+DEFAULT_REST = 0
+
+
+def game_feature_row(rt: pd.DataFrame, home_team: str, away_team: str,
+                     home_rest=DEFAULT_REST, away_rest=DEFAULT_REST) -> dict | None:
+    """Leakage-safe feature row for one game, given as-of ratings `rt`.
+
+    SHARED by `build_model_frame()` (training) and `model.predict_2026()`
+    (inference) so the two can never drift apart. Before issue #18 the inference
+    path ignored this entirely and used a hardcoded `0.5 + 1.2 * epa_diff`, a
+    function of one number that had nothing to do with the 14 features the
+    model was actually fitted on.
+
+    Returns None when either team has no as-of rating, so callers skip the game.
+    """
+    if home_team not in rt.index or away_team not in rt.index:
+        return None
+    h, a = rt.loc[home_team], rt.loc[away_team]
+    return {
+        "home_off_epa_pp": h["off_epa_per_play"],
+        "away_off_epa_pp": a["off_epa_per_play"],
+        "home_def_epa_pp": h["def_epa_allowed_per_play"],
+        "away_def_epa_pp": a["def_epa_allowed_per_play"],
+        "home_rz_td": h["off_rz_td_rate"],
+        "away_rz_td": a["off_rz_td_rate"],
+        "home_3d_epa_pp": h["off_3d_epa_per_play"],
+        "away_3d_epa_pp": a["off_3d_epa_per_play"],
+        "home_pass_epa_pp": h["off_pass_epa"] / h["off_plays"],
+        "away_pass_epa_pp": a["off_pass_epa"] / a["off_plays"],
+        "home_rush_epa_pp": h["off_rush_epa"] / h["off_plays"],
+        "away_rush_epa_pp": a["off_rush_epa"] / a["off_plays"],
+        "home_rest": home_rest,
+        "away_rest": away_rest,
+    }
+
+
+_WARNED_MISSING_SEASONS: set[int] = set()
+
+
+def _load_pbp_or_empty(season: int) -> pd.DataFrame | None:
+    """Load a season of play-by-play, or None if we know we do not have it.
+
+    Seasons outside PBP_SEASONS (e.g. 2026 before it kicks off) have no published
+    play-by-play, and nflverse answers with a 404. That is a legitimate "no data"
+    state, not an error: a caller asking for as-of ratings in a season that has
+    not started should get an empty result, not an unhandled HTTPError.
+
+    The membership check happens BEFORE any network call. Without it, a
+    full-season prediction asked for 17 unrated weeks and made 17 doomed HTTP
+    requests, which made `/predictions` unusably slow.
+
+    A season we DO claim to have (in PBP_SEASONS) propagates its errors --
+    swallowing a real download failure there would silently drop training rows.
+    """
+    if season not in PBP_SEASONS:
+        # Warn once per season: callers ask week by week, so without this a
+        # full-season prediction would emit the same warning 17 times.
+        if season not in _WARNED_MISSING_SEASONS:
+            _WARNED_MISSING_SEASONS.add(season)
+            warnings.warn(
+                f"no play-by-play for {season}: not in PBP_SEASONS="
+                f"{list(PBP_SEASONS)}, so this season is treated as unrated.",
+                stacklevel=2,
+            )
+        return None
+    return ingest.load_pbp(season)
+
+
 def team_ratings_asof(season: int, week: int, refresh: bool = False) -> pd.DataFrame:
     """Per-team efficiency 'as of' (season, week): uses weeks 1..week-1.
 
     Week 1 uses the most recent **strictly-prior** season's full-year efficiency.
     Returns an EMPTY DataFrame when no strictly-prior season exists (e.g. 2022
     week 1), so callers drop those games instead of rating them on future data.
+    Also returns empty when the season's play-by-play is not published yet.
 
     Cached to data/processed/team_ratings_{season}_w{week}.csv.gz. The empty
     case is deliberately NOT cached.
@@ -125,7 +213,9 @@ def team_ratings_asof(season: int, week: int, refresh: bool = False) -> pd.DataF
         return pd.read_csv(cache, low_memory=False)
 
     if week > 1:
-        pbp = ingest.load_pbp(season)
+        pbp = _load_pbp_or_empty(season)
+        if pbp is None:
+            return pd.DataFrame()
         pbp = pbp[pbp["week"] < week]
         plays = _offense_plays(pbp)
         ratings = _team_efficiency_from_plays(plays)
@@ -173,22 +263,16 @@ def build_model_frame(seasons, refresh: bool = False) -> pd.DataFrame:
             continue
         rt = ratings_df.set_index("team")
         ht, at = g["home_team"], g["away_team"]
-        if ht not in rt.index or at not in rt.index:
+        feats = game_feature_row(rt, ht, at,
+                                 g.get("home_rest", DEFAULT_REST),
+                                 g.get("away_rest", DEFAULT_REST))
+        if feats is None:
             continue
-        h, a = rt.loc[ht], rt.loc[at]
         rows.append({
             "season": season, "week": week,
             "home_team": ht, "away_team": at,
-            "home_off_epa_pp": h["off_epa_per_play"], "away_off_epa_pp": a["off_epa_per_play"],
-            "home_def_epa_pp": h["def_epa_allowed_per_play"], "away_def_epa_pp": a["def_epa_allowed_per_play"],
-            "home_rz_td": h["off_rz_td_rate"], "away_rz_td": a["off_rz_td_rate"],
-            "home_3d_epa_pp": h["off_3d_epa_per_play"], "away_3d_epa_pp": a["off_3d_epa_per_play"],
-            "home_pass_epa_pp": h["off_pass_epa"] / h["off_plays"],
-            "away_pass_epa_pp": a["off_pass_epa"] / a["off_plays"],
-            "home_rush_epa_pp": h["off_rush_epa"] / h["off_plays"],
-            "away_rush_epa_pp": a["off_rush_epa"] / a["off_plays"],
+            **feats,
             "spread": g["spread_line"],
-            "home_rest": g.get("home_rest", 0), "away_rest": g.get("away_rest", 0),
             "home_win": 1 if g["home_score"] > g["away_score"] else 0,
         })
     return pd.DataFrame(rows)
