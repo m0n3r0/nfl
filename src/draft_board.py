@@ -31,11 +31,30 @@ _SEASON_WEIGHTS = {
     y: w for y, w in zip(HISTORY_SEASONS, [1.0, 1.5, 2.0, 2.5][-len(HISTORY_SEASONS):])
 }
 
-# Depth we surface per position. Generous enough that a 10-team anchor-forced pick
-# is never stranded even if rivals snipe the top names before our turn.
-_SKILL_DEPTH = {"QB": 15, "RB": 30, "WR": 35, "TE": 15}
-K_TOP = 12
-DEF_TOP = 12
+# Depth we surface per position.
+#
+# The board must outlast the WHOLE draft, not just the early rounds: a 10-team x
+# 15-round snake consumes 150 players, and rivals take ~9 names between each of
+# our picks. The old caps (15/30/35/15 + 12 K + 12 DEF = ~121) ran dry around
+# round 12, at which point choose_pick() returned None and Yahoo auto-drafted the
+# rest of our team -- including the K and DEF slots. See issue #9.
+#
+# These depths total ~250, i.e. ~100 spare names of headroom. The underlying
+# projection pool is much deeper (3,300+ players), so raising these is free.
+_SKILL_DEPTH = {"QB": 32, "RB": 60, "WR": 70, "TE": 32}
+K_TOP = 28
+DEF_TOP = 28
+
+# Smallest board we are willing to ship. Guards against a future edit quietly
+# reintroducing the round-12 exhaustion: 10 teams x 15 rounds = 150 picks, and we
+# want meaningful headroom above that. write_original_board() raises if it is short.
+MIN_BOARD_SIZE = 250
+
+# Floor for the rookie-starter carve-out. Deliberately low: a rookie holding a
+# real starting role is board-worthy for depth even at a weak projection, and the
+# board now has room to carry him. Was 20.0, which (with the old caps) excluded
+# most of the 2026 class.
+_ROOKIE_MIN_PROJ = 5.0
 
 # Standard fantasy kicker weights (distance-tiered FG + XP). nflverse zeroes K/DEF
 # in the player table, so we score K ourselves from the raw kicking columns.
@@ -118,7 +137,7 @@ def _skill_board(corpus: dict, preset: str) -> list[dict]:
             continue
         if float(r.get("role_share", 0) or 0) < 0.60:
             continue
-        if float(r["proj_total"]) < 20.0:
+        if float(r["proj_total"]) < _ROOKIE_MIN_PROJ:
             continue
         key = (r["player_display_name"], r["position"])
         if key in on_board:
@@ -297,9 +316,22 @@ def merge_league_adp(board: list[dict],
 
 def write_original_board(path: str | Path, corpus: dict | None = None,
                          preset: str = "half-ppr",
-                         league_adp_path: str | Path | None = "data/scrapes/yahoo_league_adp.json") -> list[dict]:
-    """Compute the board, merge the league ADP scrape (if present), serialize."""
+                         league_adp_path: str | Path | None = "data/scrapes/yahoo_league_adp.json",
+                         min_size: int | None = MIN_BOARD_SIZE) -> list[dict]:
+    """Compute the board, merge the league ADP scrape (if present), serialize.
+
+    `min_size` guards against shipping a board that is too small to finish the
+    draft (see MIN_BOARD_SIZE). It defaults on for the real pipeline; tests that
+    build a board from a synthetic corpus pass min_size=None.
+    """
     board = build_original_board(corpus=corpus, preset=preset)
+    if min_size is not None and len(board) < min_size:
+        # Loud, not silent: a short board strands the late rounds (issue #9).
+        raise ValueError(
+            "draft board has only %d players, need >= %d to survive a 10-team "
+            "x 15-round draft (raise _SKILL_DEPTH/K_TOP/DEF_TOP)"
+            % (len(board), min_size)
+        )
     merge_league_adp(board, load_league_adp(league_adp_path)
                      if league_adp_path is not None else None)
     p = Path(path)

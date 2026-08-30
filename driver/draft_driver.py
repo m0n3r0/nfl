@@ -501,25 +501,39 @@ def read_available(ws):
       return out.slice(0,40);
     })()""")
 
-def normalize_available(raw):
+def normalize_available(raw, def_map=None):
     """Convert read_available() rows ([name, code, pos, text]) into the form
     choose_pick expects. Team defenses are keyed by their short BOARD name
     (e.g. 'LAR' -> 'Rams') so the forced DEF pick can match them; a one-token or
     city-prefixed Yahoo DEF label such as 'Rams LAR - DEF' / 'Los Angeles Rams
-    LAR - DEF' would otherwise never equal the BOARD key 'Rams'. Returns
-    (names, adp_map) where adp_map keys the (normalized) lowercased name to the
-    Yahoo ADP parsed from that row's text."""
-    names, adp_map = [], {}
+    LAR - DEF' would otherwise never equal the BOARD key 'Rams'.
+
+    `def_map` is the team-code -> short-name map to use. It MUST be derived from
+    the ACTIVE board, not the static BOARD tuple -- otherwise defenses that only
+    exist on the original nflverse board (BAL/CHI/KC/LAC/TB) can never resolve.
+    Defaults to the module-level map for backwards compatibility.
+
+    Returns (names, adp_map, pos_map):
+      names    - normalized names in Yahoo's display order
+      adp_map  - lowercased name -> Yahoo ADP parsed from the row text
+      pos_map  - lowercased name -> position Yahoo reported, so the off-board
+                 fallback in choose_pick can respect slot needs
+    """
+    def_map = DEF_CODE_TO_NAME if def_map is None else def_map
+    names, adp_map, pos_map = [], {}, {}
     for row in raw:
         parts = list(row) + [None, None, None, None]
         name, code, pos, text = parts[0], parts[1], parts[2], parts[3]
         if pos in ("DEF", "DST"):
-            name = DEF_CODE_TO_NAME.get((code or "").upper(), name)
+            name = def_map.get((code or "").upper(), name)
+            pos = "DEF"
         names.append(name)
+        if pos:
+            pos_map[name.lower()] = pos
         a = parse_adp(text)
         if a is not None:
             adp_map[name.lower()] = a
-    return names, adp_map
+    return names, adp_map, pos_map
 
 def is_my_pick(ws):
     return ev(ws,"""(function(){
@@ -547,7 +561,65 @@ def _crowd_reach(c, round_num):
     return float(adp) - exp_pick > ADP_WINDOW
 
 
-def choose_pick(available, drafted, round_num, board, adp_map=None):
+def _fallback_pick(available, board, drafted, round_num, adp_map, pos_map):
+    """Last-resort pick from players NOT on our board, so we always fill the slot.
+
+    Our board is finite; in a 10-team x 15-round draft it can be exhausted before
+    the later rounds. Previously choose_pick returned None in that case, run_draft
+    logged NO_VALID_PICK and looped, and Yahoo's clock expired -- auto-drafting the
+    rest of our team including the K and DEF slots (issue #11).
+
+    Yahoo's own board order (its ADP column) is a sane default. We prefer a slot we
+    still need; failing that, the lowest available ADP. Returns None only when
+    `available` is genuinely empty.
+    """
+    board_names = {v["name"].lower() for v in board.values()}
+    off_board = [n for n in available if n.lower() not in board_names]
+    if not off_board:
+        return None
+
+    def rank(name):
+        # Unknown ADP sorts last, but still ahead of drafting nobody.
+        return adp_map.get(name.lower(), 9999.0)
+
+    def pos_of(name):
+        return (pos_map.get(name.lower()) or "").upper()
+
+    def timing_ok(pos):
+        if pos in ("K", "DEF") and round_num < (TOTAL_ROUNDS - K_DEF_LAST_ROUNDS + 1):
+            return False
+        if pos == "QB" and round_num < MY_PICK_ROUNDS_QB:
+            return False
+        return True
+
+    ordered = sorted(off_board, key=rank)
+
+    # Prefer an unfilled required slot whose timing window is open.
+    for name in ordered:
+        pos = pos_of(name)
+        if pos in REQUIRED and drafted.get(pos, 0) < REQUIRED[pos] and timing_ok(pos):
+            log("PICK_FALLBACK round=" + str(round_num) + " need " + pos
+                + " -> " + name + " (off-board, adp=" + str(adp_map.get(name.lower())) + ")")
+            return (name, None, pos, adp_map.get(name.lower()) or 0)
+
+    # Otherwise best available by Yahoo ADP, still respecting the timing windows.
+    for name in ordered:
+        pos = pos_of(name)
+        if timing_ok(pos):
+            log("PICK_FALLBACK round=" + str(round_num) + " best-available -> " + name
+                + " (off-board, adp=" + str(adp_map.get(name.lower())) + ")")
+            return (name, None, pos or None, adp_map.get(name.lower()) or 0)
+
+    # Only timing-guarded names remain (e.g. a kicker in round 5). We deliberately
+    # do NOT override the guards here: Yahoo's auto-draft picks from its pre-rank,
+    # which beats spending an early pick on a K/DEF. In the late rounds -- the case
+    # this fallback exists for -- the K/DEF window is open anyway, so real
+    # exhaustion still resolves.
+    log("PICK_FALLBACK round=" + str(round_num) + " none available within timing guards")
+    return None
+
+
+def choose_pick(available, drafted, round_num, board, adp_map=None, pos_map=None):
     """Position-target-aware pick driven by a value board.
 
     `board` is a dict name -> {name, team, pos, adp, value, ecr?}. Candidates are
@@ -562,8 +634,16 @@ def choose_pick(available, drafted, round_num, board, adp_map=None):
        deadline (ANCHOR_BY_ROUND), force the highest-value available player at
        that position.
     2) Otherwise pick the highest-value available player respecting timing guards.
-    3) Fallback: best available ignoring need (still respect timing)."""
+    3) Fallback: best available ignoring need (still respect timing) -- bench.
+    4) Ignore the reach guard, keep the timing guards.
+    5) Off-board fallback: pick from players Yahoo shows but our board does not
+       know, so an exhausted board degrades instead of returning None (see
+       _fallback_pick and issue #11).
+
+    `pos_map` (lowercased name -> position, from normalize_available) is only used
+    by step 5, for players who are not on our board at all."""
     adp_map = adp_map or {}
+    pos_map = pos_map or {}
     avail_lower = {n.lower() for n in available}
     scored = []
     for v in board.values():
@@ -635,7 +715,12 @@ def choose_pick(available, drafted, round_num, board, adp_map=None):
         if pos == "QB" and round_num < MY_PICK_ROUNDS_QB:
             continue
         return (c["name"], c.get("team"), pos, c.get("adp") or 0)
-    return None
+
+    # 5) off-board fallback: no board candidate survives (board exhausted, or
+    #    every candidate tripped a guard). Draft a player Yahoo is showing rather
+    #    than returning None, which would stall until Yahoo auto-drafts our slot.
+    return _fallback_pick(available, board, drafted, round_num,
+                          adp_map or {}, pos_map or {})
 
 def click_player(ws,name):
     # Robust name-based row finder (Yahoo holds the name in a cell, not in the
@@ -767,8 +852,14 @@ def run_draft():
             log("ENGINE_OVERRIDE_IGNORED: DRAFT_ENGINE=fantasypros set but FP_API_KEY missing -> original board used")
     # Rebuild the DEF name map from the ACTIVE board so any defense it includes
     # (keyed by its team code) resolves when Yahoo shows 'CODE - DEF'.
-    DEF_CODE_TO_NAME = {v["team"].upper(): v["name"]
-                        for v in board.values() if v.get("pos") == "DEF"}
+    #
+    # This MUST be threaded explicitly into normalize_available(). A previous
+    # version assigned to the bare name here, which (with no `global` statement)
+    # created a local that nothing ever read -- leaving normalize_available() on
+    # the stale map built from the static BOARD, so BAL/CHI/KC/LAC/TB could never
+    # be drafted. See issue #10.
+    def_map = {v["team"].upper(): v["name"]
+               for v in board.values() if v.get("pos") == "DEF"}
     drafted={}
     round_num=1
     picks_made=0
@@ -777,11 +868,13 @@ def run_draft():
         try:
             if is_my_pick(ws):
                 # read_available returns [name, code, pos, text]; normalize maps
-                # DEF codes to BOARD keys and parses live Yahoo ADP per row.
-                available, adp_map = normalize_available(read_available(ws))
+                # DEF codes to ACTIVE-board keys and parses live Yahoo ADP per row.
+                raw_rows = read_available(ws)
+                available, adp_map, pos_map = normalize_available(raw_rows, def_map=def_map)
                 log("MY_PICK round="+str(round_num)+" avail="+str(len(available))
                     + " yahoo_adp="+str(len(adp_map)))
-                pick=choose_pick(available,drafted,round_num,board,adp_map=adp_map)
+                pick=choose_pick(available,drafted,round_num,board,
+                                 adp_map=adp_map,pos_map=pos_map)
                 if pick:
                     name,team,pos,adp=pick
                     ok=click_player(ws,name)

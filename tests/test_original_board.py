@@ -143,6 +143,36 @@ def test_real_board_depth_if_present():
         assert counts.get(pos, 0) >= 10, "%s has %d (need >=10 for 10-team)" % (pos, counts.get(pos, 0))
 
 
+def test_real_board_is_larger_than_the_whole_draft():
+    """Issue #9/#30: the per-position depth check above is NOT sufficient. The
+    board has to outlast the ENTIRE draft, not just the anchor rounds.
+
+    A 10-team x 15-round snake consumes TEAMS * TOTAL_ROUNDS = 150 players, and
+    rivals take ~9 names between each of our picks. A smaller board runs dry in
+    the late rounds: choose_pick() finds no candidate, run_draft() logs
+    NO_VALID_PICK and loops, and Yahoo auto-drafts the remainder of our team
+    (including the K and DEF slots). That is exactly what happened with the old
+    121-player board.
+
+    Import the driver's own constants so the numbers cannot drift apart.
+    """
+    path = ROOT / "data" / "board" / "original_board.json"
+    if not path.exists():
+        import pytest
+        pytest.skip("real board not generated yet (run: cli.py original-board)")
+    board = json.loads(path.read_text(encoding="utf-8"))
+    needed = dd.TEAMS * dd.TOTAL_ROUNDS
+    assert len(board) >= needed, (
+        "board has %d players, but a %d-team x %d-round draft needs %d"
+        % (len(board), dd.TEAMS, dd.TOTAL_ROUNDS, needed)
+    )
+    # And keep real headroom: rivals consume ~9 names per round between our picks.
+    assert len(board) >= draft_board.MIN_BOARD_SIZE, (
+        "board has %d players; MIN_BOARD_SIZE is %d so the late rounds "
+        "always have candidates left" % (len(board), draft_board.MIN_BOARD_SIZE)
+    )
+
+
 # --------------------------------------------------------------------------- #
 # Driver consumption tests (JSON -> choose_pick guardrails)
 # --------------------------------------------------------------------------- #
