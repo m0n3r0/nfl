@@ -16,6 +16,35 @@ each section is struck from the "not started" column only when its code lands.
 
 ---
 
+## Repository topology
+
+**Local repo:** `C:\nfl-win` (branch `main`). **Remote:** `github` ->
+`https://github.com/m0n3r0/nfl` (branch `main`).
+
+A second remote named `origin` used to point at `C:\nfl`, a bare repo holding the
+pre-rebuild artifact-import history. That history is **not** an ancestor of `main` — the
+two have no merge-base, because `main` was rebuilt from scratch ("Professional-grade
+rebuild", `f29c5ef`). The two branches had diverged by 17 commits vs 6.
+
+Only one thing on the old branch was not already in `main`: `intel/` (14 files — an
+autonomous collector plus ~126k lines of raw 2026-08-27 JSON snapshots: players,
+schedule, game boxscores). Everything else (images, validation logs, board rows,
+`data/scrapes/`, `memory/`) had been carried across.
+
+Cleaned up on 2026-08-31:
+
+- Backed the whole thing up first, including the orphan branch, to
+  `nfl-cdrive-mirror-backup.bundle` (kept outside the repo; `git bundle verify` passes
+  and it records `refs/heads/master` at `d19d1a7`).
+- Removed the `origin` remote. `github` is now the only remote, matching the fact that
+  `nfl-win` is the local repo of record.
+
+`intel/` is therefore not in `main` and is not referenced by any code or doc in it. It
+was a parallel collector superseded by `src/ingest.py` (nflverse). Recover it from the
+bundle if it is ever wanted; it was deliberately left out rather than deleted.
+
+---
+
 ## Phase 1 — draft blockers (done)
 
 **Draft:** Tue Sep 1 2026, 5:00pm EDT. These three would each have cost us the draft.
