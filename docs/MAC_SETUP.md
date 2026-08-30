@@ -64,11 +64,46 @@ For Edge: `/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge`
 (same flags). Keep 9222 bound to loopback only — anyone who can reach it can
 drive the browser **and** your logged-in Yahoo session.
 
-### One-time Yahoo login
-The session lives in the profile dir (`--user-data-dir`). Log in once with a
-GUI session (or Apple Remote Desktop) and keep the profile; a truly headless
-Mac can re-login via CDP later but 2FA/captcha make the one-time GUI login
-far more reliable.
+### One-time Yahoo login (pick one)
+
+The session lives in the profile dir (`--user-data-dir`); once logged in, every
+later headless launch with the same profile stays logged in.
+
+**Option A — copy the already-working Windows session (easiest, recommended).**
+Yahoo auth is cookie-based, so the logged-in Edge profile transfers. Copy it
+(no need to re-enter password or fight 2FA):
+```bash
+# On the Windows box, zip the profile, then on the Mac:
+scp -r user@windows:/c/edge-debug-profile/Default "$HOME/edge-draft-profile/Default"
+# (keep it light: skip Cache/, Code Cache/, GPUCache/)
+```
+Launch headless with that `--user-data-dir` and verify with:
+```bash
+python tools/check_login.py      # expect team_page_status: 200, team_page_has_doge: true
+```
+
+**Option B — log in from headless via CDP (`tools/login_yahoo.py`).** Drives the
+standard Yahoo email → password → 2FA flow over the debug port using real CDP
+input events; prompts on stdin (or `YAHOO_USER`/`YAHOO_PASSWORD` env / `.env`),
+and refuses to touch anything in the league page:
+```bash
+python tools/login_yahoo.py
+# [1] checking existing session ... -> ALREADY_LOGGED_IN (profile carries session)
+# ...or drives: email -> password -> 2FA-code prompt -> LOGGED_IN_OK
+```
+If a **captcha** appears it prints `CAPTCHA_BLOCKED` and stops — that challenge
+is not worth automating; fall back to A or C.
+
+**Option C — one-time headful login.** On a headless Mac, the browser still
+renders to the built-in window server; show it via **Screen Sharing / Apple
+Remote Desktop**, launch the browser headful once, log in interactively, quit,
+then relaunch headless with the same profile. Most reliable when 2FA/captcha
+are in play.
+
+Whichever option, finish with the check that the draft toolchain relies on:
+```bash
+python tools/check_login.py      # 200 + Doge visible = authenticated
+```
 
 ## 4. Validate the draft driver headless
 
