@@ -13,6 +13,7 @@ LEAGUE = "1329011"
 TEAM_ID = "2"
 LOG = r"C:\edge-debug-profile\draft_log.txt"
 TOTAL_ROUNDS = 15
+TEAMS = 10                   # league size (verified live 2026-08-28)
 MY_PICK_ROUNDS_QB = 10      # don't take QB before this round
 K_DEF_LAST_ROUNDS = 2       # K/DEF only in last N rounds
 ADP_WINDOW = 40              # reach guard: skip board pick if ADP >> board rank
@@ -524,6 +525,23 @@ def is_my_pick(ws):
       return false;
     })()""")
 
+def _crowd_reach(c, round_num):
+    """True when the crowd drafts this player far later than our board ranks him.
+
+    League ADP (from the board's 'adp' field, merged from the live Yahoo league
+    scrape) more than ADP_WINDOW picks beyond the current round's window means
+    our projection is a heavy outlier vs. our own league-mates -- usually stale
+    value (injury/role news we missed). Skipped UNLESS an anchor forces the slot
+    (step 1) or nothing else is available (step 4). Players without a known ADP
+    (most of the board) always pass.
+    """
+    adp = c.get("adp")
+    if adp is None:
+        return False
+    exp_pick = (round_num - 1) * TEAMS + TEAMS  # end of the current round window
+    return float(adp) - exp_pick > ADP_WINDOW
+
+
 def choose_pick(available, drafted, round_num, board, adp_map=None):
     """Position-target-aware pick driven by a value board.
 
@@ -579,6 +597,10 @@ def choose_pick(available, drafted, round_num, board, adp_map=None):
             continue
         if pos in REQUIRED and drafted.get(pos, 0) >= REQUIRED[pos]:
             continue
+        if _crowd_reach(c, round_num):
+            log("REACH_GUARD skip %s (board round %d, league ADP %s)"
+                % (c["name"], round_num, str(c.get("adp"))))
+            continue
         return (c["name"], c.get("team"), pos, c.get("adp") or 0)
 
     # 3) bench / fallback: every REQUIRED slot is already filled (or still
@@ -586,6 +608,21 @@ def choose_pick(available, drafted, round_num, board, adp_map=None):
     #    the bench. We intentionally do NOT skip already-filled positions here
     #    -- a 2nd RB/WR on the bench is fine. Still respect the K/DEF-last and
     #    QB-round timing guards so we don't reach for K/DEF before their window.
+    for c in cands:
+        pos = c["pos"]
+        if pos in ("K", "DEF") and round_num < (TOTAL_ROUNDS - K_DEF_LAST_ROUNDS + 1):
+            continue
+        if pos == "QB" and round_num < MY_PICK_ROUNDS_QB:
+            continue
+        if _crowd_reach(c, round_num):
+            log("REACH_GUARD skip %s (bench path, league ADP %s)"
+                % (c["name"], str(c.get("adp"))))
+            continue
+        return (c["name"], c.get("team"), pos, c.get("adp") or 0)
+
+    # 4) last resort: ignore the reach guard (keep timing guards) so a board
+    #    where every candidate trips the guard still yields a pick instead of
+    #    timing out. Anchors (step 1) already bypassed the guard by design.
     for c in cands:
         pos = c["pos"]
         if pos in ("K", "DEF") and round_num < (TOTAL_ROUNDS - K_DEF_LAST_ROUNDS + 1):

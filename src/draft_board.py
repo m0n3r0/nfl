@@ -225,10 +225,83 @@ def board_to_driver_map(board: list[dict]) -> dict:
     return out
 
 
+def _adp_name_key(name: str) -> str:
+    """Normalize a player name for ADP matching (case/apostrophes/suffixes out)."""
+    n = name.replace("'", "").replace(".", "").strip().lower()
+    parts = n.split()
+    if parts and parts[-1] in ("iii", "ii", "iv", "jr", "sr"):
+        parts = parts[:-1]
+    return " ".join(parts)
+
+
+YAHOO_TEAM_ALIASES = {"LAR": "LA", "WSH": "WAS", "JAC": "JAX", "OAK": "LV", "WFT": "WAS"}
+
+
+def load_league_adp(path: str | Path = "data/scrapes/yahoo_league_adp.json") -> dict:
+    """Load the league-scoped ADP scrape (tools/scrape_league_adp.py output).
+
+    Returns {(adp_name_key, TEAM_UPPER): avg_pick}. Yahoo team codes are mapped
+    to the board's code set (LAR->LA etc). Missing file -> {} so board building
+    still works before the first scrape.
+    """
+    p = Path(path)
+    if not p.exists():
+        return {}
+    try:
+        with open(p, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    out: dict = {}
+    for row in data.get("players", []):
+        adp = row.get("adp_all_drafts")
+        if adp is None:
+            continue
+        team = YAHOO_TEAM_ALIASES.get(str(row.get("team", "")).upper(),
+                                      str(row.get("team", "")).upper())
+        out[(_adp_name_key(row["name"]), team)] = float(adp)
+    return out
+
+
+def merge_league_adp(board: list[dict],
+                     adp_map: dict | None = None) -> list[dict]:
+    """Annotate board rows with the league ADP where a match exists (in place).
+
+    Primary key is normalized name + team code. Fall back to name-only when the
+    name matches exactly one board row and one ADP entry -- this captures players
+    whose team changed between our data snapshot and Yahoo's live data (e.g.
+    deadline trades such as A.J. Brown PHI->NE, Kenneth Walker III SEA->KC,
+    verified live 2026-08-30); the row keeps its own team but inherits the ADP.
+    Unmatched rows keep adp=None (driver's reach guard passes them through).
+    """
+    if not adp_map:
+        return board
+    # name-only reverse index for the fallback (skip ambiguous names)
+    name_count: dict[str, int] = {}
+    for key in adp_map:
+        name_count[key[0]] = name_count.get(key[0], 0) + 1
+    board_name_count: dict[str, int] = {}
+    for b in board:
+        k = _adp_name_key(b["name"])
+        board_name_count[k] = board_name_count.get(k, 0) + 1
+    for b in board:
+        nk = _adp_name_key(b["name"])
+        adp = adp_map.get((nk, str(b["team"]).upper()))
+        if adp is None and name_count.get(nk, 0) == 1 and board_name_count.get(nk, 0) == 1:
+            adp = next(v for k, v in adp_map.items() if k[0] == nk)
+            b["adp_team_changed"] = True
+        if adp is not None:
+            b["adp"] = adp
+    return board
+
+
 def write_original_board(path: str | Path, corpus: dict | None = None,
-                         preset: str = "half-ppr") -> list[dict]:
-    """Compute the board and serialize it to JSON at `path`."""
+                         preset: str = "half-ppr",
+                         league_adp_path: str | Path | None = "data/scrapes/yahoo_league_adp.json") -> list[dict]:
+    """Compute the board, merge the league ADP scrape (if present), serialize."""
     board = build_original_board(corpus=corpus, preset=preset)
+    merge_league_adp(board, load_league_adp(league_adp_path)
+                     if league_adp_path is not None else None)
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     with open(p, "w", encoding="utf-8") as f:

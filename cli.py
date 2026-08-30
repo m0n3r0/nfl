@@ -162,10 +162,12 @@ def cmd_original_board(args) -> int:
     board = draft_board.write_original_board(
         "data/board/original_board.json", preset=args.preset
     )
+    adp_hits = sum(1 for b in board if b.get("adp") is not None)
     from collections import Counter
     counts = Counter(b["pos"] for b in board)
     print(f"\n=== Original draft board ({args.preset}) -> data/board/original_board.json ===")
     print(f"  total players: {len(board)}")
+    print(f"  league ADP merged: {adp_hits} players (from data/scrapes/yahoo_league_adp.json)")
     for pos in ("QB", "RB", "WR", "TE", "K", "DEF"):
         print(f"  {pos}: {counts.get(pos, 0)}")
     print("  top 5 by projected value:")
