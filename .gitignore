@@ -31,5 +31,5 @@ data/processed/
 
 # --- FD nation draft driver (runtime-generated) ---
 logs/draft_log.txt
-__pycache__/
+# (__pycache__/ already covered above -- do not duplicate it here)
 .worktrees/

@@ -316,6 +316,23 @@ def test_normalize_available_uses_supplied_def_map():
     assert names == ["Ravens"], names
 
 
+def test_normalize_available_empty_def_map_falls_back_to_static():
+    """An empty def_map must NOT defeat the static fallback.
+
+    run_draft() builds the map from the active board with a comprehension, so a
+    board with no DEF rows yields {} -- falsy but not None. Treating that as
+    "caller supplied a map" would leave every defense unresolved, which is worse
+    than the bug this replaced. The supplied map is layered over the static one.
+    """
+    # LAR is on the static BOARD, so an empty active map must still resolve it.
+    raw = [["Los Angeles Rams", "LAR", "DEF", "Los Angeles Rams LAR - DEF"]]
+    names, _, _ = dd.normalize_available(raw, def_map={})
+    assert names == ["Rams"], names
+    # ...and a code the static tuple knows, via an active map that lacks it.
+    names, _, _ = dd.normalize_available(raw, def_map={"BAL": "Ravens"})
+    assert names == ["Rams"], names
+
+
 def test_choose_pick_falls_back_off_board_instead_of_none():
     """Issue #11: a board with no available candidate must still yield a pick,
     preferring a slot we still need, rather than returning None (which stalls

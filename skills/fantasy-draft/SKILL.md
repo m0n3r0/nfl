@@ -22,8 +22,14 @@ board with guardrails, clicks via human-like Edge CDP input, logs to a file.
 - Draft: Tue Sep 1 2026 5:00pm EDT (= 2026-09-02 06:00 JST on this machine).
 
 ## The driver script
-Full implementation: `C:\edge-debug-profile\draft_driver.py` (also
-/home/eml/draft_driver.py). It:
+Source of truth in the repo: `C:\nfl-win\driver\draft_driver.py` — it is the **only**
+copy. Deployed to `C:\edge-debug-profile\draft_driver.py` (also
+/home/eml/draft_driver.py), which is what actually runs.
+
+> **A repo edit is not live until it is copied to the deploy directory.** The driver
+> resolves `original_board.json` next to itself, so copy both files together.
+
+It:
 1. Connects to Edge 9222 (--remote-allow-origins=* required).
 2. Opens the draft room, polls for "your pick" (team 2).
 3. On your pick: reads available players, chooses highest board player passing
@@ -37,11 +43,19 @@ Full implementation: `C:\edge-debug-profile\draft_driver.py` (also
 4. Clicks the player row + Draft/confirm with Bézier+jitter motion.
 5. Logs every decision to `C:\edge-debug-profile\draft_log.txt`.
 
-## Board (~67 players: skill + K/DEF tiers + 10-team depth at TE/QB, embedded in script)
-Gibbs, Bijan, Chase, Puka, McCaffrey, Amon-Ra, JSN, Taylor, CeeDee, Cook,
-Saquon, Jefferson, Jeanty, Achane, ChaseBrown, K.Walker, Henry, London, Hampton,
-Allen(QB), Bowers(TE), Nico, Pickens, A.J.Brown, McBride(TE), Jeremiyah Love(RB), DeVonta,
-Kyren, Jacobs, Olave.
+## Board (250 players, in `data/board/original_board.json` — NOT embedded in the script)
+
+Built by `python cli.py original-board` from nflverse data only. 250 players:
+QB 32, RB 60, WR 70, TE 32, K 28, DEF 28.
+
+It is deliberately larger than the draft itself: a 10-team x 15-round snake consumes
+150 players, and rivals take ~9 names between each of our picks. An earlier 121-player
+board ran dry around round 12, at which point the driver stalled and Yahoo auto-drafted
+the rest of our team — including the K and DEF slots. `src/draft_board.py` enforces
+`MIN_BOARD_SIZE = 250` so that cannot regress.
+
+The ~30-name static `BOARD` tuple inside the driver is **only** the fallback used when
+the JSON is missing; it is not the draft board.
 
 ## Value metric (live board)
 **Default: the original nflverse-derived board** — `python cli.py original-board`
@@ -83,16 +97,37 @@ NOTE: this machine is JST (UTC+9); the stored trigger shows +09:00 and next-run
 Yahoo DEFAULT pre-rank is the auto-draft fallback if the driver errors (e.g. Edge
 closed). User accepted this; custom Edit-My-Rankings UI was too fragile to automate.
 
-## VALIDATION (done 2026-08-21 — mock draft)
-Ran mock-draft validation. Findings + fixes applied to the driver:
+## VALIDATION
 
-1. LOGIC TEST (simulated full 15-round draft): FIRST run FAILED — original BOARD had
-   NO K and NO DEF players, so the driver would draft 15 skill players and leave K/DEF
-   EMPTY (illegal lineup). FIX: added K tier (Aubrey/Fairbairn/Dicker/Myers/Little) and
-   DEF tier (Rams/Texans/Broncos/Seahawks/Eagles/Patriots) with real Yahoo ADP; rewrote
-   `choose_pick` to be position-target-aware (forces required slots by ANCHOR_BY_ROUND
-   deadlines, fills bench with best available). RE-TEST: LEGAL_LINEUP_CHECK PASS —
-   exactly QB,TE,K,DEF=1 and RB,WR>=2, K/DEF in last 2 rounds, QB at round 10.
+### 2026-08-31 — simulated full draft on the real pick logic (current)
+`tools/simulate_draft.py` replays all 15 rounds offline against the actual
+`choose_pick()`, with opponents modelled as filling starter needs and avoiding K/DEF
+until late. This is the regression gate for board/driver changes — run it after
+touching either file.
+
+Result: **15/15 picks made**, K at R14, DEF (Ravens) at R15, legal lineup.
+
+Three bugs were found and fixed in this pass (issues #9/#10/#11):
+
+1. **Board too small** — 121 players for a 150-pick draft; ran dry at round 12 and
+   Yahoo auto-drafted the rest. Board is now 250, with a `MIN_BOARD_SIZE` guard.
+2. **DEF map rebuild was dead code** — `run_draft()` assigned `DEF_CODE_TO_NAME`
+   without a `global`, so it bound a local nothing read, and 5 defenses (BAL/CHI/KC/
+   LAC/TB, including the top-rated Ravens) could never be drafted. Now threaded
+   explicitly and layered over the static map.
+3. **No fallback when the board is exhausted** — `choose_pick()` returned `None` and
+   stalled. Added `_fallback_pick()`, which drafts a player Yahoo is showing.
+
+Known-remaining, tracked as issues #19/#20: the sim drafts **4 TEs and 0 QBs**, because
+raw projected points are QB-inflated and board `value` is not comparable across
+positions. This is a value-normalisation gap, not a stall, and is being fixed with VOR.
+
+### 2026-08-21 — mock draft (superseded)
+Historical: the original hand-built `BOARD` had **no K and no DEF**, so the driver would
+have drafted 15 skill players and left K/DEF empty (illegal lineup). Fixed at the time
+by adding K/DEF tiers to the static tuple and rewriting `choose_pick` to be
+position-target-aware (forces required slots by `ANCHOR_BY_ROUND` deadlines, fills bench
+with best available). Superseded by the nflverse board above.
 
 2. CLICK SELECTOR BUG: Yahoo player ROWS hold the name in a cell, NOT inside the
    `/nfl/players/` anchor (that anchor only wraps an icon, empty text). Original

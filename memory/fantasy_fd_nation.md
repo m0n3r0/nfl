@@ -27,8 +27,12 @@ the user mentions fantasy football, their league, the draft, lineup, waivers, or
   soft +8 value premium to RBs we still need (anchors them early despite the
   crowd's RB inflation) and (b) hard-forces slots by `ANCHOR_BY_ROUND`: 1st RB by
   R3, 2nd RB by R5, WR by R5/R9, TE by R7, QB by R10, K/DEF by R14.
-- BOARD depth for 10-team: ~67 players (10 QBs, 10 TEs, 10 Ks, 10 DEFs) so a required
-  slot is never stranded if the crowd snipes the top names before our anchor turn.
+- BOARD depth: **250 players** (QB 32, RB 60, WR 70, TE 32, K 28, DEF 28) in
+  `data/board/original_board.json`, built by `python cli.py original-board`. The board
+  must outlast the WHOLE draft, not just the early rounds — 10 teams x 15 rounds = 150
+  picks. *(Was ~67, then 121; 121 ran dry at round 12 and Yahoo auto-drafted the rest of
+  our team. Corrected 2026-08-31; `MIN_BOARD_SIZE = 250` in `src/draft_board.py` now
+  guards against regression.)*
 - Other guardrails: no QB before round 10; K/DEF only last 2 rounds; don't double
   a position past its slot count; ADP sanity window (don't reach absurdly above ADP).
 - Safety net: Yahoo DEFAULT pre-rank (ADP-based) is the auto-draft fallback. User accepted this (custom Edit-My-Rankings UI was too fragile to automate safely — Yahoo uses a JS drag widget with no stable controls).
