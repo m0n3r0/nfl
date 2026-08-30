@@ -207,6 +207,9 @@ Protocol (CDP). Lives as a self-contained module alongside the toolkit above.
 Draft: **Tue Sep 1 2026, 5:00pm EDT** (= 2026-09-02 06:00 JST on the machine).
 
 ### How to run the draft
+> Windows instructions below. For a **headless macOS** deployment (launchd
+> instead of the scheduled task, headless Chromium instead of GUI Edge) see
+> [docs/MAC_SETUP.md](docs/MAC_SETUP.md).
 Edge must be open on port 9222, bound to loopback (`--remote-debugging-address=127.0.0.1`), with `--remote-allow-origins=*` and the user logged in. See the security note below for the required firewall restriction.
 
 > **Security note (read before opening the port).** CDP exposes a *full browser-control

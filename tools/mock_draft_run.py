@@ -36,9 +36,25 @@ import http.server
 import socketserver
 
 CDP = "http://127.0.0.1:9222"
-DEPLOYED = r"C:\edge-debug-profile\draft_driver.py"
-HTML = r"C:\nfl-win\tools\mock_draft_room.html"
-LOG = r"C:\edge-debug-profile\mock_draft_log.txt"
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+def _pick(env, win, posix):
+    """Env override wins; otherwise the Windows default or a portable path."""
+    if os.environ.get(env):
+        return os.environ[env]
+    return win if sys.platform.startswith("win") else posix
+
+# Deployed driver: test the exact copy the live draft will use. Override with
+# DRAFT_DRIVER on non-standard installs (e.g. the headless-Mac copy).
+DEPLOYED = _pick("DRAFT_DRIVER", r"C:\edge-debug-profile\draft_driver.py",
+                 os.path.join(REPO, "driver", "draft_driver.py"))
+HTML = _pick("MOCK_HTML", r"C:\nfl-win\tools\mock_draft_room.html",
+             os.path.join(REPO, "tools", "mock_draft_room.html"))
+LOG = _pick("MOCK_LOG", r"C:\edge-debug-profile\mock_draft_log.txt",
+            os.path.join(REPO, "logs", "mock_draft_log.txt"))
+os.makedirs(os.path.dirname(LOG), exist_ok=True)
+# Let the imported deployed driver log to the same writable place too.
+os.environ.setdefault("FD_DRAFT_LOG", LOG)
 MOCK_PORT = 8765
 
 TEAM_ID = "2"
