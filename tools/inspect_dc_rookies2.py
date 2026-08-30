@@ -1,9 +1,12 @@
 """Check rookie coverage in the refreshed depth_charts_2026."""
+import os
 import pandas as pd
 
-dc = pd.read_csv(r'C:\nfl-win\data\raw\depth_charts_2026.csv', low_memory=False)
+RAW = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                   "data", "raw")
+dc = pd.read_csv(os.path.join(RAW, "depth_charts_2026.csv"), low_memory=False)
 print('snapshot date(s):', dc['dt'].min(), '->', dc['dt'].max())
-pl = pd.read_csv(r'C:\nfl-win\data\raw\players.csv', low_memory=False)
+pl = pd.read_csv(os.path.join(RAW, "players.csv"), low_memory=False)
 pl26 = pl[pl['draft_year'] == 2026]
 ids26 = set(pl26['gsis_id'].dropna())
 dc26 = dc[dc['gsis_id'].isin(ids26)]

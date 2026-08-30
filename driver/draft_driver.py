@@ -11,7 +11,12 @@ import json, os, re, urllib.request, websocket, time, random, math, sys, io, dat
 CDP = "http://127.0.0.1:9222"
 LEAGUE = "1329011"
 TEAM_ID = "2"
-LOG = r"C:\edge-debug-profile\draft_log.txt"
+# Decision log. Windows keeps the historical default; other platforms (e.g.
+# headless macOS) take $FD_DRAFT_LOG or ./draft_log.txt (set the launchd
+# working directory to where you want it). The env var wins everywhere.
+LOG = (os.environ.get("FD_DRAFT_LOG")
+       or (r"C:\edge-debug-profile\draft_log.txt" if sys.platform.startswith("win")
+           else os.path.join(os.getcwd(), "draft_log.txt")))
 TOTAL_ROUNDS = 15
 TEAMS = 10                   # league size (verified live 2026-08-28)
 MY_PICK_ROUNDS_QB = 10      # don't take QB before this round
