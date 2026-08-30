@@ -5,7 +5,12 @@ the user mentions fantasy football, their league, the draft, lineup, waivers, or
 
 ## League facts (verified 2026-08-20 via live Edge CDP)
 - Platform: Yahoo Fantasy Football, league ID **1329011**, name **"FD nation"**.
-- Manager: user is **"Doge"**, team **#2** (URL team id = 2). **10 teams** (verified 2026-08-28 via live Edge CDP — the FD nation Teams page listed exactly 10 teams; Yahoo Settings confirms "Max Teams: 10"; the earlier "12 teams" claim was incorrect). Known teams (10 total observed 08-28, 7 named): Goal Line D. (commish), Game Plan buy, Take it in the Browns, K.'s Wins, QB Sneak C., Otto-matic Win!, N. Before Zod.
+- Manager: user is **"Doge"**, team **#2** (URL team id = 2). **10 teams** (verified 2026-08-28 via live Edge CDP — the FD nation Teams page listed exactly 10 teams; Yahoo Settings confirms "Max Teams: 10"; the earlier "12 teams" claim was incorrect).
+- Known opposing team names (10 observed 08-28, 7 named): "Goal Line D. (commish)", "Game Plan buy", "Take it in the Browns", "K.'s Wins", "QB Sneak C.", "Otto-matic Win!", "N. Before Zod".
+  *Manager first names are deliberately REDUCED TO INITIALS here. This repo is public
+  (it was made public on 2026-08-31), and these are other people's real names — don't
+  restore them. The bot picks best-player-available and is slot-agnostic, so it never
+  needs to know who runs which team.*
 - Format: Head-to-Head, **.5 PPR** (Receptions = 0.5), fractional points ON, negative points ON.
 - Roster: 1 QB, 2 WR, 2 RB, 1 TE, 1 W/R/T (flex), 1 K, 1 DEF, 6 BN, 2 IR (15 active + 2 IR).
 - Draft: **Live Standard snake**, 15 rounds, **1 minute per pick**, scheduled **Tue Sep 1 2026, 5:00pm EDT** (= 2026-09-02 06:00 JST on this machine). *Corrected 2026-08-28 from the live Yahoo tab — repo had Aug 28; actual draft is Sep 1.*
