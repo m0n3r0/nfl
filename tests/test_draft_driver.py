@@ -292,11 +292,64 @@ def test_normalize_available_maps_def_code_to_board_name():
         ["Jahmyr Gibbs", "DET", "RB", "Jahmyr Gibbs DET - RB ADP 1.5"],
         ["A.J. Brown", "NE", "WR", "A.J. Brown NE - WR ADP 25.0"],
     ]
-    names, adp_map = dd.normalize_available(raw)
+    names, adp_map, pos_map = dd.normalize_available(raw)
     assert names == ["Rams", "Jahmyr Gibbs", "A.J. Brown"], names
     assert adp_map["rams"] == 12.5
     assert adp_map["jahmyr gibbs"] == 1.5
     assert adp_map["a.j. brown"] == 25.0
+    # pos_map drives the off-board fallback's slot awareness
+    assert pos_map["rams"] == "DEF"
+    assert pos_map["jahmyr gibbs"] == "RB"
+
+
+def test_normalize_available_uses_supplied_def_map():
+    """Issue #10: the DEF map must come from the ACTIVE board, not the static
+    BOARD tuple -- otherwise defenses that only exist on the original nflverse
+    board (BAL/CHI/KC/LAC/TB) can never be drafted."""
+    raw = [["Baltimore Ravens", "BAL", "DEF", "Baltimore Ravens BAL - DEF ADP 90.0"]]
+    # Static BOARD has no BAL entry, so the default map leaves it unresolved.
+    names, _, _ = dd.normalize_available(raw)
+    assert names == ["Baltimore Ravens"], names
+    # Passing the active board's map resolves it.
+    active = {"BAL": "Ravens", "CHI": "Bears"}
+    names, _, _ = dd.normalize_available(raw, def_map=active)
+    assert names == ["Ravens"], names
+
+
+def test_choose_pick_falls_back_off_board_instead_of_none():
+    """Issue #11: a board with no available candidate must still yield a pick,
+    preferring a slot we still need, rather than returning None (which stalls
+    run_draft until Yahoo auto-drafts our slot)."""
+    board = {"Rams": {"name": "Rams", "team": "LAR", "pos": "DEF",
+                      "adp": None, "ecr": None, "value": 6.0}}
+    # Nothing on our board is available; Yahoo is showing assorted players.
+    available = ["Some Kicker", "Some RB", "Another WR"]
+    pos_map = {"some kicker": "K", "some rb": "RB", "another wr": "WR"}
+    adp_map = {"some kicker": 150.0, "some rb": 40.0, "another wr": 60.0}
+
+    # Every slot filled except K, round 14 (K/DEF window open): take the kicker
+    # even though the RB has a better (lower) ADP, because we NEED the slot.
+    need_k = {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "DEF": 1}
+    pick = dd.choose_pick(available, need_k, 14, board,
+                          adp_map=adp_map, pos_map=pos_map)
+    assert pick is not None, "must fall back, not return None"
+    assert pick[0] == "Some Kicker", pick
+
+    # Mid-draft with every slot filled: take the best (lowest) ADP available.
+    drafted = {"QB": 1, "RB": 2, "WR": 2, "TE": 1}
+    pick = dd.choose_pick(available, drafted, 5, board,
+                          adp_map=adp_map, pos_map=pos_map)
+    assert pick is not None
+    assert pick[0] == "Some RB", pick   # lowest ADP among timing-legal names
+
+    # Timing guards still hold in the fallback: a K is not draftable in round 5.
+    pick = dd.choose_pick(["Some Kicker"], {"QB": 1, "RB": 2, "WR": 2, "TE": 1},
+                          5, board, adp_map={"some kicker": 150.0},
+                          pos_map={"some kicker": "K"})
+    assert pick is None, "K must not be drafted before its window even in fallback"
+
+    # Genuinely nothing available -> None (nothing we can do).
+    assert dd.choose_pick([], {}, 5, board, adp_map={}, pos_map={}) is None
 
 
 def test_board_has_enough_candidates_per_required_position():
