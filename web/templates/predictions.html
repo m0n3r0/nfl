@@ -9,9 +9,14 @@
   </select>
   <button type="submit">Go</button>
 </form>
-<p class="muted">Home win probability from 2025 team efficiency (EPA differential). Analytical only — not a betting system.</p>
+<p class="muted">Home win probability from the calibrated model, using as-of-week team
+efficiency. <code>with_spread</code> rows also use the published Vegas line (more accurate,
+but largely tracks it); <code>no_spread</code> rows are EPA and rest only. Analytical
+only — not a betting system.</p>
+{% if not predictions %}<p class="notice"><b>No data:</b> no computable weeks. Before the
+season starts only week 1 is available — later weeks need in-season play-by-play.</p>{% endif %}
 <table>
-  <tr><th>Week</th><th>Home</th><th>Away</th><th>Home win %</th><th>EPA diff</th><th>TO diff</th></tr>
+  <tr><th>Week</th><th>Home</th><th>Away</th><th>Home win %</th><th>EPA diff</th><th>Spread</th><th>Model</th></tr>
   {% for g in predictions %}
   <tr>
     <td>{{ g.week }}</td><td><b>{{ g.home_team }}</b></td><td>{{ g.away_team }}</td>
@@ -19,7 +24,9 @@
       <div class="bar" style="width:120px"><span style="width:{{ (g.home_win_prob*100)|round }}%"></span></div>
       {{ (g.home_win_prob*100)|round(1) }}%
     </td>
-    <td>{{ g.epa_diff }}</td><td>{{ g.to_diff }}</td>
+    <td>{{ g.epa_diff }}</td>
+    <td>{{ g.spread if g.spread is not none else "—" }}</td>
+    <td class="muted">{{ g.model }}</td>
   </tr>
   {% endfor %}
 </table>

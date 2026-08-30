@@ -34,6 +34,69 @@ def test_predict_2026_returns_week1():
     assert (preds["home_win_prob"] <= 1).all()
 
 
+# ---------- issue #18: predict_2026() never used the trained model ----------
+
+
+def test_train_and_predict_share_one_feature_definition():
+    """The inference frame must be built from the training feature columns.
+
+    Issue #18: predict_2026() scored games with a hardcoded
+    `0.5 + 1.2 * epa_diff` -- one hand-tuned number -- while the model was fitted
+    on 14 standardized features. A completely different function, so the
+    published "model" predictions were never model output at all.
+
+    Both paths now go through features.game_feature_row(), and the canonical
+    column list lives in features.py so they cannot drift apart again.
+    """
+    assert model._feature_cols() == list(features.FEATURE_COLS)
+    # game_feature_row() emits exactly the training columns, nothing more/less
+    rt = features.team_ratings_asof(2026, 1).set_index("team")
+    row = features.game_feature_row(rt, "BUF", "MIA", 7, 7)
+    assert row is not None
+    assert set(row) == set(features.FEATURE_COLS)
+    # unknown teams are skipped rather than scored on missing data
+    assert features.game_feature_row(rt, "BUF", "NOPE", 7, 7) is None
+
+
+def test_predict_2026_uses_the_trained_model():
+    """Predictions must come from the fitted pipeline, never the old formula."""
+    preds = model.predict_2026(week=1)
+    assert len(preds) == 16
+    assert set(preds["model"]) <= {"with_spread", "no_spread"}, (
+        f"predictions fell back to the hand-rolled linear formula: "
+        f"{sorted(set(preds['model']))}"
+    )
+    # week-1 2026 spreads are published, so the stronger variant should be used
+    assert (preds["model"] == "with_spread").all()
+    # real probabilities, not the degenerate 0.05/0.95 clipping of the fallback
+    assert preds["home_win_prob"].nunique() > 5
+
+
+def test_future_season_pbp_is_unrated_not_an_error():
+    """A season with no published PBP returns empty instead of raising.
+
+    nflverse answers with a 404 for play_by_play_<season>.csv before that season
+    kicks off. That is a legitimate "no data" state, not a failure: it is what
+    predict_2026() hits for week 2+ and what the /ratings page hits for a future
+    week. Both must degrade gracefully rather than 404/500.
+
+    Passes offline too -- a connection error is caught the same way. Only
+    seasons inside PBP_SEASONS re-raise, so a real download failure during
+    training can never be silently swallowed.
+    """
+    future = max(features.PBP_SEASONS) + 1
+    assert future not in features.PBP_SEASONS
+    rt = features.team_ratings_asof(future, 2, refresh=False)
+    assert rt.empty, f"expected no ratings for unrated season {future}"
+
+
+def test_linear_fallback_is_bounded_and_explicit():
+    """The fallback still exists for a missing artifact, but is bounded."""
+    assert abs(model._linear_fallback(0.0) - 0.5) < 1e-9
+    assert model._linear_fallback(10.0) == 0.95
+    assert model._linear_fallback(-10.0) == 0.05
+
+
 def test_features_asof_no_leakage():
     # week-3 2025 ratings must only use weeks 1-2 (cached; build is fast on cache)
     rt = features.team_ratings_asof(2025, 3, refresh=False)
@@ -104,6 +167,10 @@ if __name__ == "__main__":
     test_evaluation_runs_and_is_honest()
     test_time_series_cv_is_stable()
     test_predict_2026_returns_week1()
+    test_train_and_predict_share_one_feature_definition()
+    test_predict_2026_uses_the_trained_model()
+    test_future_season_pbp_is_unrated_not_an_error()
+    test_linear_fallback_is_bounded_and_explicit()
     test_features_asof_no_leakage()
     test_prior_season_is_strictly_prior()
     test_prior_season_never_returns_future()
