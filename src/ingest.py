@@ -50,6 +50,10 @@ def _corpus_datasets() -> dict[str, tuple[str, str]]:
         f"{_RELEASE_BASE}/depth_charts/depth_charts_{SCHEDULE_SEASON}.csv",
         f"depth_charts_{SCHEDULE_SEASON}.csv",
     )
+    d["draft_picks"] = (
+        f"{_RELEASE_BASE}/draft_picks/draft_picks.csv",
+        "draft_picks.csv",
+    )
     d["injuries"] = (
         f"{_RELEASE_BASE}/injuries/injuries_{STATS_SEASON}.csv",
         f"injuries_{STATS_SEASON}.csv",
@@ -93,6 +97,19 @@ def load_pbp(season: int, refresh: bool = False) -> pd.DataFrame:
     name = f"play_by_play_{season}.csv"
     dest = download_asset("pbp", name, refresh=refresh)
     return pd.read_csv(dest, low_memory=False)
+
+
+def load_draft_picks(season: int | None = None, refresh: bool = False) -> pd.DataFrame:
+    """NFL draft picks 1980-present (nflverse, updated after each real draft).
+
+    Columns include season, round, pick, team, gsis_id, pfr_player_id,
+    position, college, age and career-production/AV columns. Pass ``season``
+    (e.g. 2026) to return just that draft class; the default returns all.
+    """
+    df = pd.read_csv(download("draft_picks", refresh=refresh), low_memory=False)
+    if season is not None:
+        df = df[df["season"] == season].reset_index(drop=True)
+    return df
 
 
 def load_team_stats(season: int, refresh: bool = False) -> pd.DataFrame:
