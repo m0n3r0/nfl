@@ -173,3 +173,17 @@ the parser handles every board name format we know of.
   `find_draft_links.py`). All small read-only CDP probes; safe to keep.
 - WSL crashed again at ~20:30; verified: repo intact at ae09196, tests 24 passed
   (draft suite), deployed driver/board MD5-match, Edge still alive on 9222.
+
+## Headless login + cross-platform tooling (2026-08-30)
+- `tools/login_yahoo.py`: CDP-driven Yahoo login for a fresh headless browser
+  (email → password → 2FA prompt → verify via same-origin team-page fetch).
+  Reads YAHOO_USER/YAHOO_PASSWORD (env or .env) or stdin. Prints
+  ALREADY_LOGGED_IN / LOGGED_IN_OK / CAPTCHA_BLOCKED. **Tested live** against
+  the logged-in Edge: `ALREADY_LOGGED_IN` detected correctly, zero page
+  interaction. Credential prompt is skipped when already logged in.
+- Caveat: Yahoo occasionally serves an interactive captcha to headless mode →
+  then fall back to MAC_SETUP option A (cookie-copy the Windows profile) or C
+  (one-time headful login via Screen Sharing). Option A is preferred because
+  Yahoo auth is cookie-based and the profile transfers directly.
+- `signed_in()` reuses the proven marker (team page fetch 200 + /Doge/i) from
+  tools/check_login.py — plain "sign out" body-text is NOT reliable on Yahoo.
