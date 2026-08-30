@@ -26,6 +26,13 @@ data/processed/
 *.parquet
 *.csv.bz
 
+# --- Live league scrapes: contain personal data, never commit ---
+# These are raw dumps of the logged-in Yahoo league page. They carry the real
+# first names of all ten league managers, the league ID, and a LOGGED_IN_INDICATOR
+# flag. Harmless while the repo was private; this repo is now PUBLIC, so they must
+# stay out. The bot reads them from disk at runtime -- it just must not track them.
+data/scrapes/
+
 # --- Jupyter checkpoints ---
 .ipynb_checkpoints/
 
