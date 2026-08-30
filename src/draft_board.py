@@ -108,6 +108,27 @@ def _skill_board(corpus: dict, preset: str) -> list[dict]:
             continue
         capped.append(row)
         seen[row["pos"]] = n + 1
+    # Rookie-starter carve-out: a 2026 draft-class player holding a clear
+    # starting role (full starter role share) is board-worthy even when his
+    # conservative projection sits below the veteran cutoff. Deep rookies and
+    # backups stay off the board — no noise, no hype spikes.
+    on_board = {(r["name"], r["pos"]) for r in capped}
+    for _, r in proj.iterrows():
+        if not bool(r.get("is_rookie", False)):
+            continue
+        if float(r.get("role_share", 0) or 0) < 0.60:
+            continue
+        if float(r["proj_total"]) < 20.0:
+            continue
+        key = (r["player_display_name"], r["position"])
+        if key in on_board:
+            continue
+        capped.append({
+            "name": r["player_display_name"],
+            "team": r["last_team"], "pos": r["position"],
+            "value": float(r["proj_total"]),
+        })
+        on_board.add(key)
     return capped
 
 

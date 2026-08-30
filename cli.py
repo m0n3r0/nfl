@@ -20,6 +20,7 @@ import argparse
 import sys
 
 from src import ingest, scoring, lineup, corpus, projections, analysis, model, draft_board
+from src.config import SCHEDULE_SEASON
 from src.config import FANTASY_POSITIONS, SCHEDULE_SEASON, STATS_SEASON
 
 
@@ -173,6 +174,32 @@ def cmd_original_board(args) -> int:
     return 0
 
 
+def cmd_draft_class(args) -> int:
+    """Summarize a real NFL draft class (default 2026) from nflverse data."""
+    picks = ingest.load_draft_picks(season=args.season, refresh=args.refresh)
+    players = ingest.load("players")
+    merged = picks.merge(
+        players[["gsis_id", "display_name", "position"]].rename(
+            columns={"position": "roster_position"}
+        ),
+        on="gsis_id", how="left", suffixes=("", "_players")
+    )
+    merged["display_name"] = merged["display_name"].fillna(merged["pfr_player_name"])
+    merged["position"] = merged["position"].fillna(merged["roster_position"])
+    out = merged[["round", "pick", "team", "display_name", "position",
+                  "college", "age", "gsis_id"]].rename(
+        columns={"team": "draft_team", "age": "age_at_draft"}
+    )
+    dest = f"data/processed/draft_class_{args.season}.csv"
+    out.to_csv(dest, index=False)
+    print(f"=== {args.season} NFL draft class: {len(out)} picks -> {dest} ===")
+    print(f"  fantasy-relevant (QB/RB/WR/TE): {len(out[out['position'].isin(['QB', 'RB', 'WR', 'TE'])])}")
+    print("  round 1:")
+    for _, r in out[out["round"] == 1].iterrows():
+        print(f"    {int(r.pick):>2}. {r.display_name} ({r.draft_team} {r.position}, {r.college})")
+    return 0
+
+
 def cmd_predict(args) -> int:
     preds = model.predict_2026(week=args.week)
     title = f"2026" + (f" Week {args.week}" if args.week else " (all weeks)")
@@ -295,6 +322,13 @@ def build_parser() -> argparse.ArgumentParser:
     pob.add_argument("--preset", default="half-ppr",
                      choices=["standard", "ppr", "half-ppr"])
     pob.set_defaults(func=cmd_original_board)
+
+    pdc = sub.add_parser("draft-class",
+                         help="summarize a real NFL draft class (nflverse)")
+    pdc.add_argument("--season", type=int, default=2026)
+    pdc.add_argument("--refresh", action="store_true",
+                     help="re-download draft_picks.csv")
+    pdc.set_defaults(func=cmd_draft_class)
 
     pw = sub.add_parser("web", help="launch the local web UI")
     pw.add_argument("--port", type=int, default=5000)

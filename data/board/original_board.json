@@ -198,14 +198,14 @@
     "value": 219.7
   },
   {
-    "name": "Rashee Rice",
-    "team": "KC",
+    "name": "A.J. Brown",
+    "team": "PHI",
     "pos": "WR",
     "value": 219.1
   },
   {
-    "name": "A.J. Brown",
-    "team": "PHI",
+    "name": "Rashee Rice",
+    "team": "KC",
     "pos": "WR",
     "value": 219.1
   },
@@ -288,27 +288,15 @@
     "value": 190.5
   },
   {
-    "name": "Travis Kelce",
-    "team": "KC",
+    "name": "Brock Bowers",
+    "team": "LV",
     "pos": "TE",
-    "value": 189.7
-  },
-  {
-    "name": "DeVonta Smith",
-    "team": "PHI",
-    "pos": "WR",
-    "value": 189.5
+    "value": 188.4
   },
   {
     "name": "Chris Olave",
     "team": "NO",
     "pos": "WR",
-    "value": 188.4
-  },
-  {
-    "name": "Brock Bowers",
-    "team": "LV",
-    "pos": "TE",
     "value": 188.4
   },
   {
@@ -594,6 +582,12 @@
     "value": 123.0
   },
   {
+    "name": "Kyle Pitts",
+    "team": "ATL",
+    "pos": "TE",
+    "value": 122.3
+  },
+  {
     "name": "Zane Gonzalez",
     "team": "ATL",
     "pos": "K",
@@ -612,34 +606,52 @@
     "value": 108.5
   },
   {
+    "name": "George Pickens",
+    "team": "DAL",
+    "pos": "WR",
+    "value": 91.3
+  },
+  {
+    "name": "Tee Higgins",
+    "team": "CIN",
+    "pos": "WR",
+    "value": 87.2
+  },
+  {
+    "name": "DeVonta Smith",
+    "team": "PHI",
+    "pos": "WR",
+    "value": 78.9
+  },
+  {
     "name": "Malik Washington",
     "team": "MIA",
     "pos": "WR",
     "value": 77.1
   },
   {
-    "name": "Tyreek Hill",
-    "team": "MIA",
-    "pos": "WR",
-    "value": 58.3
-  },
-  {
-    "name": "Gabe Davis",
-    "team": "BUF",
-    "pos": "WR",
-    "value": 32.0
-  },
-  {
-    "name": "Michael Thomas",
-    "team": "NO",
-    "pos": "WR",
-    "value": 27.9
-  },
-  {
-    "name": "Russell Gage",
+    "name": "Chris Godwin Jr.",
     "team": "TB",
     "pos": "WR",
-    "value": 27.3
+    "value": 74.8
+  },
+  {
+    "name": "Jeremiyah Love",
+    "team": "ARI",
+    "pos": "RB",
+    "value": 73.2
+  },
+  {
+    "name": "Jayden Reed",
+    "team": "GB",
+    "pos": "WR",
+    "value": 70.4
+  },
+  {
+    "name": "Carnell Tate",
+    "team": "TEN",
+    "pos": "WR",
+    "value": 65.2
   },
   {
     "name": "Ravens",

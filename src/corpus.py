@@ -86,6 +86,13 @@ def build_depth_roles(season: int = SCHEDULE_SEASON) -> pd.DataFrame:
     'starter' flag (pos_rank == 1) plus a role share estimate.
     """
     dc = ingest.load_depth_charts(season=season)
+    # The nflverse depth-charts file carries every dated snapshot of the
+    # offseason (March -> cutdowns). Keep only each player-slot's LATEST
+    # snapshot so roles reflect the current depth chart, not stale ones.
+    if "dt" in dc.columns:
+        dc = dc.sort_values("dt").drop_duplicates(
+            ["team", "pos_abb", "gsis_id"], keep="last"
+        )
     dc = dc[dc["pos_abb"].isin(SKILL_POSITIONS)].copy()
     dc["pos_rank"] = pd.to_numeric(dc["pos_rank"], errors="coerce")
     dc["starter"] = dc["pos_rank"] == 1

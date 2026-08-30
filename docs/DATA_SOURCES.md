@@ -64,6 +64,7 @@ stats feed. Three real levers, in order of impact:
 | Source | What it gives | Use in this repo |
 | --- | --- | --- |
 | [nflverse-data](https://github.com/nflverse/nflverse-data) | Historical + weekly player/stat data, schedules, rosters | Toolkit ingest/scoring/projections (already used) |
+| [nflverse draft_picks](https://github.com/nflverse/nflverse-data/releases/tag/draft_picks) | Real NFL draft picks 1980-present (round, pick, team, gsis_id, college, age) | `cli.py draft-class`; players.csv `draft_year`/`draft_team` feed the rookie prior in projections |
 | [FantasyPros API](https://www.fantasypros.com/api-data/) — **free key** | Expert Consensus Rankings (ECR) only; ADP/projections gated behind paid tier | **Live value board** (ECR best-player-available; see below) |
 | [FantasyPros Real-Time ADP](https://www.fantasypros.com/nfl/real-time-adp/) — **free, no key** | Live "REAL-TIME" ADP column, from the *same* expert pool as ECR | **Primary ADP source** for `VALUE = ADP − ECR` (scraped from a fresh Edge tab; see below) |
 | [Sleeper](https://sleeper.com) | League host; public player API | Reference (note: `adp` field is null pre-season, so not used live) |
