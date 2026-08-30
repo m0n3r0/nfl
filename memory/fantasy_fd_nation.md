@@ -162,3 +162,14 @@ the parser handles every board name format we know of.
   drafting QBs; real-room opponents take QBs so the board won't dump 4 QBs on us.
 - Remaining pre-draft steps: re-scrape ADP + rebuild board the morning of Sep 1
   (new injuries/cuts), and ensure Edge is open on 9222 at 5pm EDT.
+
+## GAME_PLAN.md completed + tree cleaned (2026-08-30, post-crash)
+- `docs/GAME_PLAN.md` (beginner game plan) finished: Parts 0-6 (60-sec, what-is
+  fantasy, three phases, draft bot + draft-day checklist, waivers, weekly lineup,
+  command cheat-sheet with exact `cli.py` half-ppr commands).
+- Committed session leftovers: `tools/edge_alive.py` (Edge 9222 health check),
+  `tools/back_to_league.py`, `tools/recover_tab.py` (tab recovery), plus ADP-page
+  debug probes (`dbg_headers/lines/trs.py`, `dump_draft_page*.py`,
+  `find_draft_links.py`). All small read-only CDP probes; safe to keep.
+- WSL crashed again at ~20:30; verified: repo intact at ae09196, tests 24 passed
+  (draft suite), deployed driver/board MD5-match, Edge still alive on 9222.
