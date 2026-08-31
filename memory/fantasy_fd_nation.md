@@ -197,3 +197,20 @@ the parser handles every board name format we know of.
   Yahoo auth is cookie-based and the profile transfers directly.
 - `signed_in()` reuses the proven marker (team page fetch 200 + /Doge/i) from
   tools/check_login.py — plain "sign out" body-text is NOT reliable on Yahoo.
+
+## Phase 2 complete (2026-08-31) — deploy drift fixed (#21)
+- All Phase-2 issues (#17 leakage, #18 predict, #19/#20 VOR+scale, #21 deploy drift)
+  are now committed, pushed (github main = c899774), and the driver/board are
+  deployed to `C:\edge-debug-profile\`.
+- **Deploy workflow is now one command:** `powershell -File tools/deploy.ps1`
+  (default DeployDir `C:\edge-debug-profile`). It copies `driver/draft_driver.py` +
+  `data/board/original_board.json`, writes `DEPLOY_SHA.txt` (git SHA), and
+  `Get-FileHash`-verifies both copies so a partial deploy fails loudly.
+- **Drift detection at runtime:** `run_draft()` logs
+  `DEPLOY_GIT_SHA=<sha> FILE_SHA256=<12-char content hash>` at startup, so
+  `draft_log.txt` proves which code actually ran. A stale deploy shows a SHA/SHA256
+  mismatch even when `DEPLOY_SHA.txt` is missing.
+- Reminder: a repo edit is NOT live until `tools/deploy.ps1` has been run and the
+  `OK:` / `DEPLOY_SHA=` lines confirm. Validate before Sep 1 5pm EDT.
+- Fast regression gate: `pytest tests/test_draft_driver.py tests/test_original_board.py
+  tests/test_simulation.py` → 29 passed. Full suite was 47 passed earlier this cycle.
