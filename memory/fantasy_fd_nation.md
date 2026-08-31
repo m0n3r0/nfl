@@ -228,3 +228,23 @@ the parser handles every board name format we know of.
   236e35db0af0904399882542b5ae86b15e4e3abc. Fast gate now 31 passed.
 - Live draft Tue Sep 1 2026 5pm EDT, team #2 "Doge", 10-team .5PPR 15-round snake.
   Nothing blocking remains in the repo before draft time.
+
+## P0 #32 found & fixed via live Edge test (2026-08-31, post-close)
+- After closing #9-#31, a live Edge CDP harness (NEW isolated `file://` tab; the user's
+  logged-in Yahoo tab was never touched) drove the REAL `read_available` /
+  `search_player` / `click_player` / `read_pick_number`. It surfaced **P0 #32**:
+  `read_available()` returned `[]` on every page because #27's raw-string conversion
+  (`r"""..."""`) left the regex escapes doubled — `\\s` in a raw string is two literal
+  backslashes → CDP delivered `\\s` → JS matched literal `\s`, not whitespace. The driver
+  could not see ANY available player → total draft failure on Sep 1. Fixed by
+  single-backslashing the 7 escapes (commit `d1a027c`). Created + closed issue #32 with
+  the fix reference.
+- New harness (the only test that actually runs the parser; unit suite mocks
+  `read_available` away): `tools/test_driver_cdp.py` + `tools/mock_draft_room_40.html`
+  (40-row virtualized DOM window + real search box). Asserts #23a virtualization, #23b
+  off-window search, #23c click-draft, #26 pick-number read + guard. `pytest` fast gate
+  still 31 passed.
+- **Deploy SHA is now `d1a027c461be65d37a0fb6580eb4d28058c6ee02`** (supersedes the
+  236e35d noted above; confirmed via `DEPLOY_SHA.txt` + `Get-FileHash`).
+- `gh issue list --state open` → 0. Repo is fully ready for the Tue Sep 1 2026 5pm EDT
+  draft.

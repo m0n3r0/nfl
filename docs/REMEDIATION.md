@@ -9,11 +9,14 @@ Tracking the 2026-08-31 code review. Every finding is a GitHub issue on
 | 2 | #17, #18, #19, #20, #21 | Correctness: leakage, predict, VOR, scale, deploy | **done** (#17/#18 shipped, #19/#20 + #21 deploy drift fixed this pass) |
 | 3 | #22, #23, #24, #25, #26 | Privacy, robustness, performance, CI | **done** |
 | 4 | #27, #28, #29, #30, #31 | Hygiene, tests, docs | **done** |
+| 5 | #32 | Live-browser P0: `read_available()` dead name-scan | **done** |
 
 Phase 1 (draft-blockers) and Phase 2 (leakage, predict, value scale/VOR, deploy
 drift) are complete and verified by the `tests/test_simulation.py` regression gate.
 Phases 3 (privacy/robustness/performance/CI) and 4 (hygiene/tests/docs) are also
-complete; every issue #9-#31 is now closed. The sections below record what each fix
+complete; every issue #9-#31 is now closed, and a late-found P0 (#32 — a dead
+`read_available()` regex that made the driver blind to every available player, caught
+only by the live Edge CDP test) is fixed too. The sections below record what each fix
 did. A section is marked done only when its code has landed and is verified by the
 regression gate (`tools/simulate_draft.py` / `tests/test_simulation.py`).
 
@@ -415,3 +418,43 @@ pass.
   has landed.
 - Tests section: list all five test files.
 - `.gitignore`: remove the duplicate `__pycache__/` entry.
+
+---
+
+## Phase 5 — live-browser P0 (done)
+
+### #32 `read_available()` returned `[]` on every page — **fixed** (d1a027c)
+
+A live Edge CDP test — a **new isolated `file://` tab** driving the real
+`read_available` / `search_player` / `click_player` / `read_pick_number` code (the
+user's logged-in Yahoo tab was never touched) — surfaced a production-blocking bug no
+unit test had exercised: `read_available()` returned an empty list for the mock room
+even though 40 rows were rendered with text like `Aaron Adams NE - RB`.
+
+**Root cause:** #27's raw-string conversion (`r"""..."""`) left the regex escapes
+*double-counted*. Inside a raw string `r"\\s"` is two literal backslashes, so CDP
+delivered `\\s` to the browser; JS parsed that as an escaped backslash + `s`, matching
+the *literal text* `\s`, not whitespace. `innerText.replace(/\\s+/g,' ')` never stripped
+whitespace and the name regex never matched → `read_available` returned `[]` for
+**every** page. In production the driver therefore could not see ANY available player
+and would never make a pick — a total draft failure on Sep 1.
+
+**Fix:** single-backslash the 7 escapes in `read_available()`'s JS (`\\s`→`\s` ×5,
+`\\w`→`\w` ×2). After the fix the CDP harness returns 40 rows and the deep off-window
+target is surfaced and drafted via `search_player`.
+
+**Regression + guard against recurrence:**
+- `tools/mock_draft_room_40.html` (new): Yahoo-style 60-player room with a 40-row
+  virtualized DOM window and a real `<input type=search>` box — the exact surface
+  `search_player` relies on. Exposes `window.MockDraft` (load / setTurn / domNames /
+  drafted / clear).
+- `tools/test_driver_cdp.py` (new): opens a **new isolated** Edge tab on 9222, drives
+  the real driver functions, and asserts #23a (virtualization: ≤40 rows, deep target
+  off-window), #23b (off-window search surfaces the deep target), #23c (click drafts
+  it), and #26 (pick-number read + guard). The user's live Yahoo tab is never touched.
+- `tests/test_draft_driver.py`: two `run_draft`-driven regression tests assert the
+  off-window `search_player` fires exactly once and on-window targets skip it.
+
+This is the bug the unit suite missed because it mocks `read_available` away — the CDP
+harness is the only test that actually runs the parser. Created and closed #32 with the
+fix reference; `gh issue list --state open` → 0.
