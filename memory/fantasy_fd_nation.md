@@ -267,3 +267,10 @@ the parser handles every board name format we know of.
   our picks. Josh Allen (board `adp: 20.0` ≈ round 2) will NOT be available at our R10 —
   our realistic QB is a later-tier player taken at R10, not Allen. The earlier naive greedy
   mistakenly listed Allen at R10 because it ignored opponent drafts. Don't promise Allen.
+- **OPEN (2026-08-31): user questioned whether the league is 2-QB, not 1-QB.** All strategy
+  (wait on QB until R10, bot anchors) assumes 1 QB. If it's actually 2-QB, the whole
+  approach is wrong and the bot's anchors must change. The roster is recorded as 1 QB
+  (verified 2026-08-20 via live Edge CDP), but live re-verification was BLOCKED this session
+  — the sandbox intercepts browser egress to external sites and CDP interaction with the live
+  Yahoo session. Needs the user to confirm in Yahoo → League → Settings → Starting Lineup
+  (shows "Quarterbacks (QB): 1" or "2"). Act on confirmation.
