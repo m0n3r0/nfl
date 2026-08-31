@@ -565,6 +565,72 @@ def ev(ws,expr):
         o=json.loads(ws.recv())
         if o.get("id")==wid: return o.get("result",{}).get("result",{}).get("value")
 
+# ---- CDP resilience (#38) ------------------------------------------------
+# DOM reads can fail transiently: Yahoo may be slow to render, the websocket
+# may drop a frame, or the page may be mid-navigation. Retry with exponential
+# backoff before giving up, and capture a screenshot on final failure for
+# post-mortem debugging.
+
+DOM_RETRIES = 3
+DOM_BACKOFF_BASE = 1.5  # seconds; doubles each retry
+
+def _ev_retry(ws, expr, what="dom read"):
+    """Call ev() with retry + exponential backoff. On final failure, capture
+    a CDP screenshot for post-mortem and re-raise. Does NOT change the return
+    value — this is purely a resilience wrapper around the transport."""
+    last_err = None
+    for attempt in range(1, DOM_RETRIES + 1):
+        try:
+            result = ev(ws, expr)
+            if result is not None:
+                return result
+            # None is a valid return for some expressions (e.g. void functions);
+            # only treat it as a failure for reads that expect data.
+            return result
+        except (websocket.WebSocketException, ConnectionError, OSError,
+                json.JSONDecodeError, KeyError) as e:
+            last_err = e
+            wait = DOM_BACKOFF_BASE ** attempt
+            log("DOM_RETRY %s attempt %d/%d failed (%s) — retrying in %.1fs"
+                % (what, attempt, DOM_RETRIES, repr(e)[:80], wait))
+            time.sleep(wait)
+    # All retries exhausted: capture a screenshot for post-mortem, then raise.
+    try:
+        _cdp_screenshot(ws, what)
+    except Exception:
+        pass
+    raise last_err  # type: ignore[misc]
+
+
+def _cdp_screenshot(ws, context="failure"):
+    """Capture a PNG screenshot via CDP Page.captureScreenshot and save it
+    to the draft log directory. Best-effort: a screenshot failure is logged
+    but never masks the original error."""
+    try:
+        wid = random.randint(100, 99999)
+        ws.send(json.dumps({"id": wid, "method": "Page.captureScreenshot",
+                            "params": {"format": "png"}}))
+        deadline = time.time() + 5
+        while time.time() < deadline:
+            o = json.loads(ws.recv())
+            if o.get("id") == wid:
+                data = o.get("result", {}).get("result", {}).get("data")
+                if data:
+                    import base64
+                    png = base64.b64decode(data)
+                    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                    path = os.path.join(os.path.dirname(LOG),
+                                        f"cdp_fail_{context}_{ts}.png")
+                    with open(path, "wb") as f:
+                        f.write(png)
+                    log("SCREENSHOT saved %s (%d bytes)" % (path, len(png)))
+                return
+    except Exception as e:
+        log("SCREENSHOT failed: %s" % repr(e))
+
+
+# ---- end CDP resilience (#38) --------------------------------------------
+
 def navigate(ws,url):
     wid=random.randint(100,99999)
     ws.send(json.dumps({"id":wid,"method":"Page.navigate","params":{"url":url}}))
@@ -603,7 +669,7 @@ def read_available(ws):
     # Name-based scan (Yahoo player rows hold the name in a cell, NOT inside the
     # /nfl/players/ anchor which only wraps an icon). Return [name, row_text] so
     # the caller can also pull Yahoo ADP (Average Draft Position) from the row.
-    return ev(ws,r"""(function(){
+    return _ev_retry(ws,r"""(function(){
       var out=[];
       var seen={};
       var rows=document.querySelectorAll('tr, li');
@@ -689,7 +755,7 @@ def normalize_available(raw, def_map=None):
     return names, adp_map, pos_map
 
 def is_my_pick(ws):
-    return ev(ws,"""(function(){
+    return _ev_retry(ws,"""(function(){
       var b=document.body?document.body.innerText.toUpperCase():'';
       if(/YOUR TURN|ON THE CLOCK/.test(b)) return true;
       var btns=document.querySelectorAll('button');
