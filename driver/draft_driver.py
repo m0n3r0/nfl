@@ -6,7 +6,8 @@ Guarantees a legal lineup: required slots (QB,2RB,2WR,TE,K,DEF) filled by
 their deadlines, bench (6 BN) filled with best available afterwards.
 All decisions logged to C:\\edge-debug-profile\\draft_log.txt
 """
-import json, os, re, urllib.request, websocket, time, random, math, sys, io, datetime
+import json, os, re, urllib.request, websocket, time, random, math, sys, io, datetime, hashlib
+from pathlib import Path
 
 CDP = "http://127.0.0.1:9222"
 LEAGUE = "1329011"
@@ -197,6 +198,38 @@ def log(s):
     with io.open(LOG,"a",encoding="utf-8") as f:
         f.write(line+"\n")
     print(line)
+
+def _driver_sha256():
+    """Content fingerprint of this driver file (drift detection).
+
+    Two deployed copies with different bytes hash differently, so a stale deploy
+    shows up in the draft log even though the deployed copy has no .git to query.
+    """
+    try:
+        h = hashlib.sha256()
+        with open(Path(__file__).resolve(), "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                h.update(chunk)
+        return h.hexdigest()[:12]
+    except OSError:
+        return "unknown"
+
+
+def log_deploy_identity():
+    """Stamp which code is actually running, so a stale deploy is visible (issue #21).
+
+    We log (a) the git SHA written next to this file by tools/deploy.ps1, and
+    (b) a content hash of the file itself, which catches drift even when the
+    sidecar is missing. A deploy step that copies a new driver must also refresh
+    DEPLOY_SHA.txt, or the SHA will disagree with the running file.
+    """
+    sha_file = Path(__file__).resolve().parent / "DEPLOY_SHA.txt"
+    git_sha = "unknown"
+    try:
+        git_sha = sha_file.read_text(encoding="utf-8").strip() or "unknown"
+    except OSError:
+        pass
+    log("DEPLOY_GIT_SHA=%s FILE_SHA256=%s" % (git_sha, _driver_sha256()))
 
 def http_get(path):
     with urllib.request.urlopen(CDP+path,timeout=8) as r:
@@ -933,6 +966,7 @@ def _confirm_pick(ws, name, timeout=8):
 
 def run_draft():
     log("DRAFT_DRIVER_START team="+TEAM_ID)
+    log_deploy_identity()
     ws=connect()
     navigate(ws,"https://football.fantasysports.yahoo.com/f1/%s/draft"%LEAGUE)
     # Guard: confirm we're on the FD nation / Doge draft before any click. A clear
