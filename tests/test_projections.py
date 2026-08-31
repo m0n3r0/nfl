@@ -9,12 +9,17 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src import corpus, projections, analysis  # noqa: E402
 from src.config import STATS_SEASON  # noqa: E402
+
+# Runs against the real cached nflverse corpus -> slow. CI nightly, not every push.
+# See issue #25.
+pytestmark = pytest.mark.slow
 
 
 def _corpus():

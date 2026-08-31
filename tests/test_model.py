@@ -3,10 +3,16 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src import model, features  # noqa: E402
+
+# Loads the ~95 MB PBP corpus -> slow. Run in CI nightly, not on every push.
+# See issue #25.
+pytestmark = pytest.mark.slow
 
 
 def test_evaluation_runs_and_is_honest():

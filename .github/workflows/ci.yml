@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Nightly full-suite run (the data-backed "slow" tests need the ~95 MB corpus).
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  fast:
+    name: Fast tests (hermetic)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run fast (not slow) tests
+        run: pytest -m "not slow" -q
+
+  full:
+    name: Full suite (with corpus)
+    runs-on: ubuntu-latest
+    # Only the scheduled/nightly run or an explicit [full-ci] commit tag kicks
+    # this off, so a normal push stays fast.
+    if: >-
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.head_commit.message, '[full-ci]')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Ingest nflverse corpus (network)
+        run: python cli.py ingest
+      - name: Run full suite
+        run: pytest -q

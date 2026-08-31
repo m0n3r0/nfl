@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 # Make `src` importable when run directly.
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,6 +18,10 @@ sys.path.insert(0, str(ROOT))
 
 from src import ingest, scoring  # noqa: E402
 from src.config import STATS_SEASON  # noqa: E402
+
+# Loads the ~95 MB PBP corpus on every test -> slow. Run in CI nightly, not on
+# every push. See issue #25.
+pytestmark = pytest.mark.slow
 
 
 def test_scoring_reproduces_nflverse():
