@@ -26,6 +26,16 @@ import pandas as pd
 from .config import SKILL_POSITIONS, HISTORY_SEASONS
 from . import corpus as corpus_mod, projections
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+INJURY_GLOB = str(REPO_ROOT / "data" / "raw" / "injuries_*.csv")
+
+# Injury statuses that exclude a player from the draft board entirely.
+# "Out" = confirmed unavailable; "IR" = on injured reserve (season or long-term).
+INJURY_EXCLUDE_STATUSES = {"Out", "IR", "Reserve/Injured", "Reserve/PUP", "Reserve/NFI"}
+# Injury statuses that reduce projection confidence but don't exclude.
+INJURY_PENALTY_STATUSES = {"Doubtful", "Questionable"}
+INJURY_PENALTY_FACTOR = {"Doubtful": 0.60, "Questionable": 0.85}
+
 # Season weights (most recent gets the most say) — mirrors projections.py.
 _SEASON_WEIGHTS = {
     y: w for y, w in zip(HISTORY_SEASONS, [1.0, 1.5, 2.0, 2.5][-len(HISTORY_SEASONS):])
@@ -110,18 +120,63 @@ def _team_col(df: pd.DataFrame) -> str:
     return "recent_team"
 
 
-def _skill_board(corpus: dict, preset: str) -> list[dict]:
+def _load_injury_flags() -> dict[str, str]:
+    """Load the latest injury report status per gsis_id from nflverse injury CSVs.
+
+    Returns {gsis_id: report_status} for the most recent week available.
+    Returns {} if no injury data is present (e.g. fresh install before ingest).
+    """
+    import glob as _glob
+    files = sorted(_glob.glob(INJURY_GLOB))
+    if not files:
+        return {}
+    df = pd.read_csv(files[-1], usecols=["gsis_id", "report_status"], low_memory=False)
+    df = df.dropna(subset=["gsis_id", "report_status"])
+    # keep the last occurrence per player (latest report wins)
+    return dict(zip(df["gsis_id"], df["report_status"]))
+
+
+def _skill_board(corpus: dict, preset: str, injury_flags: dict[str, str] | None = None) -> list[dict]:
     proj = projections.project_players(corpus, preset=preset)
+    if injury_flags is None:
+        injury_flags = _load_injury_flags()
+
+    # Recency filter (#35 follow-up): exclude players who did not appear in
+    # the most recent season's weekly data — UNLESS they are rookies (#83
+    # follow-up). Rookies have no 2025 games because they are new, not
+    # retired. Without this carve-out, the filter removes all 80 rookies
+    # from the board (Jeremiyah Love, Carnell Tate, etc.).
+    weekly = corpus["weekly_history"]
+    recent_ids = set(
+        weekly[weekly["season"] == weekly["season"].max()]["player_id"]
+    )
+    is_rookie = (
+        proj["is_rookie"].fillna(False).astype(bool)
+        if "is_rookie" in proj.columns
+        else pd.Series(False, index=proj.index)
+    )
+    proj = proj[proj["player_id"].isin(recent_ids) | is_rookie]
+
     rows = []
     for _, r in proj.iterrows():
         pos = r["position"]
         if pos not in SKILL_POSITIONS:
             continue
+        # Injury filter (#35): exclude players whose latest report says Out/IR.
+        gsis = str(r.get("player_id", ""))
+        status = injury_flags.get(gsis, "")
+        if status in INJURY_EXCLUDE_STATUSES:
+            continue
+        value = float(r["proj_total"])
+        # Penalize (don't exclude) Questionable/Doubtful players.
+        if status in INJURY_PENALTY_STATUSES:
+            value *= INJURY_PENALTY_FACTOR.get(status, 1.0)
         rows.append({
             "name": r["player_display_name"],
             "team": r["last_team"],
             "pos": pos,
-            "value": float(r["proj_total"]),
+            "value": round(value, 1),
+            "injury": status or None,
         })
     # cap depth per position (keep the highest-projected)
     capped: list[dict] = []
@@ -162,6 +217,11 @@ def _kicker_board(corpus: dict) -> list[dict]:
     k = weekly[weekly["position"].isin(["K", "PK"])].copy()
     if k.shape[0] == 0:
         return []
+    # Recency filter (#35 follow-up): kickers who last played before the
+    # most recent complete season are retired or irrelevant. Without this,
+    # a 2022-only kicker (e.g. Ryan Succop) outranks current starters.
+    latest = k["season"].max()
+    k = k[k["season"] >= latest - 1]
     k["k_pts"] = k.apply(score_kicker_row, axis=1)
     k["w"] = k["season"].map(_SEASON_WEIGHTS)
     k["wp"] = k["k_pts"] * k["w"]
