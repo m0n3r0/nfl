@@ -366,6 +366,27 @@ def _norm_name(full, team=None):
         return base + "|" + team.upper()
     return base
 
+def to_display(full, team=None):
+    """Convert a full board name to Yahoo's draft-room display form ('J. Burrow').
+    Mirrors _norm_name's normalization so DOM searches match whatever abbreviated
+    name Yahoo actually renders. Single-token names (defenses: 'Ravens') pass through."""
+    parts = full.replace("'", "").replace(".", "").split()
+    if parts and re.match(r"^(IV|III|II|I|Jr|SR)$", parts[-1], re.I):
+        parts = parts[:-1]
+    if len(parts) < 2:
+        return full
+    return parts[0][0].upper() + ". " + parts[-1]
+
+# Reverse maps (built once at import) so Yahoo's abbreviated display names
+# ("J. Burrow") resolve to full board names ("Joe Burrow"). _norm_name normalizes
+# BOTH sides to the same 'F. Last|TEAM' key, so this also covers the (unknown)
+# case where Yahoo renders the full name. Discovered 2026-08-31 via a live mock
+# draft: Yahoo's roster/room shows "J. Burrow" while our board keys are "Joe Burrow",
+# which left choose_pick thinking every available player was off-board.
+ABBREV_TO_FULL = {_norm_name(n, t): n for (n, t, p, a) in BOARD}
+ABBREV_TO_FULL_NT = {_norm_name(n, None): n for (n, t, p, a) in BOARD}
+NAME_TO_TEAM = {n: t for (n, t, p, a) in BOARD}
+
 def build_value_board(adp_map=None):
     """Live board: BOARD names annotated with FantasyPros ECR combined with ADP,
     ordered by value. ADP comes from (in priority order):
@@ -609,10 +630,13 @@ def read_available(ws):
       var rows=document.querySelectorAll('tr, li');
       for(var i=0;i<rows.length;i++){
         var t=rows[i].innerText.replace(/\s+/g,' ').trim();
-        // player name pattern: "First Last" (or "First" for team defenses like
-        // "Ravens") followed by "TEAM - POS". The name may be 1-3 words; the
-        // second/third word is optional so single-word defense names parse.
-        var m=t.match(/([A-Z][a-z]+(?:['’]\w+)?(?:\.?[ -][A-Z][a-z]+(?:['’]\w+)?){0,3})(?:\s+(?:I{1,3}|IV|VI{0,3}|Jr|Sr)\.?)?\s+([A-Za-z]{2,4})\s*-\s*(QB|RB|WR|TE|K|DEF|DST)/);
+        // Yahoo renders names abbreviated ("J. Burrow", "A.J. Brown", "C. McCaffrey")
+        // AND full ("Joe Burrow"). Capture the name greedily-but-minimally up to the
+        // "TEAM - POS" code -- the only reliably-structured token -- so BOTH forms
+        // survive intact. The old pattern chopped "J. Burrow" to "Burrow" and
+        // "McCaffrey" to "Caffrey", which broke downstream board matching (issue #32).
+        // An optional leading draft-rank ("12. ") is skipped; defenses ("Ravens") pass.
+        var m=t.match(/^(?:\d+\.?\s*)?(.*?)\s+([A-Za-z]{2,4})\s*-\s*(QB|RB|WR|TE|K|DEF|DST)/);
         if(m && !seen[m[1]]){ seen[m[1]]=1; out.push([m[1], m[2], m[3], t]); }
       }
       return out.slice(0,40);
@@ -675,11 +699,25 @@ def normalize_available(raw, def_map=None):
     def_map = merged_map
     names, adp_map, pos_map = [], {}, {}
     for row in raw:
-        parts = list(row) + [None, None, None, None]
-        name, code, pos, text = parts[0], parts[1], parts[2], parts[3]
+        # Re-extract code/pos from the row text rather than trusting the exact field
+        # ordering returned by read_available()'s JS push (it omits the position group).
+        text = (list(row) + [None, None, None, None])[3]
+        name = (list(row) + [None, None, None, None])[0]
+        m = re.search(r"\b([A-Za-z]{2,4})\s*-\s*(QB|RB|WR|TE|K|DEF|DST)", text or "")
+        code = m.group(1) if m else None
+        pos = m.group(2).upper() if m else None
         if pos in ("DEF", "DST"):
             name = def_map.get((code or "").upper(), name)
             pos = "DEF"
+        else:
+            # Yahoo renders names abbreviated ("J. Burrow"); map them back to the full
+            # board key ("Joe Burrow") so choose_pick's board matching works. The team
+            # code disambiguates collisions (A.J. Brown NE vs Amon-Ra St. Brown DET).
+            full = ABBREV_TO_FULL.get(_norm_name(name, code))
+            if not full:
+                full = ABBREV_TO_FULL_NT.get(_norm_name(name, None), name)
+            if full:
+                name = full
         names.append(name)
         if pos:
             pos_map[name.lower()] = pos
@@ -933,7 +971,13 @@ def choose_pick(available, drafted, round_num, board, adp_map=None, pos_map=None
 def click_player(ws,name):
     # Robust name-based row finder (Yahoo holds the name in a cell, not in the
     # /nfl/players/ anchor). Climb to the nearest TR/LI, scroll into view, click center.
-    box = ev(ws,"""(function(){
+    # `name` is the full board name ("Joe Burrow") but Yahoo renders it abbreviated
+    # ("J. Burrow"); try BOTH so we match whatever the room actually displays.
+    disp = to_display(name, NAME_TO_TEAM.get(name))
+    candidates = [name, disp]
+    box = None
+    for cand in candidates:
+        box = ev(ws,"""(function(){
       var name=%r;
       var all=document.querySelectorAll('*');
       for(var i=0;i<all.length;i++){
@@ -948,7 +992,9 @@ def click_player(ws,name):
         }
       }
       return null;
-    })()"""%name)
+    })()"""%cand)
+        if box:
+            break
     if not box: return False
     click_at(ws,int(box["x"]),int(box["y"]))
     time.sleep(random.uniform(0.3,0.8))
@@ -957,7 +1003,9 @@ def click_player(ws,name):
     # (ADP / default board order), so the value pick we chose is usually NOT the
     # top row -- clicking the top button would draft the wrong player. Scope the
     # button search to the row that holds the chosen name.
-    btn = ev(ws,"""(function(){
+    btn = None
+    for cand in candidates:
+        btn = ev(ws,"""(function(){
       var name=%r;
       var all=document.querySelectorAll('*');
       var row=null;
@@ -977,7 +1025,9 @@ def click_player(ws,name):
           }
         }
       }
-      return null; })()"""%name)
+      return null; })()"""%cand)
+        if btn:
+            break
     if btn:
         click_at(ws,int(btn["x"]),int(btn["y"]))
         return True
@@ -1011,12 +1061,13 @@ def _confirm_pick(ws, name, timeout=8):
     failure yields False and the caller proceeds (transparent log)."""
     deadline = time.time() + timeout
     low = name.lower()
+    disp = to_display(name, NAME_TO_TEAM.get(name)).lower()
     while time.time() < deadline:
         try:
             if not is_my_pick(ws):
                 av = read_available(ws)
                 names = [r[0].lower() for r in av]
-                if low not in names:
+                if low not in names and disp not in names:
                     return True
         except Exception:
             pass

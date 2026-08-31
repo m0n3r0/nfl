@@ -162,13 +162,19 @@ def fmt_player(r):
 
 def main():
     write = "--write" in sys.argv
+    team = OUR_TEAM
+    if "--team" in sys.argv:
+        team = int(sys.argv[sys.argv.index("--team") + 1])
+    out = "docs/DRAFT_CHEAT_SHEET.md"
+    if "--out" in sys.argv:
+        out = sys.argv[sys.argv.index("--out") + 1]
     board = load_board()
     by = rank_by_pos(board)
-    picks = our_pick_numbers(OUR_TEAM, N_TEAMS, ROUNDS)
-    suggested = simulate(board, OUR_TEAM, N_TEAMS, ROUNDS)
+    picks = our_pick_numbers(team, N_TEAMS, ROUNDS)
+    suggested = simulate(board, team, N_TEAMS, ROUNDS)
 
     L = []
-    L.append("# FD nation — Manual Draft Cheat Sheet (team #2 \"Doge\")")
+    L.append(f"# FD nation — Manual Draft Cheat Sheet (team #{team} \"Doge\")")
     L.append("")
     L.append(f"_Generated {datetime.datetime.now():%Y-%m-%d %H:%M} from "
              f"`data/board/original_board.json` ({len(board)} players). "
@@ -211,9 +217,9 @@ def main():
 
     text = "\n".join(L) + "\n"
     if write:
-        with open("docs/DRAFT_CHEAT_SHEET.md", "w") as f:
+        with open(out, "w") as f:
             f.write(text)
-        print("wrote docs/DRAFT_CHEAT_SHEET.md")
+        print(f"wrote {out}")
     else:
         print(text)
 

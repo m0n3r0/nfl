@@ -37,8 +37,20 @@
   //    mechanism driver.search_player() relies on to surface an off-window target.
   //  - Drafted players render as <div> (not <li>) so they leave the available scan.
   window.MockDraft = (function () {
-    var all = [], drafted = [], query = "";
+    var all = [], drafted = [], query = "", abbrev = false;
     var WINDOW = 40;
+
+    // Mirror driver.to_display(): full board name -> Yahoo's draft-room form
+    // ("J. Burrow"). Used only when abbrev mode is on, to reproduce the exact
+    // DOM rendering that broke name matching (issue #32).
+    function abbrevName(full) {
+      var parts = full.replace(/'/g, "").replace(/\./g, "").split(/\s+/);
+      if (parts.length && /^(IV|III|II|I|Jr|SR)$/i.test(parts[parts.length - 1])) {
+        parts = parts.slice(0, -1);
+      }
+      if (parts.length < 2) return full;
+      return parts[0][0].toUpperCase() + ". " + parts[parts.length - 1];
+    }
 
     function visible() {
       if (query) {
@@ -55,7 +67,9 @@
         var li = document.createElement("li");
         var span = document.createElement("span");
         span.className = "nm";
-        span.textContent = p.name + " " + p.team + " - " + p.pos;
+        var label = abbrev ? (abbrevName(p.name) + " " + p.team + " - " + p.pos)
+                           : (p.name + " " + p.team + " - " + p.pos);
+        span.textContent = label;
         var btn = document.createElement("button");
         btn.className = "draft-btn";
         btn.textContent = "Draft";
@@ -90,6 +104,7 @@
 
     return {
       load: function (list) { all = list.slice(); drafted = []; query = ""; inp.value = ""; setTurn(false); render(); },
+      setAbbrev: function (on) { abbrev = !!on; render(); },
       setTurn: setTurn,
       drafted: function () { return drafted.slice(); },
       domNames: function () {

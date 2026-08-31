@@ -1,4 +1,4 @@
-# FD nation — Manual Draft Cheat Sheet (team #2 "Doge")
+# FD nation — Manual Draft Cheat Sheet (team #1 "Doge")
 
 _Generated 2026-08-31 15:25 from `data/board/original_board.json` (250 players). Re-run `tools/gen_cheat_sheet.py --write` after the morning-of ADP re-scrape to refresh._
 
@@ -6,41 +6,41 @@ _Generated 2026-08-31 15:25 from `data/board/original_board.json` (250 players).
 
 | Round | Overall pick | Approx. clock |
 |---|---|---|
-| 1 | 2 | 17:01 EDT |
-| 2 | 19 | 17:18 EDT |
-| 3 | 22 | 17:21 EDT |
-| 4 | 39 | 17:38 EDT |
-| 5 | 42 | 17:41 EDT |
-| 6 | 59 | 17:58 EDT |
-| 7 | 62 | 18:01 EDT |
-| 8 | 79 | 18:18 EDT |
-| 9 | 82 | 18:21 EDT |
-| 10 | 99 | 18:38 EDT |
-| 11 | 102 | 18:41 EDT |
-| 12 | 119 | 18:58 EDT |
-| 13 | 122 | 19:01 EDT |
-| 14 | 139 | 19:18 EDT |
-| 15 | 142 | 19:21 EDT |
+| 1 | 1 | 17:00 EDT |
+| 2 | 20 | 17:19 EDT |
+| 3 | 21 | 17:20 EDT |
+| 4 | 40 | 17:39 EDT |
+| 5 | 41 | 17:40 EDT |
+| 6 | 60 | 17:59 EDT |
+| 7 | 61 | 18:00 EDT |
+| 8 | 80 | 18:19 EDT |
+| 9 | 81 | 18:20 EDT |
+| 10 | 100 | 18:39 EDT |
+| 11 | 101 | 18:40 EDT |
+| 12 | 120 | 18:59 EDT |
+| 13 | 121 | 19:00 EDT |
+| 14 | 140 | 19:19 EDT |
+| 15 | 141 | 19:20 EDT |
 
 ## Suggested pick by round (GUIDE — draft best available that fits your needs)
 
 | R | Overall | Player | Role |
 |---|---|---|---|
-| 1 | 2 | Christian McCaffrey (SF - RB) val 351 | starter |
-| 2 | 19 | Kyren Williams (LA - RB) val 255 | starter |
-| 3 | 22 | Mike Evans (TB - WR) val 221 | starter |
-| 4 | 39 | Rashee Rice (KC - WR) val 219 | starter |
-| 5 | 42 | George Kittle (SF - TE) val 195 | starter |
-| 6 | 59 | Brian Thomas Jr. (JAX - WR) val 175 | bench/flex |
-| 7 | 62 | David Montgomery (DET - RB) val 199 | bench/flex |
-| 8 | 79 | Garrett Wilson (NYJ - WR) val 174 | bench/flex |
-| 9 | 82 | Rhamondre Stevenson (NE - RB) val 190 | bench/flex |
-| 10 | 99 | Tyler Shough (NO - QB) val 213 | starter |
-| 11 | 102 | Tetairoa McMillan (CAR - WR) val 167 | bench/flex |
-| 12 | 119 | Jacory Croskey-Merritt (WAS - RB) val 130 | bench/flex |
-| 13 | 122 | Alec Pierce (IND - WR) val 130 | bench/flex |
-| 14 | 139 | Ryan Succop (TB - K) val 109 | starter |
-| 15 | 142 | Broncos (DEN - DEF) val 73 | starter |
+| 1 | 1 | Christian McCaffrey (SF - RB) val 351 | starter |
+| 2 | 20 | Kyren Williams (LA - RB) val 255 | starter |
+| 3 | 21 | Mike Evans (TB - WR) val 221 | starter |
+| 4 | 40 | Malik Nabers (NYG - WR) val 201 | starter |
+| 5 | 41 | George Kittle (SF - TE) val 195 | starter |
+| 6 | 60 | Brian Thomas Jr. (JAX - WR) val 175 | bench/flex |
+| 7 | 61 | David Montgomery (DET - RB) val 199 | bench/flex |
+| 8 | 80 | Garrett Wilson (NYJ - WR) val 174 | bench/flex |
+| 9 | 81 | Rhamondre Stevenson (NE - RB) val 190 | bench/flex |
+| 10 | 100 | Deshaun Watson (CLE - QB) val 202 | starter |
+| 11 | 101 | Tetairoa McMillan (CAR - WR) val 167 | bench/flex |
+| 12 | 120 | Jacory Croskey-Merritt (WAS - RB) val 130 | bench/flex |
+| 13 | 121 | Jerry Jeudy (CLE - WR) val 132 | bench/flex |
+| 14 | 140 | Harrison Butker (KC - K) val 109 | starter |
+| 15 | 141 | Broncos (DEN - DEF) val 73 | starter |
 
 ## Anchor rules (same as the bot)
 - Rounds 1-5: take RB/WR. Anchor **2nd RB by R5**, **WR by R5/R9**.

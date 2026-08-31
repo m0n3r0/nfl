@@ -270,6 +270,24 @@ the parser handles every board name format we know of.
 - **RESOLVED (2026-08-31): confirmed 1-QB league.** User pasted the live Settings → Roster
   Positions: `QB, WR, WR, RB, RB, TE, W/R/T, K, DEF, BN×6, IR×2` — exactly **one** QB slot.
   Matches the recorded roster (verified 2026-08-20 live CDP) and confirms the wait-on-QB-
-  until-R10 strategy and all bot anchors are correct. **No change needed.** (The live
-  re-verification block — sandbox intercepts external browser egress / CDP-to-Yahoo — remains
-  a known limitation for future live checks, but the user's pasted settings resolved it.)
+  until-R10 strategy and all bot anchors are correct. **No change needed.** (CORRECTION 2026-08-31
+  evening: the earlier 'sandbox blocks CDP-to-Yahoo' note is OVERTURNED — a read-only CDP attach
+  to the live Yahoo tab succeeded, proving the live session is controllable from PowerShell/CDP.
+  Only `Target.createTarget`-to-external-URL and `/json/new` are blocked; the driver's
+  `connect()` attaches to an existing tab, so it's unaffected.)
+
+## P0 Yahoo name-abbreviation bug — fixed 2026-08-31 (pre-draft)
+Yahoo's draft room/roster render names abbreviated ("J. Burrow", "C. McCaffrey", "A.J. Brown")
+while our board keys are full ("Joe Burrow"). Two-part fix in `driver/draft_driver.py`:
+1. `read_available()`'s name regex was corrupting abbreviated names BEFORE normalize ran
+   ("J. Burrow"->"Burrow", "McCaffrey"->"Caffrey"), so the resolution maps never triggered.
+   Replaced with `^(?:\d+\.?\s*)?(.*?)\s+([A-Za-z]{2,4})\s*-\s*(POS)` — captures the name up
+   to the "TEAM - POS" code (optionally skipping a leading rank "12. "), so BOTH abbreviated
+   and full forms survive intact.
+2. `to_display()` + `ABBREV_TO_FULL`/`ABBREV_TO_FULL_NT`/`NAME_TO_TEAM` reverse maps added;
+   `normalize_available()` resolves abbreviated -> full (team-code disambiguated);
+   `click_player()` and `_confirm_pick()` try BOTH full + display names.
+Verified: `tools/_test_abbrev.py` (regex + map asserts) and a new `tools/test_driver_cdp.py`
+#32 case drive the REAL driver against a Yahoo-style mock in abbreviated mode — read ->
+normalize -> click all succeed. Deployed to `C:\edge-debug-profile\` (DEPLOY_SHA == HEAD).
+This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
