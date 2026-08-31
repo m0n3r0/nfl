@@ -6,13 +6,13 @@ Tracking the 2026-08-31 code review. Every finding is a GitHub issue on
 | Phase | Issues | Theme | Status |
 |---|---|---|---|
 | 1 | #9, #10, #11 | Draft-blocking: board size, DEF map, no-pick stall | **done** |
-| 2 | #17, #18, #19, #20, #21 | Correctness: leakage, predict, VOR, scale, deploy | **in progress** (#17/#18 shipped, #19/#20 done this pass; #21 open) |
+| 2 | #17, #18, #19, #20, #21 | Correctness: leakage, predict, VOR, scale, deploy | **done** (#17/#18 shipped, #19/#20 + #21 deploy drift fixed this pass) |
 | 3 | #22, #23, #24, #25, #26 | Privacy, robustness, performance, CI | not started |
 | 4 | #27, #28, #29, #30, #31 | Hygiene, tests, docs | not started |
 
-Phases 2-4 below describe the intended fix. Phase 2 is partially shipped: #17
-(leakage) and #18 (predict) landed in earlier passes; #19/#20 (value scale + VOR)
-landed in this pass; #21 (deploy drift) remains open. Phases 3-4 are still planned.
+Phase 1 (draft-blockers) and Phase 2 (leakage, predict, value scale/VOR, deploy
+drift) are complete and verified by the `tests/test_simulation.py` regression gate.
+The Phase-2 sections below record what each fix did; Phases 3-4 remain planned.
 A section is marked done only when its code has landed and is verified by the
 regression gate (`tools/simulate_draft.py` / `tests/test_simulation.py`).
 
@@ -153,7 +153,7 @@ is now the only copy.
 
 ---
 
-## Phase 2 — correctness (in progress)
+## Phase 2 — correctness (done)
 
 ### #17 Leakage in `team_ratings_asof()` — **fixed**
 
@@ -313,11 +313,25 @@ now drafts for need with per-team position caps (mirroring a real 10-team league
 simulation tests *our* bot. After that fix, a full replay yields the balanced roster above with
 no `NO_VALID_PICK`. Regression: `tests/test_simulation.py`.
 
-### #21 Deploy drift
+### #21 Deploy drift — **fixed**
 
-Planned fix: `tools/deploy.ps1` copies the driver and board to the deploy directory and
-verifies both with `Get-FileHash`. The driver stamps its git SHA at startup so a stale
-deploy is visible.
+The deployed copy (default `C:\edge-debug-profile`) silently drifted from the repo: a fix
+applied here could easily never reach the copy that actually runs the draft.
+
+- **Verified copy step** (`tools/deploy.ps1`): one command copies `driver/draft_driver.py` and
+  `data/board/original_board.json` into the deploy directory, then `Get-FileHash` checksums both
+  against the sources and throws on a mismatch — so a partial copy fails loudly instead of
+  shipping a half-written driver. It also writes `DEPLOY_SHA.txt` (the current `git rev-parse
+  HEAD`) next to the copies so the running driver knows which commit it came from.
+- **Deploy identity stamp** (`driver/draft_driver.py`): `run_draft()` now calls
+  `log_deploy_identity()` at startup, logging `DEPLOY_GIT_SHA=<sha from DEPLOY_SHA.txt>` and
+  `FILE_SHA256=<12-char content hash of the running file>`. The content hash catches a stale
+  deploy even when the sidecar is missing or out of date, so the draft log proves which code
+  actually ran on every pick.
+
+Workflow now: edit in repo → `powershell -File tools/deploy.ps1` (confirm the `OK:` line and
+`DEPLOY_SHA=`) → start the draft. Both the git SHA and the file fingerprint are visible in
+`draft_log.txt` on every run.
 
 ---
 

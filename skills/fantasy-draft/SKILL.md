@@ -26,16 +26,20 @@ Source of truth in the repo: `C:\nfl-win\driver\draft_driver.py` — it is the *
 copy. Deployed to `C:\edge-debug-profile\draft_driver.py` (also
 /home/eml/draft_driver.py), which is what actually runs.
 
-> **A repo edit is not live until it is copied to the deploy directory.** The driver
-> resolves `original_board.json` next to itself, so copy both files together.
+> **A repo edit is not live until it is deployed.** Use `powershell -File
+> tools/deploy.ps1` — it copies `driver/draft_driver.py` + `data/board/original_board.json`
+> to the deploy dir, writes `DEPLOY_SHA.txt` (git SHA), and `Get-FileHash`-verifies both
+> copies so a partial deploy fails loudly. The driver logs `DEPLOY_GIT_SHA` /
+> `FILE_SHA256` at startup, so `draft_log.txt` proves which code ran.
 
 It:
 1. Connects to Edge 9222 (--remote-allow-origins=* required).
 2. Opens the draft room, polls for "your pick" (team 2).
 3. On your pick: reads available players, chooses highest board player passing
    guardrails:
-   - 10-team RB anchor: soft +8 scarcity premium on RBs still needed, hard force
-     1st RB by R3 / 2nd RB by R5 (ANCHOR_BY_ROUND schedule)
+   - 10-team RB anchor: soft scarcity premium (SCARCITY_FRACTION = 0.10 of the RB
+     value spread) on RBs still needed, hard force 1st RB by R3 / 2nd RB by R5
+     (ANCHOR_BY_ROUND schedule)
    - no QB before round 10
    - K/DEF only last 2 rounds
    - no doubling a filled position slot

@@ -29,9 +29,10 @@ the user mentions fantasy football, their league, the draft, lineup, waivers, or
   patch used only in that legacy mode. Without a crowd signal we forfeit `VALUE = ADP − ECR`
   (crowd-arbitrage); the original engine maximizes our own expected points.
 - 10-team scarcity anchoring: RB is the scarcest position, so the bot (a) adds a
-  soft +8 value premium to RBs we still need (anchors them early despite the
-  crowd's RB inflation) and (b) hard-forces slots by `ANCHOR_BY_ROUND`: 1st RB by
-  R3, 2nd RB by R5, WR by R5/R9, TE by R7, QB by R10, K/DEF by R14.
+  soft scarcity premium (`SCARCITY_FRACTION = {"RB": 0.10}` of the RB value spread)
+  to RBs we still need (anchors them early despite the crowd's RB inflation) and
+  (b) hard-forces slots by `ANCHOR_BY_ROUND`: 1st RB by R3, 2nd RB by R5, WR by
+  R5/R9, TE by R7, QB by R10, K/DEF by R14.
 - BOARD depth: **250 players** (QB 32, RB 60, WR 70, TE 32, K 28, DEF 28) in
   `data/board/original_board.json`, built by `python cli.py original-board`. The board
   must outlast the WHOLE draft, not just the early rounds — 10 teams x 15 rounds = 150
