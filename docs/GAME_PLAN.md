@@ -207,6 +207,13 @@ cd C:\nfl-win
 | Draft board | `cli.py original-board` | Rebuild the board the bot drafts from |
 | Rookies | `cli.py draft-class --season 2026` | Summarize the real 2026 NFL draft class |
 
+> **Draft-morning data refresh (issue #50):** before `original-board`, run
+> `cli.py corpus --refresh` to pull the latest depth charts (post-cutdown
+> waiver moves) and the current-season injuries file. Until nflverse publishes
+> `injuries_2026.csv` (Week 1 practice reports), the board logs a
+> `STALE INJURY DATA` warning and ignores last season's flags on purpose —
+> healthy stars stay on the board.
+
 **Our league is `.5 PPR`** — use `--preset half-ppr` on every scoring command so
 the numbers match the league's actual scoring.
 

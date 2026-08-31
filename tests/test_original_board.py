@@ -15,6 +15,7 @@ from collections import Counter
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -176,6 +177,60 @@ def test_real_board_is_larger_than_the_whole_draft():
         "board has %d players; MIN_BOARD_SIZE is %d so the late rounds "
         "always have candidates left" % (len(board), draft_board.MIN_BOARD_SIZE)
     )
+
+
+# --------------------------------------------------------------------------- #
+# Injury staleness guard (issue #50) — hermetic, monkeypatched injury files
+# --------------------------------------------------------------------------- #
+def _write_injury_csv(tmp_path, season, rows):
+    """rows: list of (gsis_id, report_status)."""
+    path = tmp_path / f"injuries_{season}.csv"
+    df = pd.DataFrame(
+        [dict(season=season, week=1, gsis_id=g, report_status=s) for g, s in rows]
+    )
+    df.to_csv(path, index=False)
+    return path
+
+
+def test_stale_injury_flags_are_ignored(tmp_path, monkeypatch):
+    """Issue #50: last season's final injury reports (e.g. Super Bowl week) must
+    NOT exclude or penalize anyone in the new season. Before this guard, ~194
+    healthy players (Nico Collins, Jayden Daniels, ...) were dropped from the
+    board by 7-month-old Out/IR statuses."""
+    _write_injury_csv(tmp_path, 2025, [("p1", "Out"), ("p2", "Questionable")])
+    monkeypatch.setattr(draft_board, "INJURY_GLOB", str(tmp_path / "injuries_*.csv"))
+    with pytest.warns(UserWarning, match="STALE INJURY DATA"):
+        flags = draft_board._load_injury_flags()
+    assert flags == {}, "stale (previous-season) injury flags must be ignored"
+    board = draft_board.build_original_board(corpus=_synthetic_corpus(), preset="half-ppr")
+    names = {b["name"] for b in board}
+    assert "Josh Allen" in names, "healthy star dropped by a stale Out status"
+    # stale Questionable must not dock value either: compare to a no-flags board
+    cmc = next(b for b in board if b["name"] == "Christian McCaffrey")
+    base = draft_board._skill_board(_synthetic_corpus(), "half-ppr", injury_flags={})
+    base_cmc = next(b for b in base if b["name"] == "Christian McCaffrey")
+    assert cmc["value"] == base_cmc["value"]
+
+
+def test_current_season_injury_flags_still_apply(tmp_path, monkeypatch):
+    """The guard must not neuter the #35 filter for CURRENT-season data:
+    a 2026 Out status still excludes, a 2026 Questionable still penalizes."""
+    _write_injury_csv(tmp_path, 2026, [("p1", "Out"), ("p2", "Questionable")])
+    monkeypatch.setattr(draft_board, "INJURY_GLOB", str(tmp_path / "injuries_*.csv"))
+    flags = draft_board._load_injury_flags()
+    assert flags == {"p1": "Out", "p2": "Questionable"}
+    board = draft_board.build_original_board(corpus=_synthetic_corpus(), preset="half-ppr")
+    names = {b["name"] for b in board}
+    assert "Josh Allen" not in names, "current-season Out must still exclude"
+    cmc = next(b for b in board if b["name"] == "Christian McCaffrey")
+    base = draft_board._skill_board(_synthetic_corpus(), "half-ppr", injury_flags={})
+    base_cmc = next(b for b in base if b["name"] == "Christian McCaffrey")
+    assert cmc["value"] == round(base_cmc["value"] * draft_board.INJURY_PENALTY_FACTOR["Questionable"], 1)
+
+
+def test_no_injury_files_returns_empty(tmp_path, monkeypatch):
+    monkeypatch.setattr(draft_board, "INJURY_GLOB", str(tmp_path / "injuries_*.csv"))
+    assert draft_board._load_injury_flags() == {}
 
 
 # --------------------------------------------------------------------------- #

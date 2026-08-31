@@ -38,11 +38,11 @@ _SEASON_WEIGHTS = {y: w for y, w in zip(HISTORY_SEASONS, [1.0, 1.5, 2.0, 2.5][-l
 _GAMES_FOR_CONFIDENCE = 20.0
 REGULAR_SEASON_GAMES = 17
 
-# Rookie prior: with zero games the regression step yields exactly the position
-# mean; these discounts (applied after the role-share scaling) keep projected
-# rookies below proven veterans unless they hold a clear starting role.
-ROOKIE_DISCOUNT_BY_ROUND = {1: 0.80, 2: 0.65}
-ROOKIE_DISCOUNT_DEFAULT = 0.50
+# Rookie prior: draft capital supplies a modest signal when there is no NFL
+# history.  A first-round starter should not be structurally capped below the
+# position mean; later picks remain conservative.
+ROOKIE_DISCOUNT_BY_ROUND = {1: 1.10, 2: 0.90}
+ROOKIE_DISCOUNT_DEFAULT = 0.75
 
 
 def _position_league_means(weekly: pd.DataFrame) -> pd.DataFrame:
@@ -51,28 +51,30 @@ def _position_league_means(weekly: pd.DataFrame) -> pd.DataFrame:
     return g.groupby("position")["fantasy_points"].mean().rename("pos_mean").reset_index()
 
 
-def project_players(corpus: dict, preset: str = "ppr") -> pd.DataFrame:
+def project_players(corpus: dict) -> pd.DataFrame:
+    """Note: scoring is baked into the corpus at build time (corpus.build
+    scores weekly_history with the preset), so there is no preset arg here."""
     weekly = corpus["weekly_history"]
     roles = corpus["depth_roles"]
     schedule = corpus["schedule_2026"]
     team_def = corpus["team_defense"]
 
     # ---- 1. weighted per-game baseline per player ----
-    weekly = weekly.copy()
+    weekly = weekly.copy().sort_values(["player_id", "season", "week"])
     weekly["w"] = weekly["season"].map(_SEASON_WEIGHTS)
     weekly["wp"] = weekly["fantasy_points"] * weekly["w"]
-    grp = weekly.groupby(["player_id", "player_display_name", "position", "recent_team"])
+    # Group by player, not team.  A mid-career team change must not discard the
+    # player's earlier production when selecting the latest 2026 team role.
+    grp = weekly.groupby(["player_id", "player_display_name", "position"])
     base = grp.agg(
         weighted_ppg=("wp", "sum"),
         weight_sum=("w", "sum"),
-        games=("week", "nunique"),
+        games=("week", "size"),
         last_season=("season", "max"),
-        last_team=("recent_team", lambda s: s.iloc[-1]),
+        last_team=("recent_team", "last"),
+        seasons_played=("season", "nunique"),
     ).reset_index()
     base["baseline_ppg"] = base["weighted_ppg"] / base["weight_sum"]
-    # A player who changed teams appears on multiple rows; keep the most recent
-    # team's row as his 2026 projection (the depth chart drives his 2026 role).
-    base = base.sort_values("last_season").drop_duplicates("player_id", keep="last")
 
     # ---- 2b. rookie prior: draft-class players have no weekly history, so they
     # are absent from `base`. Inject them with games = 0 (confidence 0, so the
@@ -102,7 +104,9 @@ def project_players(corpus: dict, preset: str = "ppr") -> pd.DataFrame:
                 "draft_round": _round.values if hasattr(_round, "values") else _round,
                 "is_rookie": True,
             })], ignore_index=True)
-            base["is_rookie"] = base["is_rookie"].fillna(False)
+    if "is_rookie" not in base.columns:
+        base["is_rookie"] = False
+    base["is_rookie"] = base["is_rookie"].astype("boolean").fillna(False).astype(bool)
 
     # ---- 2. regression to position mean ----
     pos_means = _position_league_means(weekly)
@@ -136,7 +140,11 @@ def project_players(corpus: dict, preset: str = "ppr") -> pd.DataFrame:
     base = base.merge(team_sos, left_on="last_team", right_on="team", how="left")
     base["team_sos"] = base["team_sos"].fillna(0.0)
     base["proj_ppg"] = base["role_ppg"] * (1 + base["team_sos"])
-    base["proj_total"] = (base["proj_ppg"] * REGULAR_SEASON_GAMES).round(1)
+    # Scale totals by observed availability.  The floor keeps a small sample
+    # from becoming a zero-season projection while still pricing in durability.
+    availability = (base["games"] / (17.0 * base["seasons_played"])).clip(upper=1.0)
+    base["expected_games"] = REGULAR_SEASON_GAMES * (0.5 + 0.5 * availability)
+    base["proj_total"] = (base["proj_ppg"] * base["expected_games"]).round(1)
     base["proj_ppg"] = base["proj_ppg"].round(2)
 
     if "draft_round" not in base.columns:
@@ -146,16 +154,16 @@ def project_players(corpus: dict, preset: str = "ppr") -> pd.DataFrame:
     out = base[[
         "player_id", "player_display_name", "position", "last_team",
         "games", "baseline_ppg", "pos_mean", "role_share", "team_sos",
-        "proj_ppg", "proj_total", "draft_round", "is_rookie",
+        "expected_games", "proj_ppg", "proj_total", "draft_round", "is_rookie",
     ]].copy()
     out = out.sort_values("proj_total", ascending=False).reset_index(drop=True)
     out.insert(0, "rank", out.index + 1)
     return out
 
 
-def project_for_week(corpus: dict, week: int, preset: str = "ppr") -> pd.DataFrame:
+def project_for_week(corpus: dict, week: int) -> pd.DataFrame:
     """Projected fantasy points for a specific 2026 week (uses that week's SOS)."""
-    proj = project_players(corpus, preset=preset)
+    proj = project_players(corpus)
     schedule = corpus["schedule_2026"]
     team_def = corpus["team_defense"]
     wk = schedule[schedule["week"] == week]
