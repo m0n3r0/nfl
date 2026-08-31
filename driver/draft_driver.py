@@ -130,7 +130,67 @@ ANCHOR_BY_ROUND = {
 # dry. While we still NEED a scarce position, add this premium to its effective
 # value so the bot anchors it early. The anchor schedule above is the hard
 # guarantee; this premium just biases close calls toward scarce positions.
-SCARCITY_BONUS = {"RB": 8.0}
+#
+# It is a FRACTION of the position's value spread, not an absolute number
+# (issue #20). As an absolute 8.0 it was meaningless against 300-point
+# projections and overwhelming against rank differences of ~5; scaled to the
+# spread it means the same thing on either board.
+SCARCITY_FRACTION = {"RB": 0.10}
+
+# ---- Value over replacement (issues #19 + #20) -----------------------------
+# Raw projected points are not comparable across positions. The top QB projects
+# for ~393 points and the top TE for ~195, but we have to START one of each
+# either way, so the question is never "who scores more" -- it is "how much more
+# than the best alternative I could pick up for free". That difference is VOR,
+# and it is the only number that is comparable across positions.
+#
+# Replacement level = the Nth-best player at a position, where N is how many a
+# 10-team league starts. Past that line a player is waiver-wire material, so his
+# marginal value to this roster is about zero.
+REPLACEMENT_COUNT = {
+    "QB":  10,   # 1 per team
+    "RB":  24,   # 2 per team + ~4 of the 10 WRT flex slots
+    "WR":  25,   # 2 per team + ~5 of the 10 WRT flex slots
+    "TE":  12,   # 1 per team + ~2 flex
+    "K":   10,
+    "DEF": 10,
+}
+
+# Bench guardrails. The bench path takes best-player-available regardless of
+# need, which without these will happily roster a 4th quarterback or a 2nd
+# kicker because their raw projection still beats a WR3's.
+BENCH_CAP = {"QB": 2, "K": 1, "DEF": 1, "TE": 2}
+
+
+def replacement_values(board):
+    """Value of the last *startable* player at each position (waiver level).
+
+    Used to turn raw projections into VOR. Positions with no configured
+    replacement count fall back to 10 (one starter per team).
+    """
+    by_pos = {}
+    for v in board.values():
+        by_pos.setdefault(v["pos"], []).append(float(v.get("value") or 0.0))
+    repl = {}
+    for pos, vals in by_pos.items():
+        vals.sort(reverse=True)
+        n = REPLACEMENT_COUNT.get(pos, 10)
+        if len(vals) < n:
+            # Fewer than the replacement number of players on the board: every
+            # one of them is above the waiver-wire level, so treat replacement as
+            # 0. This keeps VOR == raw value on a thin board (e.g. a 2-player
+            # unit test) instead of collapsing every position to 0 and hiding
+            # real value gaps between positions. The real 250-player board has
+            # >= n players at every position, so live behaviour is unaffected.
+            repl[pos] = 0.0
+            continue
+        repl[pos] = vals[n - 1]
+    return repl
+
+
+def vor(value, pos, repl):
+    """Value over replacement: points above the best free alternative."""
+    return float(value) - repl.get(pos, 0.0)
 
 def log(s):
     line = datetime.datetime.now().strftime("%H:%M:%S") + " " + str(s)
@@ -677,25 +737,44 @@ def choose_pick(available, drafted, round_num, board, adp_map=None, pos_map=None
     adp_map = adp_map or {}
     pos_map = pos_map or {}
     avail_lower = {n.lower() for n in available}
+    repl = replacement_values(board)
+
     scored = []
     for v in board.values():
         if v["name"].lower() not in avail_lower:
             continue
-        eff = v.get("value", 0.0)
         ecr = v.get("ecr")
-        if ecr is not None:
-            ya = adp_map.get(v["name"].lower())
-            if ya is not None:
-                eff = float(ya) - float(ecr)   # Yahoo ADP - FantasyPros ECR
-        # 10-team positional-scarcity soft premium: while we still NEED a scarce
-        # position, lift its effective value so the crowd's RB inflation can't
-        # price us out of the position before the anchor deadline forces it.
-        need = REQUIRED.get(v["pos"], 0) - drafted.get(v["pos"], 0)
-        if need > 0 and v["pos"] in SCARCITY_BONUS:
-            eff += SCARCITY_BONUS[v["pos"]]
+        ya = adp_map.get(v["name"].lower()) if ecr is not None else None
+        if ecr is not None and ya is not None:
+            # Live market path: Yahoo ADP - FantasyPros ECR. Both are RANKS, so
+            # this is already comparable across positions. Do NOT VOR it -- VOR
+            # is a correction for projected POINTS, and applying it to rank
+            # differences would be meaningless.
+            eff = float(ya) - float(ecr)
+        else:
+            # Projection path: convert raw points to value over replacement.
+            # Without this a 195-point TE outranks every remaining WR and the
+            # bot drafts four tight ends and no quarterback (issues #19/#20).
+            eff = vor(v.get("value", 0.0), v["pos"], repl)
         scored.append((eff, v))
-    scored.sort(key=lambda x: x[0], reverse=True)
-    cands = [v for _, v in scored]
+
+    # 10-team positional-scarcity soft premium, scaled to the value spread
+    # actually in play so it means the same thing on either board. While we
+    # still NEED a scarce position, lift it so the crowd's RB inflation can't
+    # price us out before the anchor deadline forces the slot anyway.
+    spread = {}
+    for eff, v in scored:
+        lo, hi = spread.get(v["pos"], (eff, eff))
+        spread[v["pos"]] = (min(lo, eff), max(hi, eff))
+    adjusted = []
+    for eff, v in scored:
+        need = REQUIRED.get(v["pos"], 0) - drafted.get(v["pos"], 0)
+        if need > 0 and v["pos"] in SCARCITY_FRACTION:
+            lo, hi = spread[v["pos"]]
+            eff += SCARCITY_FRACTION[v["pos"]] * (hi - lo)
+        adjusted.append((eff, v))
+    adjusted.sort(key=lambda x: x[0], reverse=True)
+    cands = [v for _, v in adjusted]
 
     # 1) forced fills for required slots past their anchor deadline
     for pos, need in REQUIRED.items():
@@ -724,12 +803,16 @@ def choose_pick(available, drafted, round_num, board, adp_map=None, pos_map=None
     #    timing-guarded), so draft the best available player by value to fill
     #    the bench. We intentionally do NOT skip already-filled positions here
     #    -- a 2nd RB/WR on the bench is fine. Still respect the K/DEF-last and
-    #    QB-round timing guards so we don't reach for K/DEF before their window.
+    #    QB-round timing guards so we don't reach for K/DEF before their window,
+    #    and BENCH_CAP so we don't end up rostering a 4th QB over a WR3.
     for c in cands:
         pos = c["pos"]
         if pos in ("K", "DEF") and round_num < (TOTAL_ROUNDS - K_DEF_LAST_ROUNDS + 1):
             continue
         if pos == "QB" and round_num < MY_PICK_ROUNDS_QB:
+            continue
+        cap = BENCH_CAP.get(pos)
+        if cap is not None and drafted.get(pos, 0) >= cap:
             continue
         if _crowd_reach(c, round_num):
             log("REACH_GUARD skip %s (bench path, league ADP %s)"

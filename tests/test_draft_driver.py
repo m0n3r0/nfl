@@ -264,11 +264,23 @@ def _board(*rows):
 def test_scarcity_premium_anchors_rb_over_higher_value_wr():
     """10-team overlay: while we still NEED an RB, the scarcity premium lifts a
     lower-raw-value RB above a higher-value WR, so we anchor RB early instead of
-    letting the crowd's RB inflation (negative VALUE) price us out of the slot."""
-    board = _board(("RB Stud", "RB", 2.0), ("WR Stud", "WR", 6.0))
-    # Raw values say WR > RB (6 > 2); the RB need premium flips the decision.
-    pick = dd.choose_pick(["RB Stud", "WR Stud"], {}, 1, board)
+    letting the crowd's RB inflation (negative VALUE) price us out of the slot.
+
+    The premium is a FRACTION of the position's value spread (issue #20), so the
+    board must carry more than one RB for the spread -- and therefore the premium
+    -- to be non-zero; a single-RB board has no spread to scale. Use two RBs with
+    a real spread and a WR whose value sits just above the top RB, so only the
+    premium tips the decision to RB.
+    """
+    # RB spread 10.0 vs 8.0 -> premium = 0.10 * 2.0 = 0.2 on the top RB.
+    # WR at 10.1: without the premium RB(10.0) < WR(10.1); with it RB(10.2) > WR.
+    board = _board(("RB Stud", "RB", 10.0), ("RB Other", "RB", 8.0),
+                   ("WR Stud", "WR", 10.1))
+    pick = dd.choose_pick(["RB Stud", "RB Other", "WR Stud"], {}, 1, board)
     assert pick[0] == "RB Stud"
+    # Sanity: once the RB need is met, the higher-value WR wins again.
+    pick2 = dd.choose_pick(["RB Stud", "RB Other", "WR Stud"], {"RB": 2}, 1, board)
+    assert pick2[0] == "WR Stud"
 
 
 def test_anchor_forces_rb_on_schedule():
