@@ -12,6 +12,7 @@ Run with:  python -m pytest tests/test_draft_driver.py
 
 import re
 import sys
+import time as _realtime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -390,6 +391,80 @@ def test_board_has_enough_candidates_per_required_position():
     for pos in ("QB", "TE", "K", "DEF"):
         assert counts[pos] == 10, "%s has %d candidates (expected 10)" % (pos, counts[pos])
     assert len(dd.BOARD) == 67, "BOARD has %d players (expected 67)" % len(dd.BOARD)
+
+
+def _run_draft_controlled(off_window_name, on_window_names):
+    """Drive run_draft() end-to-end with every external dependency faked, so we
+    can assert the issue #23 off-window search wiring without a live browser.
+
+    `choose_pick` always returns `off_window_name`; `read_available` only ever
+    surfaces `on_window_names`. Returns call counters for search_player/click.
+    """
+    calls = {"search": 0, "click": 0}
+    saved = {}
+
+    def patch(attr, val):
+        saved[attr] = getattr(dd, attr)
+        setattr(dd, attr, val)
+
+    # Make the draft loop exit after the first pick by leaping the clock forward
+    # on every time.time() call so the ~3h deadline is exceeded immediately.
+    clock = [_realtime.time()]
+
+    def fake_time():
+        clock[0] += 10_000
+        return clock[0]
+
+    patch("connect", lambda: "WS")
+    patch("navigate", lambda ws, url: None)
+    patch("verify_session", lambda ws: True)
+    patch("log_deploy_identity", lambda: None)
+    patch("load_original_board", lambda: {})
+    patch("read_available",
+          lambda ws: [[n, "c", "RB", "ADP 9"] for n in on_window_names])
+    patch("normalize_available",
+          lambda raw, def_map=None: ([r[0] for r in raw], {}, {}))
+    patch("choose_pick", lambda *a, **k: (off_window_name, "Tm", "RB", 99))
+    patch("search_player",
+          lambda ws, name: (calls.__setitem__("search", calls["search"] + 1)
+                            or [name, "c9", "RB", "ADP 99"]))
+    patch("click_player",
+          lambda ws, name: (calls.__setitem__("click", calls["click"] + 1)
+                            or True))
+    patch("is_my_pick", lambda ws: True)
+    patch("_confirm_pick", lambda ws, name, timeout=8: True)
+    patch("log", lambda *a, **k: None)
+    patch("ev", lambda ws, js: "")
+    patch("time", type("T", (), {
+        "time": staticmethod(fake_time),
+        "sleep": staticmethod(lambda *a, **k: None),
+    })())
+    patch("random", type("R", (), {
+        "uniform": staticmethod(lambda a, b: 1.0),
+    })())
+    try:
+        dd.run_draft()
+    finally:
+        for attr, val in saved.items():
+            setattr(dd, attr, val)
+    return calls
+
+
+def test_off_window_target_triggers_search_player():
+    """Issue #23: a chosen player absent from read_available()'s virtualized
+    40-row window must be searched (filtering Yahoo's DOM to that player)
+    before the click, so a deep target (e.g. row 60) is still selectable."""
+    calls = _run_draft_controlled("Deep Sleeper", ["Vis A", "Vis B"])
+    assert calls["search"] == 1, calls
+    assert calls["click"] == 1, calls
+
+
+def test_on_window_target_skips_search_player():
+    """Negative control: a target already in the visible 40-row window is
+    clicked directly, with no extra Yahoo search round-trip."""
+    calls = _run_draft_controlled("Vis A", ["Vis A", "Vis B"])
+    assert calls["search"] == 0, calls
+    assert calls["click"] == 1, calls
 
 
 if __name__ == "__main__":
