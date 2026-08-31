@@ -1,6 +1,6 @@
 # FD nation — Manual Draft Cheat Sheet (team #2 "Doge")
 
-_Generated 2026-08-31 17:40 from `data/board/original_board.json` (250 players). Re-run `tools/gen_cheat_sheet.py --write` after the morning-of ADP re-scrape to refresh._
+_Generated 2026-08-31 17:54 from `data/board/original_board.json` (250 players). Re-run `tools/gen_cheat_sheet.py --write` after the morning-of ADP re-scrape to refresh._
 
 ## Your 15 picks (snake, 10-team, 1 min/pick)
 
