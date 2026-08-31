@@ -66,51 +66,91 @@ def gate(pos, round_):
     return False
 
 
-def greedy_suggest(board, picks):
-    """A simple best-value-per-need simulation for OUR 15 picks, used only as a
-    guide. Opponents are ignored (this is a fallback, not the live bot). Mirrors
-    the bot's bench caps so it doesn't hoard QBs/TEs."""
+def snake_teams(n, rounds):
+    """Return a list of team numbers in draft order (snake). Index i -> team of
+    overall pick i+1."""
+    order = []
+    for r in range(1, rounds + 1):
+        seq = list(range(1, n + 1)) if r % 2 == 1 else list(range(n, 0, -1))
+        order.extend(seq)
+    return order
+
+
+def simulate(board, our_team, n, rounds):
+    """Simulate the WHOLE draft (all teams) so the suggested picks reflect when
+    players actually come off the board. Opponents draft for need by league ADP
+    (like a typical league); WE draft by the bot's anchors + value, force-filling
+    the single-copy slots (QB/K/DEF) at their anchor rounds. Returns our 15 picks."""
+    order = snake_teams(n, rounds)
     taken = set()
-    # starter needs
     need = {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "K": 1, "DEF": 1}
-    # hard totals (starter + bench) — mirrors driver BENCH_CAP discipline
     max_per = {"QB": 2, "TE": 2, "K": 1, "DEF": 1}
     have = {p: 0 for p in need}
+    opp_need = {t: dict(need) for t in range(1, n + 1)}
+    # single-copy starters forced at their anchor round if still needed
+    force = (("TE", 6), ("QB", 10), ("K", 14), ("DEF", 14))
     out = []
-    for round_, overall in picks:
+    for idx, team in enumerate(order):
+        overall = idx + 1
+        round_ = (overall - 1) // n + 1
         avail = [r for r in board if id(r) not in taken]
-        gaps, bench = [], []
-        for r in avail:
-            pos = r["pos"]
-            if pos in need and have[pos] < need[pos] and gate(pos, round_):
-                gaps.append(r)
-            elif gate(pos, round_):
-                # respect hard totals for capped positions
-                if pos in max_per and have[pos] >= max_per[pos]:
-                    continue
-                bench.append(r)
-        pool = gaps if gaps else bench
-        if not pool:
-            pool = avail  # desperate fallback: anything
-        if gaps:
-            best = max(pool, key=lambda x: x["value"])
-        else:
-            # balance RB/WR on bench picks so the guide looks like a real lineup
-            rb_avail = any(r["pos"] == "RB" for r in pool)
-            wr_avail = any(r["pos"] == "WR" for r in pool)
-            if rb_avail and wr_avail:
-                pref = "WR" if have["WR"] <= have["RB"] else "RB"
-                sub = [r for r in pool if r["pos"] == pref]
-                best = max(sub, key=lambda x: x["value"])
+        if not avail:
+            break
+        if team == our_team:
+            best = None
+            role = "bench/flex"
+            # force-fill single-slot starters at anchor round if still open
+            for pos, gr in force:
+                if have.get(pos, 0) < need.get(pos, 0) and round_ >= gr:
+                    cands = [r for r in avail if r["pos"] == pos]
+                    if cands:
+                        best = max(cands, key=lambda x: x["value"])
+                        role = "starter"
+                        break
+            if best is None:
+                gaps, bench = [], []
+                for r in avail:
+                    pos = r["pos"]
+                    if pos in need and have[pos] < need[pos] and gate(pos, round_):
+                        gaps.append(r)
+                    elif gate(pos, round_):
+                        if pos in max_per and have[pos] >= max_per[pos]:
+                            continue
+                        bench.append(r)
+                pool = gaps if gaps else bench
+                if not pool:
+                    pool = avail
+                if gaps:
+                    best = max(pool, key=lambda x: x["value"])
+                    role = "starter"
+                else:
+                    rb = any(r["pos"] == "RB" for r in pool)
+                    wr = any(r["pos"] == "WR" for r in pool)
+                    if rb and wr:
+                        pref = "WR" if have["WR"] <= have["RB"] else "RB"
+                        best = max([r for r in pool if r["pos"] == pref],
+                                   key=lambda x: x["value"])
+                    else:
+                        best = max(pool, key=lambda x: x["value"])
+            pos = best["pos"]
+            if pos in need and have[pos] < need[pos]:
+                have[pos] += 1
             else:
-                best = max(pool, key=lambda x: x["value"])
-        taken.add(id(best))
-        pos = best["pos"]
-        if pos in need and have[pos] < need[pos]:
-            have[pos] += 1
+                have[pos] = have.get(pos, 0) + 1
+            out.append((round_, overall, best, role))
         else:
-            have[pos] = have.get(pos, 0) + 1
-        out.append((round_, overall, best, "starter" if (gaps and best in gaps) else "bench/flex"))
+            # opponent: draft for need by league ADP (lowest ADP first)
+            oneed = opp_need[team]
+            need_avail = [r for r in avail
+                          if r["pos"] in oneed and oneed[r["pos"]] > 0]
+            pool_o = need_avail if need_avail else avail
+            best = min(pool_o, key=lambda x: (
+                x.get("adp") if isinstance(x.get("adp"), (int, float)) else 999,
+                -x["value"]))
+            pos = best["pos"]
+            if pos in oneed:
+                oneed[pos] -= 1
+        taken.add(id(best))
     return out
 
 
@@ -125,7 +165,7 @@ def main():
     board = load_board()
     by = rank_by_pos(board)
     picks = our_pick_numbers(OUR_TEAM, N_TEAMS, ROUNDS)
-    suggested = greedy_suggest(board, picks)
+    suggested = simulate(board, OUR_TEAM, N_TEAMS, ROUNDS)
 
     L = []
     L.append("# FD nation — Manual Draft Cheat Sheet (team #2 \"Doge\")")
