@@ -70,53 +70,42 @@ DEF in the last two rounds.
 
 --- ROUND-BY-ROUND PLAN (pick #2, snake) ---
 
-R1  (pick 2):  Christian McCaffrey RB — the consensus 1.01 in
-               half-PPR. 350+ projected points. Take him.
-               ALTERNATIVE if taken: Bijan Robinson (ADP 2).
+R1  (pick 2):  Jahmyr Gibbs RB — 312 projected. The RB1 by VOR.
 
-R2  (pick 19): Kyren Williams RB — 255 projected, ADP 29. He is
-               a VALUE: projected much higher than where the
-               crowd drafts him. Take the RB2 and lock your
-               foundation.
-               ALTERNATIVE: Derrick Henry (ADP 18), Saquon
-               Barkley (ADP 12) if they fall.
+R2  (pick 19): Derrick Henry RB — 300 projected. The RB2.
+               Locks the foundation with two elite RBs.
 
-R3  (pick 22): Mike Evans WR — 221 projected. A consistent WR1
-               with elite red-zone usage. Takes the WR1 slot.
-               ALTERNATIVE: any top-12 WR still on the board.
+R3  (pick 22): Ja'Marr Chase WR — 234 projected. The WR1.
 
-R4  (pick 39): Rashee Rice WR — 219 projected. High ceiling,
-               KC offense. ALTERNATIVE: Nico Collins,
-               A.J. Brown, or the best available WR.
+R4  (pick 39): Justin Jefferson WR — 223 projected. The WR2.
+               Two elite WRs to complement the RB room.
 
-R5  (pick 42): George Kittle TE — 195 projected. The TE1 by our
-               projections. Massive positional advantage.
-               ALTERNATIVE: Brock Bowers (ADP 21), Trey McBride
-               (ADP 26).
+R5  (pick 42): Trey McBride TE — 180 projected. The TE1.
 
-R6  (pick 59): Brian Thomas Jr. WR — 175 projected. Breakout
-               candidate in his second year. Your WR3/flex.
+R6  (pick 59): Christian McCaffrey RB — 298 projected.
+               He falls here because of injury risk, but the
+               ceiling is RB1 overall. Massive value at R6.
 
-R7  (pick 62): David Montgomery RB — 199 projected. RB3 depth.
+R7  (pick 62): Saquon Barkley RB — 297 projected.
+               Another RB1-caliber player. Your RB room is
+               now the strongest in the league.
 
-R8  (pick 79): Garrett Wilson WR — 174 projected. WR4 depth.
+R8  (pick 79): Amon-Ra St. Brown WR — 222 projected. The WR3.
 
-R9  (pick 82): Rhamondre Stevenson RB — 190 projected. RB4.
+R9  (pick 82): Bijan Robinson RB — 274 projected.
 
-R10 (pick 99): Tyler Shough QB — 213 projected. Your QB1.
-               A rookie with a high ceiling. The position is
-               deep: you are NOT reaching.
+R10 (pick 99): Josh Allen QB — 393 projected. The QB1 by our
+               projections. You waited and still got the best.
 
-R11 (pick 102): Tetairoa McMillan WR — 167 projected. Rookie
-               WR1 in Carolina. High ceiling.
+R11 (pick 102): Jonathan Taylor RB — 289 projected.
 
-R12 (pick 119): Jacory Croskey-Merritt RB — 130 projected.
+R12 (pick 119): Malik Nabers WR — 201 projected.
 
-R13 (pick 122): Alec Pierce WR — 130 projected.
+R13 (pick 122): Jaxon Smith-Njigba WR — 222 projected.
 
-R14 (pick 139): Ryan Succop K — 109 projected.
+R14 (pick 139): Austin Seibert K — 176 projected. Your K1.
 
-R15 (pick 142): Broncos DEF — 73 projected.
+R15 (pick 142): Ravens DEF — 100 projected. Your DEF1.
 
 --- PROJECTED STARTING LINEUP (after the draft) ---
 
@@ -127,7 +116,7 @@ R15 (pick 142): Broncos DEF — 73 projected.
   WR: Rashee Rice (KC)            ~12.9 pts/gm
   TE: George Kittle (SF)          ~11.5 pts/gm
   FLEX: David Montgomery (DET)    ~11.7 pts/gm
-  K: Ryan Succop (TB)
+  K: Austin Seibert (WAS)
   DEF: Broncos
 
   Bench: Brian Thomas Jr. WR, Garrett Wilson WR,
