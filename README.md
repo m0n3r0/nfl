@@ -252,6 +252,7 @@ Protocol (CDP). Lives as a self-contained module alongside the toolkit above.
 - `memory/fantasy_fd_nation.md` — persistent league context for the agent.
 - `data/board/` — original draft board (`original_board.json`, nflverse-derived, zero external deps, **250 players**) + K/DEF ADP reference.
 - `data/scrapes/` — roster/standings/settings extracts from the live tab. **Local-only: gitignored and never committed** (it contains real league member names + session state); the driver reads it from disk at runtime.
+- `tools/` — load-bearing utilities only: `scrape_league_adp.py` (league ADP scrape), `check_login.py` / `login_yahoo.py` (auth), `simulate_draft.py` (offline regression harness, used by `tests/test_simulation.py`), `mock_draft_run.py` + `mock_draft_room.html` (pre-draft click validation), `check_draft_state.py` / `back_to_league.py` / `recover_tab.py` / `edge_alive.py` (CDP health & recovery), and `deploy.ps1` (one-command verified deploy). Throwaway debug probes live in `tools/debug/` and are not part of the pipeline.
 - `validation/` — mock-draft + click validation logs (2026-08-21).
 - `docs/REMEDIATION.md` — phase-by-phase log of the 2026-08-31 review.
 
