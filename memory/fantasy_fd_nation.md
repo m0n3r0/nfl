@@ -214,3 +214,17 @@ the parser handles every board name format we know of.
   `OK:` / `DEPLOY_SHA=` lines confirm. Validate before Sep 1 5pm EDT.
 - Fast regression gate: `pytest tests/test_draft_driver.py tests/test_original_board.py
   tests/test_simulation.py` → 29 passed. Full suite was 47 passed earlier this cycle.
+
+## All issues closed (2026-08-31) — tracker empty
+- Remaining P2/P3 issues (#22-#31) all addressed per the rule "fix if not addressed,
+  then track on merge": #22 mitigated (never committed, gitignored), #23 off-window
+  search wired (236e35d), #24 ratings cache (7796fa0), #25 pytest/CI (0e689d2),
+  #26 pick-number guard (236e35d), #27 raw-JS strings (7796fa0), #28 drop ties
+  (7796fa0), #29 tools/debug split (31d94bf), #30 board-size invariant (7796fa0),
+  #31 README de-stale (6fc6d40). `gh issue list --state open` → 0.
+- Final commits this cycle: 236e35d (#26/#23 + 2 run_draft regression tests, pushed,
+  deployed), 4dbbbed (REMEDIATION.md Phases 3-4 marked done). Remote HEAD = 4dbbbed.
+- Driver re-deployed to `C:\edge-debug-profile\` after 236e35d; `DEPLOY_SHA.txt`
+  236e35db0af0904399882542b5ae86b15e4e3abc. Fast gate now 31 passed.
+- Live draft Tue Sep 1 2026 5pm EDT, team #2 "Doge", 10-team .5PPR 15-round snake.
+  Nothing blocking remains in the repo before draft time.
