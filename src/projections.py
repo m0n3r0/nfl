@@ -51,7 +51,9 @@ def _position_league_means(weekly: pd.DataFrame) -> pd.DataFrame:
     return g.groupby("position")["fantasy_points"].mean().rename("pos_mean").reset_index()
 
 
-def project_players(corpus: dict, preset: str = "ppr") -> pd.DataFrame:
+def project_players(corpus: dict) -> pd.DataFrame:
+    """Note: scoring is baked into the corpus at build time (corpus.build
+    scores weekly_history with the preset), so there is no preset arg here."""
     weekly = corpus["weekly_history"]
     roles = corpus["depth_roles"]
     schedule = corpus["schedule_2026"]
@@ -153,9 +155,9 @@ def project_players(corpus: dict, preset: str = "ppr") -> pd.DataFrame:
     return out
 
 
-def project_for_week(corpus: dict, week: int, preset: str = "ppr") -> pd.DataFrame:
+def project_for_week(corpus: dict, week: int) -> pd.DataFrame:
     """Projected fantasy points for a specific 2026 week (uses that week's SOS)."""
-    proj = project_players(corpus, preset=preset)
+    proj = project_players(corpus)
     schedule = corpus["schedule_2026"]
     team_def = corpus["team_defense"]
     wk = schedule[schedule["week"] == week]
