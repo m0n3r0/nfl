@@ -1,6 +1,6 @@
 # FD nation — Manual Draft Cheat Sheet (team #2 "Doge")
 
-_Generated 2026-08-31 13:31 from `data/board/original_board.json` (250 players). Re-run `tools/gen_cheat_sheet.py --write` after the morning-of ADP re-scrape to refresh._
+_Generated 2026-08-31 13:50 from `data/board/original_board.json` (250 players). Re-run `tools/gen_cheat_sheet.py --write` after the morning-of ADP re-scrape to refresh._
 
 ## Your 15 picks (snake, 10-team, 1 min/pick)
 
@@ -27,20 +27,20 @@ _Generated 2026-08-31 13:31 from `data/board/original_board.json` (250 players).
 | R | Overall | Player | Role |
 |---|---|---|---|
 | 1 | 2 | Christian McCaffrey (SF - RB) val 351 | starter |
-| 2 | 19 | Jahmyr Gibbs (DET - RB) val 312 | starter |
-| 3 | 22 | Puka Nacua (LA - WR) val 292 | starter |
-| 4 | 39 | Ja'Marr Chase (CIN - WR) val 275 | starter |
+| 2 | 19 | Kyren Williams (LA - RB) val 255 | starter |
+| 3 | 22 | Mike Evans (TB - WR) val 221 | starter |
+| 4 | 39 | Rashee Rice (KC - WR) val 219 | starter |
 | 5 | 42 | George Kittle (SF - TE) val 195 | starter |
-| 6 | 59 | Amon-Ra St. Brown (DET - WR) val 262 | bench/flex |
-| 7 | 62 | Derrick Henry (BAL - RB) val 300 | bench/flex |
-| 8 | 79 | CeeDee Lamb (DAL - WR) val 255 | bench/flex |
-| 9 | 82 | Saquon Barkley (PHI - RB) val 297 | bench/flex |
-| 10 | 99 | Josh Allen (BUF - QB) val 393 | starter |
-| 11 | 102 | Jaxon Smith-Njigba (SEA - WR) val 224 | bench/flex |
-| 12 | 119 | Bijan Robinson (ATL - RB) val 274 | bench/flex |
-| 13 | 122 | Justin Jefferson (MIN - WR) val 223 | bench/flex |
-| 14 | 139 | Caleb Shudak (TEN - K) val 153 | starter |
-| 15 | 142 | Ravens (BAL - DEF) val 104 | starter |
+| 6 | 59 | Brian Thomas Jr. (JAX - WR) val 175 | bench/flex |
+| 7 | 62 | David Montgomery (DET - RB) val 199 | bench/flex |
+| 8 | 79 | Garrett Wilson (NYJ - WR) val 174 | bench/flex |
+| 9 | 82 | Rhamondre Stevenson (NE - RB) val 190 | bench/flex |
+| 10 | 99 | Tyler Shough (NO - QB) val 213 | starter |
+| 11 | 102 | Tetairoa McMillan (CAR - WR) val 167 | bench/flex |
+| 12 | 119 | Jacory Croskey-Merritt (WAS - RB) val 130 | bench/flex |
+| 13 | 122 | Alec Pierce (IND - WR) val 130 | bench/flex |
+| 14 | 139 | Ryan Succop (TB - K) val 109 | starter |
+| 15 | 142 | Broncos (DEN - DEF) val 73 | starter |
 
 ## Anchor rules (same as the bot)
 - Rounds 1-5: take RB/WR. Anchor **2nd RB by R5**, **WR by R5/R9**.

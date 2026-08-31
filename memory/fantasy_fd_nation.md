@@ -262,3 +262,8 @@ the parser handles every board name format we know of.
 - Cheat sheet mirrors the bot's anchors: 2nd RB by R5, WR by R5/R9, TE ~R7, no QB before
   R10, K/DEF R14-15; our 15 overall picks are 2,19,22,39,42,59,62,79,82,99,102,119,122,
   139,142 (snake, team #2).
+- **Important correction:** the cheat sheet's "suggested" column simulates ALL 10 teams
+  drafting by league ADP (need-based), so early studs are correctly shown as gone before
+  our picks. Josh Allen (board `adp: 20.0` ≈ round 2) will NOT be available at our R10 —
+  our realistic QB is a later-tier player taken at R10, not Allen. The earlier naive greedy
+  mistakenly listed Allen at R10 because it ignored opponent drafts. Don't promise Allen.
