@@ -251,14 +251,16 @@ Protocol (CDP). Lives as a self-contained module alongside the toolkit above.
 - `skills/` — Hermes skills (edge-cdp, fantasy-read, fantasy-draft) for reuse in Hermes Desktop. Documentation only; they point at the deployed driver, they do not bundle one.
 - `memory/fantasy_fd_nation.md` — persistent league context for the agent.
 - `data/board/` — original draft board (`original_board.json`, nflverse-derived, zero external deps, **250 players**) + K/DEF ADP reference.
-- `data/scrapes/` — roster/standings/settings extracts from the live tab.
+- `data/scrapes/` — roster/standings/settings extracts from the live tab. **Local-only: gitignored and never committed** (it contains real league member names + session state); the driver reads it from disk at runtime.
 - `validation/` — mock-draft + click validation logs (2026-08-21).
 - `docs/REMEDIATION.md` — phase-by-phase log of the 2026-08-31 review.
 
 **Deploy target:** the driver does not run from the repo. Copy it and the board to
-`C:\edge-debug-profile\` (the driver resolves `original_board.json` next to itself).
-A change to either file is not live until it is copied there — see "How to run the
-draft" below.
+`C:\edge-debug-profile\` (the driver resolves `original_board.json` next to itself,
+and also checks `data/board/` in the repo, so `py.exe driver/draft_driver.py` from
+the repo root works too — neither documented invocation can silently downgrade to the
+static board). A change to either file is not live until it is copied there via
+`tools/deploy.ps1` — see "How to run the draft" below.
 - **Log file** — created at draft time; every pick decision logged here. Resolved in
   this order: `$FD_DRAFT_LOG` → Windows default `C:\edge-debug-profile\draft_log.txt`
   → other platforms `./draft_log.txt`. (`.gitignore` covers `logs/draft_log.txt`; if
