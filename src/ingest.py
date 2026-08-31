@@ -54,9 +54,14 @@ def _corpus_datasets() -> dict[str, tuple[str, str]]:
         f"{_RELEASE_BASE}/draft_picks/draft_picks.csv",
         "draft_picks.csv",
     )
+    # Injuries: prefer the CURRENT season's file. nflverse only publishes
+    # injury reports once regular-season practice reports start (Week 1), so
+    # during the preseason this asset 404s -- load_injuries() falls back to the
+    # previous season, and the draft board's staleness guard (#50) ignores
+    # previous-season flags so healthy stars are not dropped by stale reports.
     d["injuries"] = (
-        f"{_RELEASE_BASE}/injuries/injuries_{STATS_SEASON}.csv",
-        f"injuries_{STATS_SEASON}.csv",
+        f"{_RELEASE_BASE}/injuries/injuries_{SCHEDULE_SEASON}.csv",
+        f"injuries_{SCHEDULE_SEASON}.csv",
     )
     return d
 
@@ -200,12 +205,19 @@ def collect_corpus(refresh: bool = False) -> dict[str, pd.DataFrame]:
     player_week_stats_{y} for each year in HISTORY_SEASONS.
     """
     out: dict[str, pd.DataFrame] = {}
-    for name in ("players", "games", "injuries", "depth_charts"):
+    for name in ("players", "games", "depth_charts"):
         print(f"Loading {name}...")
         try:
             out[name] = load(name, refresh=refresh)
         except Exception as exc:  # e.g. a 404 release that isn't out yet
             print(f"  skipped {name}: {exc}")
+    # Injuries get a season fallback: the current-season file does not exist
+    # until Week 1 practice reports are published (preseason 404).
+    print("Loading injuries...")
+    try:
+        out["injuries"] = load_injuries(refresh=refresh)
+    except Exception as exc:
+        print(f"  skipped injuries: {exc}")
     for y in HISTORY_SEASONS:
         key = "player_week_stats" if y == STATS_SEASON else f"player_week_stats_{y}"
         print(f"Loading {key}...")
@@ -222,3 +234,21 @@ def load_schedule(season: int = SCHEDULE_SEASON, refresh: bool = False) -> pd.Da
 
 def load_depth_charts(season: int = SCHEDULE_SEASON, refresh: bool = False) -> pd.DataFrame:
     return load("depth_charts", refresh=refresh)
+
+
+def load_injuries(season: int = SCHEDULE_SEASON, refresh: bool = False) -> pd.DataFrame:
+    """Injury reports for ``season``, falling back one season if unpublished.
+
+    nflverse only publishes injury reports once regular-season practice
+    reports start (Week 1), so during the preseason the current-season asset
+    404s. Falling back keeps the pipeline running off the cached prior-season
+    file; the draft board's staleness guard (issue #50) refuses to apply
+    previous-season flags, so the fallback cannot drop healthy players.
+    """
+    try:
+        dest = download_asset("injuries", f"injuries_{season}.csv", refresh=refresh)
+    except Exception as exc:
+        print(f"  injuries_{season}.csv unavailable ({exc}); "
+              f"falling back to injuries_{season - 1}.csv")
+        dest = download_asset("injuries", f"injuries_{season - 1}.csv", refresh=refresh)
+    return pd.read_csv(dest, low_memory=False)

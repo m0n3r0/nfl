@@ -27,19 +27,19 @@ import sys
 sys.path.insert(0, str(ROOT))
 
 from src import corpus, projections, analysis, model, ingest, features  # noqa: E402
-from src.config import SCHEDULE_SEASON, STATS_SEASON, PBP_SEASONS  # noqa: E402
+from src.config import SCHEDULE_SEASON, STATS_SEASON, PBP_SEASONS, league_preset  # noqa: E402
 
 app = Flask(__name__, template_folder=str(Path(__file__).parent / "templates"))
 
 
-def _get_corpus(preset="ppr"):
-    return corpus.build(preset=preset)
+def _get_corpus(preset=None):
+    return corpus.build(preset=preset or league_preset())
 
 
 @app.route("/")
 def dashboard():
     c = _get_corpus()
-    proj = projections.project_players(c, preset="ppr").head(15)
+    proj = projections.project_players(c).head(15)
     # Real, honest model evaluation (computed once per request; cached on disk by features).
     ev = model.train_and_evaluate((2022, 2023), (2024, 2025))
     cv = model.time_series_cv(PBP_SEASONS)
@@ -61,7 +61,7 @@ def dashboard():
 @app.route("/players")
 def players():
     c = _get_corpus()
-    proj = projections.project_players(c, preset="ppr")
+    proj = projections.project_players(c)
     q = request.args.get("q", "").strip().upper()
     pos = request.args.get("pos", "").strip().upper()
     if q:
@@ -88,7 +88,7 @@ def player_detail(pid):
         .agg(games=("week", "nunique"), ppg=("fantasy_points", "mean"))
         .round(2).reset_index()
     )
-    proj = projections.project_players(c, preset="ppr")
+    proj = projections.project_players(c)
     row = proj[proj["player_id"] == pid]
     proj_row = row.to_dict("records")[0] if len(row) else None
     return render_template(

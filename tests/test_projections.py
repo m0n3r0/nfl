@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src import corpus, projections, analysis  # noqa: E402
-from src.config import STATS_SEASON  # noqa: E402
+from src.config import STATS_SEASON, league_preset  # noqa: E402
 
 # Runs against the real cached nflverse corpus -> slow. CI nightly, not every push.
 # See issue #25.
@@ -23,7 +23,8 @@ pytestmark = pytest.mark.slow
 
 
 def _corpus():
-    return corpus.build(preset="ppr")
+    # Build with the league's scoring preset (FP_SCORING), not a hardcoded one.
+    return corpus.build(preset=league_preset())
 
 
 def test_corpus_assembles():
@@ -37,7 +38,7 @@ def test_corpus_assembles():
 
 def test_projections_sane():
     c = _corpus()
-    proj = projections.project_players(c, preset="ppr")
+    proj = projections.project_players(c)
     # no duplicate player rows after dedup
     assert proj["player_id"].is_unique
     # top projection is positive and within a believable range

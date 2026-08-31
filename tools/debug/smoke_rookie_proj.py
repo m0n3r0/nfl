@@ -4,7 +4,7 @@ sys.path.insert(0, r'C:\nfl-win')
 from src import corpus, projections
 
 c = corpus.build(preset='half-ppr')
-proj = projections.project_players(c, preset='half-ppr')
+proj = projections.project_players(c)
 print('projected players:', len(proj))
 rk = proj[proj['player_id'].astype(str).str.startswith('00-0041') |
           proj['player_id'].astype(str).str.startswith('00-0040')]

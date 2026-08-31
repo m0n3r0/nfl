@@ -18,13 +18,23 @@ from . import ingest, scoring
 from .config import SCHEDULE_SEASON, STATS_SEASON, HISTORY_SEASONS, SKILL_POSITIONS
 
 
+# Defense is a current-season matchup signal, not a franchise-history metric.
+# Keep the two most recently completed seasons when building the baseline.
+DEFENSE_LOOKBACK_SEASONS = 2
+
+
 def _weekly_history(preset: str = "ppr") -> pd.DataFrame:
-    """Stack 2022-2025 weekly player stats with a 'season' tag and fantasy points."""
+    """Stack regular-season weekly player stats with a season tag and scores."""
     frames = []
     for y in HISTORY_SEASONS:
         key = "player_week_stats" if y == STATS_SEASON else f"player_week_stats_{y}"
         df = ingest.load(key)
         df = df.copy()
+        # Projection totals assume a 17-game regular season.  Postseason rows
+        # would otherwise make playoff performance part of the regular-season
+        # baseline and distort both per-game means and games played.
+        if "season_type" in df.columns:
+            df = df[df["season_type"] == "REG"].copy()
         df["season"] = y
         # Weekly files use `team`; normalize so callers can rely on `recent_team`.
         if "recent_team" not in df.columns and "team" in df.columns:
@@ -36,11 +46,17 @@ def _weekly_history(preset: str = "ppr") -> pd.DataFrame:
 
 
 def build_team_defense(schedule_season: int = SCHEDULE_SEASON) -> pd.DataFrame:
-    """Derive each team's points allowed (reg + post) from the games table."""
+    """Derive recent-season regular/postseason points allowed by team.
+
+    The current schedule can contain future games with missing scores; those
+    rows are excluded rather than counted as games with no points allowed.
+    """
     games = ingest.load("games")
-    games = games[games["season"] <= schedule_season]
+    first_season = schedule_season - DEFENSE_LOOKBACK_SEASONS
+    games = games[games["season"].between(first_season, schedule_season)]
     # Regular + post-reg season games only (exclude preseason if present).
     games = games[games["game_type"].isin(["REG", "POST"])]
+    games = games.dropna(subset=["home_score", "away_score"])
     rows = []
     for _, r in games.iterrows():
         # away team allowed home_score; home team allowed away_score

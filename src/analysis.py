@@ -67,7 +67,7 @@ def weekly_matchups(corpus: dict, week: int, preset: str = "ppr", top_n: int = 2
     opponent defensive strength."""
     from . import projections
 
-    proj = projections.project_for_week(corpus, week=week, preset=preset)
+    proj = projections.project_for_week(corpus, week=week)
     board = proj[proj["position"].isin(["QB", "RB", "WR", "TE"])].copy()
     board = board.sort_values("proj_week", ascending=False).reset_index(drop=True)
     board = board.drop(columns=[c for c in ["rank"] if c in board.columns])

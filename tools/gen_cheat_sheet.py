@@ -16,6 +16,10 @@ K/DEF only R14-15. Value = projected points; ADP = league average pick.
 import json
 import sys
 import datetime
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import opponent_model
 
 BOARD = "data/board/original_board.json"
 N_TEAMS = 10
@@ -78,15 +82,17 @@ def snake_teams(n, rounds):
 
 def simulate(board, our_team, n, rounds):
     """Simulate the WHOLE draft (all teams) so the suggested picks reflect when
-    players actually come off the board. Opponents draft for need by league ADP
-    (like a typical league); WE draft by the bot's anchors + value, force-filling
-    the single-copy slots (QB/K/DEF) at their anchor rounds. Returns our 15 picks."""
+    players actually come off the board. Opponents use the shared rival model
+    (tools/opponent_model.py: per-position caps, K/DEF/QB timing gates) ranking
+    by league ADP, like a typical league; WE draft by the bot's anchors + value,
+    force-filling the single-copy slots (QB/K/DEF) at their anchor rounds.
+    Returns our 15 picks."""
     order = snake_teams(n, rounds)
     taken = set()
     need = {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "K": 1, "DEF": 1}
     max_per = {"QB": 2, "TE": 2, "K": 1, "DEF": 1}
     have = {p: 0 for p in need}
-    opp_need = {t: dict(need) for t in range(1, n + 1)}
+    opp_roster = {t: {} for t in range(1, n + 1)}
     # single-copy starters forced at their anchor round if still needed
     force = (("TE", 6), ("QB", 10), ("K", 14), ("DEF", 14))
     out = []
@@ -139,19 +145,40 @@ def simulate(board, our_team, n, rounds):
                 have[pos] = have.get(pos, 0) + 1
             out.append((round_, overall, best, role))
         else:
-            # opponent: draft for need by league ADP (lowest ADP first)
-            oneed = opp_need[team]
-            need_avail = [r for r in avail
-                          if r["pos"] in oneed and oneed[r["pos"]] > 0]
-            pool_o = need_avail if need_avail else avail
-            best = min(pool_o, key=lambda x: (
-                x.get("adp") if isinstance(x.get("adp"), (int, float)) else 999,
-                -x["value"]))
-            pos = best["pos"]
-            if pos in oneed:
-                oneed[pos] -= 1
+            # opponent: shared rival model (caps + timing gates, issue #52),
+            # ranking by league ADP (lowest first), not raw value.
+            roster = opp_roster[team]
+            best = opponent_model.opponent_pick(
+                avail, roster, round_, need, rounds,
+                key=lambda x: (
+                    -(x.get("adp") if isinstance(x.get("adp"), (int, float)) else 999),
+                    x["value"]))
+            if best is None:
+                continue
+            roster[best["pos"]] = roster.get(best["pos"], 0) + 1
         taken.add(id(best))
     return out
+
+
+REQUIRED = {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "K": 1, "DEF": 1}
+
+
+def roster_problems(picks):
+    """Check the sheet's prescribed picks form a legal roster. Returns a list
+    of problem strings (empty = legal). The sheet is the manual failover
+    artifact, so a roster missing a required starter (issue #52: zero K) must
+    fail loudly here instead of on draft night."""
+    problems = []
+    if len(picks) != ROUNDS:
+        problems.append("only %d/%d picks prescribed" % (len(picks), ROUNDS))
+    counts = {}
+    for _r, _o, p, _role in picks:
+        counts[p["pos"]] = counts.get(p["pos"], 0) + 1
+    for pos, n in REQUIRED.items():
+        if counts.get(pos, 0) < n:
+            problems.append("%s under-filled: have %d, need %d"
+                            % (pos, counts.get(pos, 0), n))
+    return problems
 
 
 def fmt_player(r):
@@ -172,6 +199,13 @@ def main():
     by = rank_by_pos(board)
     picks = our_pick_numbers(team, N_TEAMS, ROUNDS)
     suggested = simulate(board, team, N_TEAMS, ROUNDS)
+
+    problems = roster_problems(suggested)
+    if problems:
+        for p in problems:
+            print("ILLEGAL ROSTER: %s" % p, file=sys.stderr)
+        sys.exit("refusing to emit a cheat sheet that prescribes an illegal "
+                 "roster (issue #52)")
 
     L = []
     L.append(f"# FD nation — Manual Draft Cheat Sheet (team #{team} \"Doge\")")

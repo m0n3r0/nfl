@@ -23,7 +23,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .config import SKILL_POSITIONS, HISTORY_SEASONS
+from .config import SKILL_POSITIONS, HISTORY_SEASONS, SCHEDULE_SEASON
 from . import corpus as corpus_mod, projections
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -120,24 +120,50 @@ def _team_col(df: pd.DataFrame) -> str:
     return "recent_team"
 
 
-def _load_injury_flags() -> dict[str, str]:
+def _load_injury_flags(current_season: int = SCHEDULE_SEASON) -> dict[str, str]:
     """Load the latest injury report status per gsis_id from nflverse injury CSVs.
 
     Returns {gsis_id: report_status} for the most recent week available.
     Returns {} if no injury data is present (e.g. fresh install before ingest).
+
+    Staleness guard (issue #50): nflverse only publishes injury reports for the
+    current season once Week 1 practice reports exist, so before then the newest
+    file on disk is LAST season's, current through that season's final weeks.
+    Applying those flags would exclude/penalize healthy stars (Nico Collins,
+    Jayden Daniels, ... were "Out" in the Feb 2026 Super Bowl report). Flags from
+    a season older than ``current_season`` are therefore ignored entirely, with a
+    loud warning. A stale "Out"/IR is strictly worse than no filter at all.
     """
     import glob as _glob
+    import re as _re
+    import warnings as _warnings
     files = sorted(_glob.glob(INJURY_GLOB))
     if not files:
         return {}
-    df = pd.read_csv(files[-1], usecols=["gsis_id", "report_status"], low_memory=False)
+    path = files[-1]
+    m = _re.search(r"injuries_(\d{4})\.csv$", path)
+    if m:
+        season = int(m.group(1))
+    else:  # unexpected name: fall back to the data's own season column
+        season = int(pd.read_csv(path, usecols=["season"])["season"].max())
+    if season < current_season:
+        _warnings.warn(
+            f"STALE INJURY DATA: newest injury file is {path} (season {season}) "
+            f"but the current season is {current_season}. Ignoring ALL injury "
+            f"flags -- no player is excluded or penalized by last season's "
+            f"reports. Re-run ingest once nflverse publishes "
+            f"injuries_{current_season}.csv.",
+            stacklevel=2,
+        )
+        return {}
+    df = pd.read_csv(path, usecols=["gsis_id", "report_status"], low_memory=False)
     df = df.dropna(subset=["gsis_id", "report_status"])
     # keep the last occurrence per player (latest report wins)
     return dict(zip(df["gsis_id"], df["report_status"]))
 
 
 def _skill_board(corpus: dict, preset: str, injury_flags: dict[str, str] | None = None) -> list[dict]:
-    proj = projections.project_players(corpus, preset=preset)
+    proj = projections.project_players(corpus)
     if injury_flags is None:
         injury_flags = _load_injury_flags()
 

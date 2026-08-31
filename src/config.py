@@ -14,6 +14,9 @@ scheme. Key findings:
   * 2-point conversions are worth +2.0
   * K/DEF/ST players are scored 0 in the *player* stat table (defense is team-level)
 
+The league's scoring preset comes from the ``FP_SCORING`` env var (or the
+repo-root ``.env``), FantasyPros-style: STD / PPR / HALF. See league_preset().
+
 SEASONS
 -------
 SCHEDULE_SEASON is the season whose game schedule we pull (2026 by default).
@@ -87,6 +90,49 @@ SCORING_PRESETS = {
     "ppr": PPR_SCORING,
     "half-ppr": HALF_PPR_SCORING,
 }
+
+# Fallback when FP_SCORING is unset/unrecognized: this league is half-PPR
+# (.env FP_SCORING=HALF); matches src/draft_board.py's default.
+DEFAULT_PRESET = "half-ppr"
+
+# FP_SCORING env values (FantasyPros-style) -> SCORING_PRESETS keys.
+_FP_SCORING_TO_PRESET = {
+    "STD": "standard",
+    "STANDARD": "standard",
+    "PPR": "ppr",
+    "HALF": "half-ppr",
+    "HALF-PPR": "half-ppr",
+    "HALF_PPR": "half-ppr",
+}
+
+
+def _env_var(name):
+    """Read a var from the process env, falling back to the repo-root .env
+    (parsed, not loaded, so importing config never mutates os.environ)."""
+    import os
+    if os.environ.get(name):
+        return os.environ[name]
+    from pathlib import Path
+    env_path = Path(__file__).resolve().parents[1] / ".env"
+    try:
+        for line in env_path.read_text(encoding="utf-8-sig").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            if k.strip() == name:
+                return v.strip().strip('"').strip("'")
+    except OSError:
+        pass
+    return None
+
+
+def league_preset():
+    """The league's scoring preset from FP_SCORING (env or .env)."""
+    raw = _env_var("FP_SCORING")
+    if raw:
+        return _FP_SCORING_TO_PRESET.get(raw.strip().upper(), DEFAULT_PRESET)
+    return DEFAULT_PRESET
 
 # Positions we surface in rankings.
 FANTASY_POSITIONS = ["QB", "RB", "WR", "TE", "K", "DEF"]
