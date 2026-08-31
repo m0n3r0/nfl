@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FD nation — Mock Draft Room (40-row virtualized)</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 16px; }
+  h2 { margin: 0 0 4px; }
+  #turn { font-weight: 700; color: #0a0; min-height: 1.2em; }
+  #turn.waiting { color: #888; font-weight: 400; }
+  #search { margin: 8px 0; padding: 6px 10px; width: 320px; font-size: 14px; }
+  ul { list-style: none; padding: 0; margin: 0; max-width: 520px; }
+  li { padding: 6px 8px; border-bottom: 1px solid #e2e2e2; display: flex;
+       align-items: center; justify-content: space-between; }
+  li .nm { font-size: 14px; }
+  .draft-btn { margin-left: 12px; padding: 4px 12px; }
+  #drafted div { color: #555; }
+  #pickno { margin-top: 8px; color: #666; font-size: 12px; }
+</style>
+</head>
+<body>
+  <h2>FD nation — Mock Draft Room (virtualized)</h2>
+  <div id="turn" class="waiting"></div>
+  <input id="search" type="search" placeholder="Search players">
+  <h3>Available</h3>
+  <ul id="available"></ul>
+  <h3>Drafted (<span id="count">0</span>)</h3>
+  <ul id="drafted"></ul>
+  <div id="pickno"></div>
+
+  <script>
+  // Virtualized Yahoo-style draft room for CDP regression tests.
+  //  - Only the first WINDOW (40) players are in the DOM when no search is active,
+  //    mimicking Yahoo's row virtualization, so a deep target (e.g. row 55) is
+  //    genuinely absent from read_available()'s scan.
+  //  - The search box filters the live DOM to matching rows, which is exactly the
+  //    mechanism driver.search_player() relies on to surface an off-window target.
+  //  - Drafted players render as <div> (not <li>) so they leave the available scan.
+  window.MockDraft = (function () {
+    var all = [], drafted = [], query = "";
+    var WINDOW = 40;
+
+    function visible() {
+      if (query) {
+        var q = query.toLowerCase();
+        return all.filter(function (p) { return p.name.toLowerCase().indexOf(q) >= 0; });
+      }
+      return all.slice(0, WINDOW);
+    }
+
+    function render() {
+      var ul = document.getElementById("available");
+      ul.innerHTML = "";
+      visible().forEach(function (p) {
+        var li = document.createElement("li");
+        var span = document.createElement("span");
+        span.className = "nm";
+        span.textContent = p.name + " " + p.team + " - " + p.pos;
+        var btn = document.createElement("button");
+        btn.className = "draft-btn";
+        btn.textContent = "Draft";
+        btn.disabled = !(document.getElementById("turn").textContent === "YOUR TURN");
+        btn.onclick = function () { draftPlayer(p.name); };
+        li.appendChild(span);
+        li.appendChild(btn);
+        ul.appendChild(li);
+      });
+      document.getElementById("count").textContent = drafted.length;
+    }
+
+    function draftPlayer(name) {
+      var i = all.findIndex(function (p) { return p.name === name; });
+      if (i < 0) return;
+      var p = all.splice(i, 1)[0];
+      drafted.push(p);
+      setTurn(false);
+      render();
+    }
+
+    function setTurn(on) {
+      var t = document.getElementById("turn");
+      t.textContent = on ? "YOUR TURN" : "";
+      t.className = on ? "" : "waiting";
+      var btns = document.querySelectorAll(".draft-btn");
+      for (var i = 0; i < btns.length; i++) btns[i].disabled = !on;
+    }
+
+    var inp = document.getElementById("search");
+    inp.addEventListener("input", function () { query = inp.value.trim(); render(); });
+
+    return {
+      load: function (list) { all = list.slice(); drafted = []; query = ""; inp.value = ""; setTurn(false); render(); },
+      setTurn: setTurn,
+      drafted: function () { return drafted.slice(); },
+      domNames: function () {
+        return Array.prototype.slice.call(document.querySelectorAll("#available li .nm"))
+          .map(function (e) { return e.textContent; });
+      },
+      clear: function () { all = []; drafted = []; render(); }
+    };
+  })();
+  </script>
+</body>
+</html>
