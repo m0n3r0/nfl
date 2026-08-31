@@ -146,6 +146,44 @@ def main():
         assert dd._pick_number_changed(6, 5) is True, "advanced number must trigger"
         print("PASS #26 pick-number read + guard: pn=%s" % pn)
 
+        # --- #32: Yahoo abbreviation resolution (end-to-end, the P0 bug) ---
+        # Real break on 2026-08-31: Yahoo shows "J. Burrow" but the board key is
+        # "Joe Burrow"; read_available() previously chopped the initial ("Burrow")
+        # and normalize_available() could never re-resolve, so choose_pick treated
+        # every available player as off-board and fell to raw-ADP fallback. Load
+        # REAL board players (so ABBREV_TO_FULL can resolve) rendered in Yahoo's
+        # abbreviated form, then verify read -> normalize -> click all work.
+        real = [{"name": n, "team": t, "pos": p}
+                for (n, t, p, a) in dd.BOARD
+                if n in ("Joe Burrow", "Christian McCaffrey", "A.J. Brown",
+                         "Amon-Ra St. Brown", "Ja'Marr Chase", "CeeDee Lamb",
+                         "Justin Jefferson")]
+        load_players(ws, real)
+        dd.ev(ws, "MockDraft.setAbbrev(true)")
+        avail = dd.read_available(ws)
+        raw_names = [r[0] for r in avail]
+        assert "J. Burrow" in raw_names, \
+            "read_available chopped initial; got %r" % raw_names
+        assert "Burrow" not in raw_names, \
+            "read_available leaked last-name-only: %r" % raw_names
+        names, adp_map, pos_map = dd.normalize_available(avail, def_map={})
+        assert "Joe Burrow" in names, \
+            "normalize failed to resolve abbrev; names=%r" % names
+        assert "Christian McCaffrey" in names, \
+            "normalize failed McCaffrey; names=%r" % names
+        assert "CeeDee Lamb" in names, \
+            "normalize failed CeeDee Lamb; names=%r" % names
+        assert "Justin Jefferson" in names, \
+            "normalize failed Justin Jefferson; names=%r" % names
+        ok = dd.click_player(ws, "Joe Burrow")
+        assert ok is True, "click_player returned %r for abbreviated row" % ok
+        drafted = dd.ev(ws, "MockDraft.drafted()")
+        drafted_names = [p["name"] for p in (drafted or [])]
+        assert "Joe Burrow" in drafted_names, \
+            "abbrev click did not register; drafted=%r" % drafted_names
+        print("PASS #32 abbreviation resolution: read=%r normalize ok click drafted=%s"
+              % (raw_names, drafted_names))
+
         print("\nALL CDP BROWSER TESTS PASSED")
         return 0
     except AssertionError as e:
