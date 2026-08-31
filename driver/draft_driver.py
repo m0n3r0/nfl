@@ -618,6 +618,34 @@ def read_available(ws):
       return out.slice(0,40);
     })()""")
 
+
+def search_player(ws, name):
+    """Bring a specific player into the Yahoo draft search box and return the
+    (now-filtered) row, so a player below read_available()'s first-40 virtualized
+    window is still selectable (issue #23). Returns [name, code, pos, text] or None
+    on any failure; the caller then proceeds with the plain 40-row list."""
+    q = name.replace("'", "").strip()
+    try:
+        ev(ws, """(function(q){
+          var inp=document.querySelector('input[type=search]')
+               || document.querySelector('input[placeholder*="earch" i]')
+               || document.querySelector('.draft-search input');
+          if(!inp) return;
+          var setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
+          inp.focus();
+          setter.call(inp,''); inp.dispatchEvent(new Event('input',{bubbles:true}));
+          setter.call(inp,q); inp.dispatchEvent(new Event('input',{bubbles:true}));
+        })(""" + json.dumps(q) + ")")
+        time.sleep(1.0)
+        rows = read_available(ws)
+        for r in rows:
+            if r[0].lower() == q.lower() or q.lower() in r[0].lower():
+                return r
+        return rows[0] if rows else None
+    except Exception as e:
+        log("SEARCH_PLAYER_FAIL " + name + " " + repr(e))
+        return None
+
 def normalize_available(raw, def_map=None):
     """Convert read_available() rows ([name, code, pos, text]) into the form
     choose_pick expects. Team defenses are keyed by their short BOARD name
@@ -668,6 +696,38 @@ def is_my_pick(ws):
       for(var i=0;i<btns.length;i++){ if(/draft/i.test(btns[i].textContent)&&!btns[i].disabled) return true; }
       return false;
     })()""")
+
+
+def read_pick_number(ws):
+    """Best-effort read of the current overall pick number from the draft page.
+
+    Returns int, or None if it can't be parsed. Used only to guard against a
+    latched/stale is_my_pick() replaying the same turn (issue #26); a None result
+    disables the guard rather than blocking picks."""
+    try:
+        body = ev(ws, "document.body ? document.body.innerText : ''")
+    except Exception:
+        return None
+    if not body:
+        return None
+    # Prefer an explicit "Overall Pick N of M" / "Pick N of M".
+    m = re.search(r"Overall\s+Pick\s+(\d+)", body, re.I)
+    if not m:
+        m = re.search(r"Pick\s+(\d+)\s+of\s+\d+", body, re.I)
+    if not m:
+        m = re.search(r"Round\s+\d+,\s*Pick\s+(\d+)", body, re.I)
+    return int(m.group(1)) if m else None
+
+
+def _pick_number_changed(pn, last_pick_no):
+    """Guard against a stale/latched is_my_pick() acting twice on one turn.
+
+    Returns True (safe to act) when the page pick number is unreadable (pn is
+    None) or has advanced since the last pick we made. A repeated turn yields
+    only one pick. See issue #26."""
+    if pn is None:
+        return True
+    return pn != last_pick_no
 
 def _crowd_reach(c, round_num):
     """True when the crowd drafts this player far later than our board ranks him.
@@ -1012,10 +1072,19 @@ def run_draft():
     drafted={}
     round_num=1
     picks_made=0
+    last_pick_no = None  # overall pick number of our last successful pick (issue #26 guard)
     deadline=time.time()+ (3*3600)
     while time.time()<deadline and picks_made<TOTAL_ROUNDS:
         try:
             if is_my_pick(ws):
+                # Guard against a latched/stale "your turn" indicator (issue #26):
+                # only act when the overall pick number has actually advanced since
+                # our last pick. A repeated number means we already acted this turn.
+                pn = read_pick_number(ws)
+                if not _pick_number_changed(pn, last_pick_no):
+                    log("PICK_GUARD skip: pick number unchanged (%s)" % pn)
+                    time.sleep(2)
+                    continue
                 # read_available returns [name, code, pos, text]; normalize maps
                 # DEF codes to ACTIVE-board keys and parses live Yahoo ADP per row.
                 raw_rows = read_available(ws)
@@ -1026,6 +1095,15 @@ def run_draft():
                                  adp_map=adp_map,pos_map=pos_map)
                 if pick:
                     name,team,pos,adp=pick
+                    # Issue #23: read_available() only virtualizes the first ~40
+                    # DOM rows, so a high-value target Yahoo ranks deeper than row
+                    # 40 never appears in the 40-row window and is unclickable. If
+                    # the chosen name isn't in the current window, ask Yahoo to
+                    # search for it -- which filters the DOM down to that player --
+                    # before we click, so deep targets are still selectable.
+                    if name.lower() not in {n.lower() for n in available}:
+                        log("OFF_WINDOW_SEARCH for " + name)
+                        search_player(ws, name)
                     ok=click_player(ws,name)
                     if ok:
                         # Best-effort confirmation: wait (bounded) for the pick to
@@ -1038,13 +1116,18 @@ def run_draft():
                             log("PICK_CONFIRM_TIMEOUT round="+str(round_num)+" "+name+" (proceeding)")
                         drafted[pos]=drafted.get(pos,0)+1
                         picks_made+=1
+                        last_pick_no = pn  # record so a stale indicator can't replay this turn
                         log("PICKED round="+str(round_num)+" "+name+" ("+pos+") ADP="+str(adp))
                         round_num+=1
                         time.sleep(random.uniform(1.5,3.0))
                     else:
                         log("PICK_CLICK_FAILED "+str(name))
                 else:
-                    log("NO_VALID_PICK round="+str(round_num))
+                    # choose_pick returned None (board exhausted / only timing-guarded
+                    # names remain). Don't spin: let the 1-min clock expire and Yahoo
+                    # auto-draft our slot. The pick-number guard above also prevents
+                    # re-entering this branch on a stale "your turn" indicator. See #26.
+                    log("NO_VALID_PICK round="+str(round_num)+" (yielding to auto-draft)")
             else:
                 time.sleep(random.uniform(2,5))
         except Exception as e:
