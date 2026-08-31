@@ -871,6 +871,28 @@ def _pick_number_changed(pn, last_pick_no):
         return True
     return pn != last_pick_no
 
+def round_from_pick_number(pn, local_round, teams=TEAMS):
+    """Derive the draft round from the page's overall pick number (issue #44).
+
+    `round_num` in run_draft is our own counter, incremented only after a
+    successful pick and reset to 1 on restart. If the driver starts late or a
+    pick is missed/auto-drafted, that counter drifts from the room and every
+    anchor / timing gate fires at the wrong round. The page's overall pick
+    number is authoritative: round = ((pick_no - 1) // teams) + 1.
+
+    Returns the page-derived round when `pn` is a positive int, else falls back
+    to `local_round` (page number unreadable).
+    """
+    if pn is None:
+        return local_round
+    try:
+        pn = int(pn)
+    except (TypeError, ValueError):
+        return local_round
+    if pn < 1:
+        return local_round
+    return ((pn - 1) // teams) + 1
+
 def _crowd_reach(c, round_num):
     """True when the crowd drafts this player far later than our board ranks him.
 
@@ -1250,7 +1272,19 @@ def run_draft():
                 # DEF codes to ACTIVE-board keys and parses live Yahoo ADP per row.
                 raw_rows = read_available(ws)
                 available, adp_map, pos_map = normalize_available(raw_rows, def_map=def_map)
-                log("MY_PICK round="+str(round_num)+" avail="+str(len(available))
+                # Issue #44: round_num is our own counter and drifts if the driver
+                # is restarted mid-draft or a pick is missed/auto-drafted, which
+                # mistimes every anchor and the K/DEF/QB gates. Derive the round
+                # from the page's overall pick number when we can read it, so the
+                # anchor schedule tracks the room. Fall back to the local counter
+                # only when the page number is unreadable.
+                page_round = round_from_pick_number(pn, round_num) if pn is not None else None
+                if page_round is not None and page_round != round_num:
+                    log("ROUND_RESYNC page_round=%d local_round=%d (using page)"
+                        % (page_round, round_num))
+                    round_num = page_round
+                log("MY_PICK round="+str(round_num)+" page_round="+str(page_round)
+                    + " avail="+str(len(available))
                     + " yahoo_adp="+str(len(adp_map)))
                 pick=choose_pick(available,drafted,round_num,board,
                                  adp_map=adp_map,pos_map=pos_map)
@@ -1274,7 +1308,14 @@ def run_draft():
                         if _confirm_pick(ws, name):
                             log("PICK_CONFIRMED round="+str(round_num)+" "+name)
                         else:
+                            # Issue #44: we could not verify the pick registered.
+                            # We still advance local state (Yahoo may have taken it
+                            # or the confirm read simply lagged), but flag it loudly
+                            # so a divergence is visible and the next turn's page
+                            # re-read (round + drafted are reconciled above) resyncs.
                             log("PICK_CONFIRM_TIMEOUT round="+str(round_num)+" "+name+" (proceeding)")
+                            log("ROSTER_STATE_UNVERIFIED round="+str(round_num)+" "+name
+                                +" pos="+str(pos)+" -- local roster may diverge from Yahoo")
                         drafted[pos]=drafted.get(pos,0)+1
                         picks_made+=1
                         last_pick_no = pn  # record so a stale indicator can't replay this turn
