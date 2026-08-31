@@ -608,11 +608,11 @@ def read_available(ws):
       var seen={};
       var rows=document.querySelectorAll('tr, li');
       for(var i=0;i<rows.length;i++){
-        var t=rows[i].innerText.replace(/\\s+/g,' ').trim();
+        var t=rows[i].innerText.replace(/\s+/g,' ').trim();
         // player name pattern: "First Last" (or "First" for team defenses like
         // "Ravens") followed by "TEAM - POS". The name may be 1-3 words; the
         // second/third word is optional so single-word defense names parse.
-        var m=t.match(/([A-Z][a-z]+(?:['’]\\w+)?(?:\.?[ -][A-Z][a-z]+(?:['’]\\w+)?){0,3})(?:\\s+(?:I{1,3}|IV|VI{0,3}|Jr|Sr)\\.?)?\\s+([A-Za-z]{2,4})\\s*-\\s*(QB|RB|WR|TE|K|DEF|DST)/);
+        var m=t.match(/([A-Z][a-z]+(?:['’]\w+)?(?:\.?[ -][A-Z][a-z]+(?:['’]\w+)?){0,3})(?:\s+(?:I{1,3}|IV|VI{0,3}|Jr|Sr)\.?)?\s+([A-Za-z]{2,4})\s*-\s*(QB|RB|WR|TE|K|DEF|DST)/);
         if(m && !seen[m[1]]){ seen[m[1]]=1; out.push([m[1], m[2], m[3], t]); }
       }
       return out.slice(0,40);
