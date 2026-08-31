@@ -55,4 +55,44 @@ for txt, exp in checks.items():
         "regex %r -> %r, expected %r" % (txt, mm.group(1) if mm else None, exp)
 print("read_available regex keeps abbreviated+full names intact")
 
+# 7) ACTIVE-board coverage. The module-level maps are built from the 67-player
+#    static BOARD tuple, but the draft engine runs on the 250-player JSON board --
+#    which left ~198 players unresolvable (they fell to the raw-ADP fallback).
+#    rebuild_abbrev_maps() must make EVERY active board player resolvable.
+from collections import defaultdict  # noqa: E402
+
+board = dd.load_original_board()
+before = sum(1 for v in board.values()
+             if v.get("name") and dd._norm_name(v["name"], v.get("team")) in dd.ABBREV_TO_FULL)
+n_indexed = dd.rebuild_abbrev_maps(board)
+after = sum(1 for v in board.values()
+            if v.get("name") and dd._norm_name(v["name"], v.get("team")) in dd.ABBREV_TO_FULL)
+print("active board %d players | resolvable before rebuild=%d after=%d"
+      % (len(board), before, after))
+assert n_indexed >= len(board) - 1, "rebuild indexed only %d of %d" % (n_indexed, len(board))
+assert after >= len(board) - 1, "%d board players still unresolvable" % (len(board) - after)
+assert before < after, "rebuild was a no-op (expected strictly better coverage)"
+
+# A player the static maps could NOT resolve must now resolve end to end.
+target = next(v for v in board.values() if v.get("name") == "Drake Maye")
+disp = dd.to_display(target["name"], target.get("team"))
+row = [[disp, None, None, "%s %s - QB ADP 30" % (disp, target["team"])]]
+nm, _, _ = dd.normalize_available(row, def_map={})
+assert nm[0] == "Drake Maye", "active-board rebuild did not resolve %r (got %r)" % (disp, nm[0])
+print("active-board rebuild resolves %r -> %r" % (disp, nm[0]))
+
+# 8) Collision safety: when two active players abbreviate to the SAME key and no
+#    team code is available, the key must be left unresolvable (None) rather than
+#    guessing one of them -- a wrong guess would draft the wrong player.
+groups = defaultdict(list)
+for v in board.values():
+    if v.get("name"):
+        groups[dd._norm_name(v["name"], None)].append(v["name"])
+amb = sorted(k for k, ns in groups.items() if len(set(ns)) > 1)
+assert amb, "expected at least one ambiguous abbreviation on the active board"
+for k in amb[:3]:
+    got = dd.ABBREV_TO_FULL_NT.get(k, "MISSING")
+    assert got is None, "ambiguous key %r must be None, got %r" % (k, got)
+print("ambiguous abbrev keys left unmatched (no team code):", amb[:3])
+
 print("\nALL ABBREV TESTS PASSED")

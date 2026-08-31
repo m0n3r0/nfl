@@ -387,6 +387,44 @@ ABBREV_TO_FULL = {_norm_name(n, t): n for (n, t, p, a) in BOARD}
 ABBREV_TO_FULL_NT = {_norm_name(n, None): n for (n, t, p, a) in BOARD}
 NAME_TO_TEAM = {n: t for (n, t, p, a) in BOARD}
 
+
+def rebuild_abbrev_maps(board):
+    """Rebuild the Yahoo-abbreviation reverse maps from the ACTIVE board.
+
+    The module-level maps above are built from the static BOARD tuple (67 players),
+    but the draft engine runs on the 250-player JSON board -- which left ~198
+    players unresolvable: Yahoo shows "J. Burrow", the abbreviation never matched a
+    board key, and choose_pick treated them as off-board (raw-ADP fallback) for most
+    of the draft. run_draft() calls this once the engine has selected its board.
+
+    `global` is REQUIRED: assigning without it creates a function-local that nothing
+    reads, leaving normalize_available()/click_player() on the stale static maps --
+    the exact bug class as issue #10's def_map.
+
+    The team-less (NT) map is the fallback used when a row's team code is missing or
+    isn't on the board. It is only populated when unambiguous: two players can
+    abbreviate to the same "A. Brown", and guessing would draft the WRONG player, so
+    a colliding key is set to None -- the row then stays unmatched and falls through
+    to _fallback_pick rather than resolving to the wrong player.
+
+    Returns the number of players indexed.
+    """
+    global ABBREV_TO_FULL, ABBREV_TO_FULL_NT, NAME_TO_TEAM
+    ABBREV_TO_FULL, ABBREV_TO_FULL_NT, NAME_TO_TEAM = {}, {}, {}
+    for v in board.values():
+        n, t = v.get("name"), v.get("team")
+        if not n:
+            continue
+        NAME_TO_TEAM[n] = t
+        ABBREV_TO_FULL[_norm_name(n, t)] = n
+        # Team-less fallback only when unambiguous (see docstring).
+        k = _norm_name(n, None)
+        if ABBREV_TO_FULL_NT.get(k, n) != n:
+            ABBREV_TO_FULL_NT[k] = None
+        else:
+            ABBREV_TO_FULL_NT[k] = n
+    return len(ABBREV_TO_FULL)
+
 def build_value_board(adp_map=None):
     """Live board: BOARD names annotated with FantasyPros ECR combined with ADP,
     ordered by value. ADP comes from (in priority order):
@@ -1186,6 +1224,12 @@ def run_draft():
     # be drafted. See issue #10.
     def_map = {v["team"].upper(): v["name"]
                for v in board.values() if v.get("pos") == "DEF"}
+    # Rebuild the Yahoo-abbreviation reverse maps ("J. Burrow" -> "Joe Burrow") from
+    # the ACTIVE board. The module-level defaults only cover the 67-player static
+    # BOARD, so without this ~198 of 250 board players look off-board to choose_pick.
+    # See rebuild_abbrev_maps() for why `global` matters here (issue #10 bug class).
+    n_abbrev = rebuild_abbrev_maps(board)
+    log("ABBREV_MAPS rebuilt from active board: %d players" % n_abbrev)
     drafted={}
     round_num=1
     picks_made=0
