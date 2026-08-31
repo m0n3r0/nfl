@@ -6,13 +6,15 @@ Tracking the 2026-08-31 code review. Every finding is a GitHub issue on
 | Phase | Issues | Theme | Status |
 |---|---|---|---|
 | 1 | #9, #10, #11 | Draft-blocking: board size, DEF map, no-pick stall | **done** |
-| 2 | #17, #18, #19, #20, #21 | Correctness: leakage, predict, VOR, scale, deploy | not started |
+| 2 | #17, #18, #19, #20, #21 | Correctness: leakage, predict, VOR, scale, deploy | **in progress** (#17/#18 shipped, #19/#20 done this pass; #21 open) |
 | 3 | #22, #23, #24, #25, #26 | Privacy, robustness, performance, CI | not started |
 | 4 | #27, #28, #29, #30, #31 | Hygiene, tests, docs | not started |
 
-Phases 2-4 below describe the **intended** fix, not work already shipped. They are
-written up in advance so each phase can be executed without re-deriving the diagnosis;
-each section is struck from the "not started" column only when its code lands.
+Phases 2-4 below describe the intended fix. Phase 2 is partially shipped: #17
+(leakage) and #18 (predict) landed in earlier passes; #19/#20 (value scale + VOR)
+landed in this pass; #21 (deploy drift) remains open. Phases 3-4 are still planned.
+A section is marked done only when its code has landed and is verified by the
+regression gate (`tools/simulate_draft.py` / `tests/test_simulation.py`).
 
 ---
 
@@ -93,11 +95,15 @@ R14  K   Caleb Shudak      R15  DEF  Ravens
 Tests: `test_draft_driver.py` + `test_original_board.py` = 27 passing, including three new
 regression tests (active DEF map, off-board fallback, board larger than the draft).
 
-### Known-remaining (Phase 2)
+### Known-remaining (Phase 2) — resolved
 
-The simulation reported `QB under-filled` and `4 TEs drafted`. That is not a Phase 1
-regression — it is the missing VOR normalisation (#20): raw projected points are
-QB-inflated, so rivals hoard quarterbacks and TEs outrank remaining WRs. Fixed in Phase 2.
+The simulation reported `QB under-filled` and `4 TEs drafted`. The 4-TE half was the
+missing VOR normalisation (#20), now fixed. The QB half turned out *not* to be a bot
+bug: the simulation's opponent model hoarded every quarterback (see #19/#20 below), an
+impossible scenario. With the opponent model corrected to draft for need and
+`BENCH_CAP["TE"]` lowered to 2, a full 15-round replay now fills every required slot
+with a balanced roster (RB 3, WR 6, TE 2, QB 2, K 1, DEF 1) and no `NO_VALID_PICK`.
+Guarded by `tests/test_simulation.py`.
 
 ### Deep pass (second look, same day)
 
@@ -277,21 +283,35 @@ favourite on 16/16 — expected, since the spread dominates that variant. The EP
 move the *magnitude*, not the sign. The `no_spread` variant is the one that expresses an
 independent opinion, at 61.2% accuracy.
 
-### #19 + #20 Value scales and VOR
+### #19 + #20 Value scales and VOR — **fixed**
 
-Board `value` mixes season points (QB 393, K 153) with a defensive rating (DEF 6.1), and
-raw points are QB-inflated — which is why the simulation drafted four tight ends and no
-quarterback.
+Board `value` mixed season points (QB 393, K 153) with a defensive rating that was still
+per-game (DEF ~6.1), and raw points are QB-inflated — so cross-position comparisons were
+meaningless and the simulation drafted four tight ends and no quarterback.
 
-Planned fix:
+- **DEF on a season footing** (`src/draft_board.py`): the defense model is derived per game,
+  so `_defense_board()` now multiplies the per-game rating by `GAMES_PER_SEASON` (17) before
+  it reaches the board. DEF values now sit in the same ~70-105 season-point range as K, so
+  the board itself is internally consistent before VOR runs.
+- **VOR inside `choose_pick()`** (`driver/draft_driver.py`): a new `replacement_values()` /
+  `vor()` pair converts every projected-points player to value over replacement. Replacement
+  level is the Nth-best at each position (N = starters league-wide: 10 QB, 24 RB, 25 WR, 12
+  TE, 10 K/DEF). On a board thinner than that count a position degrades to raw value
+  (replacement = 0), which keeps unit-test boards sensible without changing live behaviour
+  on the 250-player board. The live market path (Yahoo ADP - FantasyPros ECR, both ranks) is
+  intentionally left un-VOR'd — applying VOR to rank differences would be meaningless.
+- **Scarcity premium is now a fraction** (`SCARCITY_FRACTION = {"RB": 0.10}`) of the
+  position's value spread, not the old absolute `8.0` that was invisible at 300-point scale.
+- **Bench cap** `BENCH_CAP = {"QB": 2, "K": 1, "DEF": 1, "TE": 2}` stops the bench path from
+  rostering a 4th QB or a 3rd TE over a WR3.
 
-- Convert every position to **VOR** (value over replacement). Replacement level is the
-  Nth-best player at each position, where N is the number a 10-team league starts, so VOR
-  is directly comparable across positions.
-- Put DEF on a season-points footing before VOR, so it is commensurable with K.
-- Make `SCARCITY_BONUS` a fraction of the position's value spread instead of an absolute
-  8.0, so it stays meaningful at any scale.
-- Add a soft cap so the bench path cannot draft more than 2 QBs.
+**On the simulation's QB-shutout:** the old `tools/simulate_draft.py` opponent model filled
+required slots but then took the single highest-raw-value player on every bench pick. Because
+QBs carry the highest raw projection, every rival hoarded all 32 quarterbacks and our bot was
+shut out — an impossible scenario with nothing to do with our VOR logic. The opponent model
+now drafts for need with per-team position caps (mirroring a real 10-team league), so the
+simulation tests *our* bot. After that fix, a full replay yields the balanced roster above with
+no `NO_VALID_PICK`. Regression: `tests/test_simulation.py`.
 
 ### #21 Deploy drift
 

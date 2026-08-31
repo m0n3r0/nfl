@@ -45,6 +45,11 @@ _SKILL_DEPTH = {"QB": 32, "RB": 60, "WR": 70, "TE": 32}
 K_TOP = 28
 DEF_TOP = 28
 
+# Team games in an NFL regular season. K and skill-position projections are
+# already season totals; the defense model is derived per game, so it is
+# multiplied by this to land on the same footing. See _defense_board().
+GAMES_PER_SEASON = 17
+
 # Smallest board we are willing to ship. Guards against a future edit quietly
 # reintroducing the round-12 exhaustion: 10 teams x 15 rounds = 150 picks, and we
 # want meaningful headroom above that. write_original_board() raises if it is short.
@@ -187,13 +192,19 @@ def _defense_board(corpus: dict) -> list[dict]:
         return []
     league_avg = td["avg_points_allowed"].mean()
     # Lower points allowed = better defense = higher fantasy value. Linear map
-    # anchored so a league-average defense is worth ~4 pts; each PA above/below
-    # the average moves value by 0.5.
+    # anchored so a league-average defense is worth ~4 pts PER GAME; each PA
+    # above/below the average moves value by 0.5.
     td["def_value"] = 4.0 + (league_avg - td["avg_points_allowed"]) * 0.5
     if "def_sos_factor" in td.columns:
         # positive def_sos_factor = allows more (easier opponents) -> worse for D
         td["def_value"] = td["def_value"] * (1.0 - 0.4 * td["def_sos_factor"].fillna(0.0))
     td["def_value"] = td["def_value"].clip(-2.0, 14.0).round(1)
+    # Convert PER-GAME to SEASON points so DEF is commensurable with K and the
+    # skill positions. Issue #19: a board value of 6.1 (DEF, per game) sat next
+    # to 153.0 (K, season) and 392.8 (QB, season), so any cross-position
+    # comparison silently treated a top defense as worthless. VOR later
+    # differences the scale away, but the board itself must be consistent.
+    td["def_value"] = (td["def_value"] * GAMES_PER_SEASON).round(1)
     td = td.sort_values("def_value", ascending=False).head(DEF_TOP)
     out = []
     for _, r in td.iterrows():

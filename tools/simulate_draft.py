@@ -35,18 +35,26 @@ def load_driver():
 
 
 def _opponent_pick(dd, board, avail, roster, rnd):
-    """Model one rival's pick.
+    """Model one rival's pick like a real manager.
 
-    Real managers draft for need, not raw value: they fill their starting lineup
-    before stacking one position, and they do not touch K/DEF until the late
-    rounds. Modelling them as "always take the highest value" (which is what a
-    naive simulation does) makes every rival hoard quarterbacks, because raw
-    projected points are QB-inflated -- see issue #20.
+    Rivals fill their starting lineup first, then take best available for the
+    bench -- but they never hoard. The previous model filled required slots
+    first yet let the bench path take the single highest-raw-value player on
+    every pick. Because QBs carry the highest raw projection, every rival took a
+    quarterback on every bench pick and hoarded all 32 of them, producing an
+    impossible QB-shutout that had nothing to do with our bot's VOR logic (issue
+    #20). The caps below mirror a realistic 10-team roster -- one starter,
+    occasionally a backup, never a pile -- so the simulation stresses OUR bot,
+    not a league that drafts 32 quarterbacks.
     """
-    cands = sorted((v for v in board.values() if v["name"] in avail),
-                   key=lambda x: x["value"], reverse=True)
+    cands = [v for v in board.values() if v["name"] in avail]
     if not cands:
         return None
+
+    # Realistic per-team totals: one starter, occasionally a backup, never a pile.
+    # Past these a rival stops reaching for the position even if its projection is
+    # high, exactly as a human would.
+    RIVAL_CAP = {"QB": 2, "RB": 5, "WR": 6, "TE": 2, "K": 1, "DEF": 1}
 
     def legal(pos):
         if pos in ("K", "DEF") and rnd < dd.TOTAL_ROUNDS - 1:
@@ -55,17 +63,25 @@ def _opponent_pick(dd, board, avail, roster, rnd):
             return False
         return True
 
-    # Fill a starting slot we still need.
+    def room_for(pos):
+        return roster.get(pos, 0) < RIVAL_CAP.get(pos, 99)
+
+    # 1) Fill a required starting slot we still need (and have room for).
     for pos, need in dd.REQUIRED.items():
-        if roster.get(pos, 0) < need:
-            for v in cands:
-                if v["pos"] == pos and legal(pos):
-                    return v
-    # Starters full -> best available for the bench.
-    for v in cands:
-        if legal(v["pos"]):
-            return v
-    return None
+        if roster.get(pos, 0) < need and room_for(pos):
+            best = max((v for v in cands if v["pos"] == pos and legal(pos)),
+                       key=lambda x: x["value"], default=None)
+            if best is not None:
+                return best
+    # 2) Best available we still have room for (bench), rounding out the roster
+    #    instead of stacking one position.
+    best = max((v for v in cands if legal(v["pos"]) and room_for(v["pos"])),
+               key=lambda x: x["value"], default=None)
+    if best is not None:
+        return best
+    # 3) Last resort: anything legal (a 250-deep board makes this unreachable).
+    return max((v for v in cands if legal(v["pos"])),
+               key=lambda x: x["value"], default=None)
 
 
 def simulate(dd, board, verbose=False):
@@ -108,8 +124,8 @@ def simulate(dd, board, verbose=False):
         problems.append("drafted %d QBs (raw points are not VOR-normalised yet, "
                         "see issue #20)" % drafted["QB"])
     if drafted.get("TE", 0) > 2:
-        problems.append("drafted %d TEs -- positional values are not comparable "
-                        "(see issues #19 and #20)" % drafted["TE"])
+        problems.append("drafted %d TEs -- over-stacking TEs; BENCH_CAP['TE'] "
+                        "should cap this (see issues #19 and #20)" % drafted["TE"])
 
     if verbose:
         for rnd, pos, name in picks:

@@ -147,10 +147,11 @@ score good RBs *negative* — left to raw value, the bot would skip RBs for
 "higher-value" WRs and get shut out of the scarcest position. Two guardrails fix
 this (both in `choose_pick`):
 
-- **Soft scarcity premium** (`SCARCITY_BONUS`) — while we still *need* a scarce
-  position (RB), its effective value gets a `+8` lift so close calls anchor it
-  early instead of being out-ranked by WRs. Once the slot is filled the premium
-  drops to zero (we don't hoard RBs).
+- **Soft scarcity premium** (`SCARCITY_FRACTION = {"RB": 0.10}`) — while we still
+  *need* a scarce position (RB), its effective value gets a lift equal to 10% of the
+  RB value spread, so close calls anchor it early instead of being out-ranked by WRs.
+  It is a fraction of the spread (not the old absolute `+8`), so it stays meaningful
+  at any scale, and it drops to zero once the slot is filled (we don't hoard RBs).
 - **Hard anchor schedule** (`ANCHOR_BY_ROUND`) — the Nth still-needed player at
   each position is *forced* if the round has passed its deadline: 1st RB by R3,
   2nd RB by R5, 1st/2nd WR by R5/R9, TE by R7, QB by R10, K/DEF by R14. This

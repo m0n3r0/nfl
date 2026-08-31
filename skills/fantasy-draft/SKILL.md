@@ -118,9 +118,12 @@ Three bugs were found and fixed in this pass (issues #9/#10/#11):
 3. **No fallback when the board is exhausted** — `choose_pick()` returned `None` and
    stalled. Added `_fallback_pick()`, which drafts a player Yahoo is showing.
 
-Known-remaining, tracked as issues #19/#20: the sim drafts **4 TEs and 0 QBs**, because
-raw projected points are QB-inflated and board `value` is not comparable across
-positions. This is a value-normalisation gap, not a stall, and is being fixed with VOR.
+Resolved (issues #19/#20): the sim previously drafted **4 TEs and 0 QBs** because board
+`value` mixed season points with a per-game DEF rating and raw points are QB-inflated.
+Fixed by putting DEF on a season-points footing and applying VOR (value over replacement)
+inside `choose_pick()`, with the scarcity premium rescaled to a fraction of the RB value
+spread and a bench cap (`BENCH_CAP`). A full 15-round replay now yields a balanced roster
+(RB 3, WR 6, TE 2, QB 2, K 1, DEF 1) with no `NO_VALID_PICK`. Regression: `tests/test_simulation.py`.
 
 ### 2026-08-21 — mock draft (superseded)
 Historical: the original hand-built `BOARD` had **no K and no DEF**, so the driver would

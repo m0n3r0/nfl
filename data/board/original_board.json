@@ -1365,168 +1365,168 @@
     "name": "Ravens",
     "team": "BAL",
     "pos": "DEF",
-    "value": 6.1
+    "value": 103.7
   },
   {
     "name": "Steelers",
     "team": "PIT",
     "pos": "DEF",
-    "value": 5.9
+    "value": 100.3
   },
   {
     "name": "Patriots",
     "team": "NE",
     "pos": "DEF",
-    "value": 5.9
+    "value": 100.3
   },
   {
     "name": "Seahawks",
     "team": "SEA",
     "pos": "DEF",
-    "value": 4.8
+    "value": 81.6
   },
   {
     "name": "Eagles",
     "team": "PHI",
     "pos": "DEF",
-    "value": 4.7
+    "value": 79.9
   },
   {
     "name": "Packers",
     "team": "GB",
     "pos": "DEF",
-    "value": 4.5
+    "value": 76.5
   },
   {
     "name": "Bills",
     "team": "BUF",
     "pos": "DEF",
-    "value": 4.4
+    "value": 74.8
   },
   {
     "name": "Chiefs",
     "team": "KC",
     "pos": "DEF",
-    "value": 4.4
+    "value": 74.8
   },
   {
     "name": "Bears",
     "team": "CHI",
     "pos": "DEF",
-    "value": 4.4
+    "value": 74.8
   },
   {
     "name": "Broncos",
     "team": "DEN",
     "pos": "DEF",
-    "value": 4.3
+    "value": 73.1
   },
   {
     "name": "Buccaneers",
     "team": "TB",
     "pos": "DEF",
-    "value": 4.3
+    "value": 73.1
   },
   {
     "name": "Chargers",
     "team": "LAC",
     "pos": "DEF",
-    "value": 4.2
+    "value": 71.4
   },
   {
     "name": "Dolphins",
     "team": "MIA",
     "pos": "DEF",
-    "value": 4.2
+    "value": 71.4
   },
   {
     "name": "SD",
     "team": "SD",
     "pos": "DEF",
-    "value": 4.1
+    "value": 69.7
   },
   {
     "name": "LA",
     "team": "LA",
     "pos": "DEF",
-    "value": 4.1
+    "value": 69.7
   },
   {
     "name": "Jaguars",
     "team": "JAX",
     "pos": "DEF",
-    "value": 4.0
+    "value": 68.0
   },
   {
     "name": "Jets",
     "team": "NYJ",
     "pos": "DEF",
-    "value": 4.0
+    "value": 68.0
   },
   {
     "name": "Cowboys",
     "team": "DAL",
     "pos": "DEF",
-    "value": 4.0
+    "value": 68.0
   },
   {
     "name": "Vikings",
     "team": "MIN",
     "pos": "DEF",
-    "value": 3.9
+    "value": 66.3
   },
   {
     "name": "49ers",
     "team": "SF",
     "pos": "DEF",
-    "value": 3.9
+    "value": 66.3
   },
   {
     "name": "Panthers",
     "team": "CAR",
     "pos": "DEF",
-    "value": 3.8
+    "value": 64.6
   },
   {
     "name": "Colts",
     "team": "IND",
     "pos": "DEF",
-    "value": 3.8
+    "value": 64.6
   },
   {
     "name": "Titans",
     "team": "TEN",
     "pos": "DEF",
-    "value": 3.7
+    "value": 62.9
   },
   {
     "name": "Giants",
     "team": "NYG",
     "pos": "DEF",
-    "value": 3.7
+    "value": 62.9
   },
   {
     "name": "Bengals",
     "team": "CIN",
     "pos": "DEF",
-    "value": 3.6
+    "value": 61.2
   },
   {
     "name": "Commanders",
     "team": "WAS",
     "pos": "DEF",
-    "value": 3.6
+    "value": 61.2
   },
   {
     "name": "Saints",
     "team": "NO",
     "pos": "DEF",
-    "value": 3.6
+    "value": 61.2
   },
   {
     "name": "Texans",
     "team": "HOU",
     "pos": "DEF",
-    "value": 3.6
+    "value": 61.2
   }
 ]
