@@ -7,13 +7,14 @@ Tracking the 2026-08-31 code review. Every finding is a GitHub issue on
 |---|---|---|---|
 | 1 | #9, #10, #11 | Draft-blocking: board size, DEF map, no-pick stall | **done** |
 | 2 | #17, #18, #19, #20, #21 | Correctness: leakage, predict, VOR, scale, deploy | **done** (#17/#18 shipped, #19/#20 + #21 deploy drift fixed this pass) |
-| 3 | #22, #23, #24, #25, #26 | Privacy, robustness, performance, CI | not started |
-| 4 | #27, #28, #29, #30, #31 | Hygiene, tests, docs | not started |
+| 3 | #22, #23, #24, #25, #26 | Privacy, robustness, performance, CI | **done** |
+| 4 | #27, #28, #29, #30, #31 | Hygiene, tests, docs | **done** |
 
 Phase 1 (draft-blockers) and Phase 2 (leakage, predict, value scale/VOR, deploy
 drift) are complete and verified by the `tests/test_simulation.py` regression gate.
-The Phase-2 sections below record what each fix did; Phases 3-4 remain planned.
-A section is marked done only when its code has landed and is verified by the
+Phases 3 (privacy/robustness/performance/CI) and 4 (hygiene/tests/docs) are also
+complete; every issue #9-#31 is now closed. The sections below record what each fix
+did. A section is marked done only when its code has landed and is verified by the
 regression gate (`tools/simulate_draft.py` / `tests/test_simulation.py`).
 
 ---
@@ -335,64 +336,70 @@ Workflow now: edit in repo → `powershell -File tools/deploy.ps1` (confirm the 
 
 ---
 
-## Phase 3 — privacy, robustness, performance, CI (planned, not started)
+## Phase 3 — privacy, robustness, performance, CI (done)
 
-### #22 `data/scrapes/` holds real names and session state
+### #22 `data/scrapes/` holds real names and session state — **mitigated**
 
 Six tracked files list all ten league managers by name and record
-`LOGGED_IN_INDICATOR True`. Planned fix: add `data/scrapes/` to `.gitignore` and
-`git rm --cached` the files.
+`LOGGED_IN_INDICATOR True`. Resolution: the files were **never committed** — they are
+gitignored (`.gitignore` line 34) and absent from history, so the public repo exposes
+nothing. No `git rm --cached` was needed. Closed as already-mitigated.
 
-### #23 `read_available()` scans only 40 rows
+### #23 `read_available()` scans only 40 rows — **fixed** (236e35d)
 
-Planned fix: search-driven fallback — when the best remaining board candidate is not in
-the visible rows, type the name into Yahoo's player search and read the result instead of
-silently substituting a worse pick.
+`search_player()` focuses Yahoo's draft search box, sets the query, and re-reads the
+(now-filtered) rows. `run_draft()` calls it whenever `choose_pick()` returns a name that
+isn't in the visible 40-row window, so a deep target (e.g. row 60) is still clickable.
+Two `run_draft()`-driven regression tests assert the off-window search fires exactly once
+and that on-window targets skip it.
 
-### #24 Ratings re-read once per game
+### #24 Ratings re-read once per game — **fixed** (7796fa0)
 
-`build_model_frame()` calls `team_ratings_asof()` per game — ~1,087 gz reads. Planned fix:
-memoize on `(season, week)`, cutting it to ~72.
+`build_model_frame()` memoizes `team_ratings_asof()` on `(season, week, refresh)`, cutting
+~1,087 per-game disk reads to ~72. `test_model.py` dropped from ~99s to ~48s.
 
-### #25 Slow tests, no CI
+### #25 Slow tests, no CI — **fixed** (0e689d2)
 
-Planned fix: `conftest.py` with session-scoped fixtures so the ~95 MB CSV/PBP data loads
-once per session; add `pytest.ini` and `.github/workflows/ci.yml` (fast tests on push/PR,
-full suite nightly).
+Added `tests/conftest.py` (session-scoped `games_df`/`weekly_stats_df` fixtures),
+`pytest.ini` (registers the `slow` marker + `testpaths`), and `.github/workflows/ci.yml`
+(`fast` job runs `pytest -m "not slow"` on push/PR; `full` job nightly / `workflow_dispatch`
+/ `[full-ci]` in commit). `test_scoring.py`, `test_model.py`, `test_projections.py` marked
+`slow`. Fast suite is 31 tests (~10s).
 
-### #26 `is_my_pick()` could latch on a stale Draft button
+### #26 `is_my_pick()` could latch on a stale Draft button — **fixed** (236e35d)
 
-Planned fix: demote the button scan to a secondary signal scoped to the active pick
-region, and track the pick number so the same turn cannot be picked twice.
+`run_draft()` reads the overall pick number each turn and skips a turn whose number is
+unchanged (`PICK_GUARD`), so a latched/stale "your turn" indicator cannot replay the same
+pick. `choose_pick()` returning `None` now logs `NO_VALID_PICK` and yields to Yahoo's
+auto-draft instead of spinning.
 
 ---
 
-## Phase 4 — hygiene and docs (planned, not started)
+## Phase 4 — hygiene and docs (done)
 
-### #27 Invalid escape sequence
+### #27 Invalid escape sequence — **fixed** (7796fa0)
 
-The multi-line JavaScript strings in `read_available()` and `click_player()` need to be
-raw strings, clearing the `DeprecationWarning` that becomes a `SyntaxError` in a future
-Python.
+`read_available()`'s and `click_player()`'s multi-line JS strings are now raw (`r"""..."""`),
+clearing the `SyntaxWarning: invalid escape sequence` (`\.`/`\s`/`\w`).
 
-### #28 Ties labelled as losses
+### #28 Ties labelled as losses — **fixed** (7796fa0)
 
-Planned fix: `build_model_frame()` drops tied games instead of encoding them as a home
-loss.
+`build_model_frame()` now drops tied games (`home_score != away_score`) instead of encoding
+them as a home loss.
 
-### #29 `tools/` cleanup
+### #29 `tools/` cleanup — **fixed** (31d94bf)
 
-Planned fix: move one-off debug probes to `tools/debug/`; keep load-bearing utilities in
-`tools/`.
+Moved 18 one-off debug probes (`dbg_*`, `dump_draft_page*`, `probe_*`, `smoke_*`,
+`cdp_*`, `verify_players`, `scrape_draft_*`) to `tools/debug/`; load-bearing utilities
+stay in `tools/`. README documents the split.
 
-### #30 Board-size invariant (code done in Phase 1)
+### #30 Board-size invariant — **fixed** (7796fa0)
 
-`test_real_board_depth_if_present` checked per-position depth >= 10, which passed on the
-broken 121-player board. Added `test_real_board_is_larger_than_the_whole_draft`, which
-asserts `len(board) >= TEAMS * TOTAL_ROUNDS` using the driver's own constants. The test is
-landed; this entry stays open until the phase is committed as a whole.
+`test_real_board_depth_if_present` now also asserts `len(board) >= TEAMS * TOTAL_ROUNDS`
+(150 picks) using the driver's own constants, so a board smaller than the draft can never
+pass.
 
-### #31 README corrections
+### #31 README corrections — **fixed** (6fc6d40)
 
 - [x] **Board path** — fixed in Phase 1. `load_original_board()` now searches the deploy
   layout, the repo layout, and the CWD, so the documented `py.exe driver/draft_driver.py`
