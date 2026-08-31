@@ -200,6 +200,11 @@ def _kicker_board(corpus: dict) -> list[dict]:
     k = weekly[weekly["position"].isin(["K", "PK"])].copy()
     if k.shape[0] == 0:
         return []
+    # Recency filter (#35 follow-up): kickers who last played before the
+    # most recent complete season are retired or irrelevant. Without this,
+    # a 2022-only kicker (e.g. Ryan Succop) outranks current starters.
+    latest = k["season"].max()
+    k = k[k["season"] >= latest - 1]
     k["k_pts"] = k.apply(score_kicker_row, axis=1)
     k["w"] = k["season"].map(_SEASON_WEIGHTS)
     k["wp"] = k["k_pts"] * k["w"]
