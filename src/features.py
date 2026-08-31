@@ -241,6 +241,12 @@ def team_ratings_asof(season: int, week: int, refresh: bool = False) -> pd.DataF
     return ratings
 
 
+# (season, week, refresh) -> ratings DataFrame. build_model_frame() iterates one
+# row per game (1,087 REG+POST games 2022-2025) but there are only ~72 distinct
+# (season, week) pairs, so this collapses 1,087 disk reads into 72. See issue #24.
+_RATINGS_CACHE = {}
+
+
 def build_model_frame(seasons, refresh: bool = False) -> pd.DataFrame:
     """Labeled game rows with leakage-safe features (home-team perspective).
 
@@ -252,11 +258,21 @@ def build_model_frame(seasons, refresh: bool = False) -> pd.DataFrame:
     games = ingest.load("games")
     games = games[games["game_type"].isin(["REG", "POST"])]
     games = games[games["season"].isin(seasons)]
+    # Ties (home_score == away_score) are rare but well-formed, so dropna() won't
+    # catch them -- left as-is they encode a tie as a home loss. Drop them instead
+    # of mislabelling. See issue #28.
+    games = games[games["home_score"] != games["away_score"]]
 
     rows = []
     for _, g in games.iterrows():
         season, week = int(g["season"]), int(g["week"])
-        ratings_df = team_ratings_asof(season, week, refresh=refresh)
+        # Memoize: only ~72 distinct (season, week) pairs exist, but the loop
+        # iterates 1,087 games, so this turns 1,087 disk reads into 72. See #24.
+        cache_key = (season, week, refresh)
+        ratings_df = _RATINGS_CACHE.get(cache_key)
+        if ratings_df is None:
+            ratings_df = team_ratings_asof(season, week, refresh=refresh)
+            _RATINGS_CACHE[cache_key] = ratings_df
         if ratings_df is None or ratings_df.empty:
             # No leakage-free prior for this game (e.g. 2022 week 1, the first
             # season we have PBP for). Drop it rather than substitute future data.

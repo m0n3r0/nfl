@@ -141,6 +141,11 @@ def test_real_board_depth_if_present():
     counts = Counter(b["pos"] for b in board)
     for pos in ("QB", "TE", "K", "DEF"):
         assert counts.get(pos, 0) >= 10, "%s has %d (need >=10 for 10-team)" % (pos, counts.get(pos, 0))
+    # The board must be big enough to fill the WHOLE draft, not just the early
+    # rounds. A 10-team x 15-round draft needs 150 picks; the board must outlast
+    # it or the bot exhausts candidates and substitutes worse picks. See issue #30.
+    assert len(board) >= dd.TEAMS * dd.TOTAL_ROUNDS, \
+        "board (%d players) smaller than the draft (%d picks)" % (len(board), dd.TEAMS * dd.TOTAL_ROUNDS)
 
 
 def test_real_board_is_larger_than_the_whole_draft():

@@ -603,7 +603,7 @@ def read_available(ws):
     # Name-based scan (Yahoo player rows hold the name in a cell, NOT inside the
     # /nfl/players/ anchor which only wraps an icon). Return [name, row_text] so
     # the caller can also pull Yahoo ADP (Average Draft Position) from the row.
-    return ev(ws,"""(function(){
+    return ev(ws,r"""(function(){
       var out=[];
       var seen={};
       var rows=document.querySelectorAll('tr, li');
