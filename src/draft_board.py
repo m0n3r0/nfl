@@ -142,14 +142,20 @@ def _skill_board(corpus: dict, preset: str, injury_flags: dict[str, str] | None 
         injury_flags = _load_injury_flags()
 
     # Recency filter (#35 follow-up): exclude players who did not appear in
-    # the most recent season's weekly data. A player with zero 2025 games is
-    # retired, on a practice squad, or otherwise irrelevant — keeping them
-    # pollutes the board with ghosts (Tom Brady, Matt Ryan, 30+ kickers...).
+    # the most recent season's weekly data — UNLESS they are rookies (#83
+    # follow-up). Rookies have no 2025 games because they are new, not
+    # retired. Without this carve-out, the filter removes all 80 rookies
+    # from the board (Jeremiyah Love, Carnell Tate, etc.).
     weekly = corpus["weekly_history"]
     recent_ids = set(
         weekly[weekly["season"] == weekly["season"].max()]["player_id"]
     )
-    proj = proj[proj["player_id"].isin(recent_ids)]
+    is_rookie = (
+        proj["is_rookie"].fillna(False).astype(bool)
+        if "is_rookie" in proj.columns
+        else pd.Series(False, index=proj.index)
+    )
+    proj = proj[proj["player_id"].isin(recent_ids) | is_rookie]
 
     rows = []
     for _, r in proj.iterrows():
