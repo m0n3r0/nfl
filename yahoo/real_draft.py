@@ -282,7 +282,7 @@ class RealDraftOperator:
             if not choice:
                 break
             wanted_name, wanted_team, wanted_pos, _ = choice
-            self.page.set_search(driver.to_display(wanted_name, wanted_team))
+            self.page.set_search(wanted_name)
             time.sleep(0.5)
             searched = self.page.read_state()
             row = self._resolve_choice(searched.rows, choice)
