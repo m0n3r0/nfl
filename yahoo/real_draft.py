@@ -274,6 +274,8 @@ class RealDraftOperator:
             raise RealDraftSafetyError("Yahoo did not expose the current round")
         roster_names = self._canonical_roster_names(state.roster)
         unavailable_names = self._known_unavailable_names(state.round)
+        alternatives: list[str] = []
+        self._choice_context = {}
         remaining = [value["name"] for value in self.board.values()
                      if value["name"].lower() not in roster_names | unavailable_names]
         choice = None
@@ -290,10 +292,19 @@ class RealDraftOperator:
                 searched = self.page.read_state()
                 row = self._resolve_choice(searched.rows, choice)
                 if row:
+                    board_row = self.board.get(wanted_name, {})
+                    self._choice_context = {
+                        "board_player": wanted_name,
+                        "board_value": board_row.get("value"),
+                        "board_adp": board_row.get("adp"),
+                        "selection_path": "full_board_search",
+                        "alternatives_unavailable": alternatives,
+                    }
                     return row
                 time.sleep(0.1)
             self._log("search_unavailable", round=state.round, overall=state.pick,
                       player=wanted_name, player_team=wanted_team, pos=wanted_pos)
+            alternatives.append(wanted_name)
             remaining = [name for name in remaining if name != wanted_name]
         self.page.set_search("")
         time.sleep(0.2)
@@ -310,7 +321,39 @@ class RealDraftOperator:
         row = self._resolve_choice(tuple(healthy), fallback) if fallback else None
         if not row:
             raise RealDraftSafetyError("no exact row matched the visible fallback decision")
+        board_name = fallback[0]
+        board_row = self.board.get(board_name, {})
+        self._choice_context = {
+            "board_player": board_name,
+            "board_value": board_row.get("value"),
+            "board_adp": board_row.get("adp"),
+            "selection_path": "visible_fallback",
+            "alternatives_unavailable": alternatives,
+        }
         return row
+
+    def _decision_reason(self, state: DraftState, player: PlayerRow) -> str:
+        """Describe the roster-construction rule applied at this live pick."""
+        counts = self._position_counts(state.roster)
+        if player.pos in {"RB", "WR"} and state.round is not None and state.round <= 5:
+            purpose = "Build the starting RB/WR core"
+        elif player.pos == "TE" and counts["TE"] == 0:
+            purpose = "Fill the starting TE slot before the round-7 target deadline"
+        elif player.pos == "QB" and counts["QB"] == 0:
+            purpose = "Fill the starting QB slot in the delayed-quarterback window"
+        elif player.pos == "K":
+            purpose = "Fill the required kicker slot only after skill-position depth"
+        elif player.pos == "DEF":
+            purpose = "Fill the required defense slot in the final-round window"
+        elif player.pos in {"RB", "WR"}:
+            purpose = "Add the strongest available flex and bench depth"
+        else:
+            purpose = f"Add value and depth at {player.pos}"
+        return (
+            f"{purpose}; entered the pick with "
+            f"{counts['QB']} QB, {counts['RB']} RB, {counts['WR']} WR, "
+            f"{counts['TE']} TE, {counts['K']} K, and {counts['DEF']} DEF."
+        )
 
     def run(self, deadline_hours: float = 4, poll_interval: float = 0.25) -> list[Pick]:
         self.page.client.bring_to_front()
@@ -322,7 +365,19 @@ class RealDraftOperator:
             self._validate_state(state)
             self._reconcile_pending(state)
             if state.complete and state.team_count == 15:
-                self._log("complete", count=15)
+                self._log("complete", count=15, roster=[
+                    {
+                        "round": pick.round,
+                        "overall": pick.overall,
+                        "player_id": pick.player.id,
+                        "player": pick.player.name,
+                        "player_team": pick.player.team,
+                        "pos": pick.player.pos,
+                        "xrank": pick.player.xrank,
+                        "adp": pick.player.adp,
+                    }
+                    for pick in state.roster
+                ])
                 return [Pick(p.round, p.overall, p.player) for p in state.roster]
             if state.forced_autodraft:
                 raise RealDraftSafetyError("Yahoo reports forced autopick mode; refusing manual clicks")
@@ -333,7 +388,11 @@ class RealDraftOperator:
                 raise RealDraftSafetyError("Yahoo round/pick does not match authoritative roster history")
             player = self._choose(state)
             self._log("decision", round=state.round, overall=state.pick, player_id=player.id,
-                      player=player.name, player_team=player.team, pos=player.pos)
+                      player=player.name, player_team=player.team, pos=player.pos,
+                      yahoo_xrank=player.xrank, yahoo_adp=player.adp,
+                      roster_before=dict(self._position_counts(state.roster)),
+                      reason=self._decision_reason(state, player),
+                      **getattr(self, "_choice_context", {}))
             self._log("submit_intent", round=state.round, overall=state.pick,
                       player_id=player.id, player=player.name)
             self.page.submit(player, state.pick)

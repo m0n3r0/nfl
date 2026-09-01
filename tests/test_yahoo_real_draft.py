@@ -9,7 +9,8 @@ from pathlib import Path
 import pytest
 
 from yahoo.cdp import CdpError, Target
-from yahoo.mock_draft import DraftState, PlayerRow, RosterPick
+from yahoo.draft_report import render_draft_report
+from yahoo.mock_draft import DraftState, Pick, PlayerRow, RosterPick
 from yahoo.real_draft import (
     AUTHORIZATION,
     RealDraftOperator,
@@ -214,3 +215,35 @@ def test_real_choice_searches_full_board_for_off_window_player(monkeypatch, tmp_
 
     assert chosen == target_player
     assert searches == ["Target Player"]
+
+
+def test_decision_reason_records_pick_specific_roster_context(tmp_path):
+    operator = operator_for(ResumePage(start=4), tmp_path / "audit.jsonl")
+    reason = operator._decision_reason(state(4), player(5, "RB"))
+    assert "starting RB/WR core" in reason
+    assert "0 QB, 4 RB, 0 WR" in reason
+
+
+def test_completed_report_uses_authoritative_picks_and_audit_reasoning(tmp_path):
+    audit = tmp_path / "audit.jsonl"
+    audit.write_text(json.dumps({
+        "event": "decision", "league": "1329011", "team": "2",
+        "round": 1, "overall": 2, "player_id": "1", "player": "Player 1",
+        "board_player": "Canonical Player 1", "board_value": 299,
+        "yahoo_xrank": 2.0, "yahoo_adp": 2.3,
+        "reason": "Build the starting RB/WR core.",
+        "alternatives_unavailable": ["First Choice"],
+    }) + "\n", encoding="utf-8")
+    picks = [
+        Pick(round_number, overall_pick(round_number), player(round_number))
+        for round_number in range(1, 16)
+    ]
+
+    report = render_draft_report(picks, audit)
+
+    assert "Round 1, overall 2: Canonical Player 1" in report
+    assert "Build the starting RB/WR core." in report
+    assert "board value 299" in report
+    assert "First Choice" in report
+    assert "Round 15, overall 142: Player 15" in report
+    assert report.count("### Round ") == 15
