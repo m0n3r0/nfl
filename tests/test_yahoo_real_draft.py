@@ -224,6 +224,12 @@ def test_decision_reason_records_pick_specific_roster_context(tmp_path):
     assert "0 QB, 4 RB, 0 WR" in reason
 
 
+def test_decision_reason_marks_a_late_first_te(tmp_path):
+    operator = operator_for(ResumePage(start=8), tmp_path / "audit.jsonl")
+    reason = operator._decision_reason(state(8), player(9, "TE"))
+    assert "after missing the round-7 target deadline" in reason
+
+
 def test_completed_report_uses_authoritative_picks_and_audit_reasoning(tmp_path):
     audit = tmp_path / "audit.jsonl"
     audit.write_text(json.dumps({

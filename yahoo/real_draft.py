@@ -338,7 +338,11 @@ class RealDraftOperator:
         if player.pos in {"RB", "WR"} and state.round is not None and state.round <= 5:
             purpose = "Build the starting RB/WR core"
         elif player.pos == "TE" and counts["TE"] == 0:
-            purpose = "Fill the starting TE slot before the round-7 target deadline"
+            purpose = (
+                "Fill the starting TE slot before the round-7 target deadline"
+                if state.round is not None and state.round <= 7
+                else "Fill the starting TE slot after missing the round-7 target deadline"
+            )
         elif player.pos == "QB" and counts["QB"] == 0:
             purpose = "Fill the starting QB slot in the delayed-quarterback window"
         elif player.pos == "K":
