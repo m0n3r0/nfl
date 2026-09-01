@@ -20,8 +20,9 @@ other local date.
   Innu/Doge identity.
 - The operator reconstructs every completed round from Yahoo roster history
   before each decision. The rendered count and history must agree.
-- Deep board targets are searched by player identity. Up to eight already-taken
-  targets are skipped before an identity-qualified visible fallback is used.
+- Deep board targets are searched by player identity. Up to twenty already-taken
+  targets are durably recorded and skipped before an identity-qualified visible
+  fallback is used.
 - Every click is preceded by a durable `submit_intent` audit record.
 - Confirmation requires the roster count to advance exactly one and the exact
   player ID to appear at the expected overall pick.

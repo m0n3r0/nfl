@@ -199,6 +199,13 @@ class RealDraftOperator:
                 pending = None
         return pending
 
+    def _known_unavailable_names(self) -> set[str]:
+        return {
+            str(record["player"]).lower()
+            for record in self._records()
+            if record.get("event") == "search_unavailable" and record.get("player")
+        }
+
     @staticmethod
     def _validate_state(state: DraftState) -> None:
         if state.total_roster != 15:
@@ -264,10 +271,11 @@ class RealDraftOperator:
         if state.round is None:
             raise RealDraftSafetyError("Yahoo did not expose the current round")
         roster_names = self._canonical_roster_names(state.roster)
+        unavailable_names = self._known_unavailable_names()
         remaining = [value["name"] for value in self.board.values()
-                     if value["name"].lower() not in roster_names]
+                     if value["name"].lower() not in roster_names | unavailable_names]
         choice = None
-        for _ in range(8):
+        for _ in range(20):
             choice = driver.choose_pick(
                 remaining, dict(self._position_counts(state.roster)), state.round, self.board
             )
@@ -280,6 +288,8 @@ class RealDraftOperator:
             row = self._resolve_choice(searched.rows, choice)
             if row:
                 return row
+            self._log("search_unavailable", round=state.round, overall=state.pick,
+                      player=wanted_name, player_team=wanted_team, pos=wanted_pos)
             remaining = [name for name in remaining if name != wanted_name]
         self.page.set_search("")
         time.sleep(0.2)
