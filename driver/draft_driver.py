@@ -741,7 +741,8 @@ def read_available(ws):
         // "McCaffrey" to "Caffrey", which broke downstream board matching (issue #32).
         // An optional leading draft-rank ("12. ") is skipped; defenses ("Ravens") pass.
         var m=t.match(/^(?:\d+\.?\s*)?(.*?)\s+([A-Za-z]{2,4})\s*-\s*(QB|RB|WR|TE|K|DEF|DST)/);
-        if(m && !seen[m[1]]){ seen[m[1]]=1; out.push([m[1], m[2], m[3], t]); }
+        var identity=m ? [m[1].toLowerCase(),m[2].toUpperCase(),m[3].toUpperCase()].join('|') : '';
+        if(m && !seen[identity]){ seen[identity]=1; out.push([m[1], m[2], m[3], t]); }
       }
       return out.slice(0,40);
     })()""")

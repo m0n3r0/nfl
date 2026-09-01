@@ -186,11 +186,17 @@ def main():
 
         # --- #58: abbreviation collisions retain team identity through click ---
         collision = [
-            {"name": "A.J. Brown", "team": "NE", "pos": "WR"},
+            {"name": "A.J. Brown", "team": "PHI", "pos": "WR"},
             {"name": "Amon-Ra St. Brown", "team": "DET", "pos": "WR"},
         ]
         load_players(ws, collision)
         dd.ev(ws, "MockDraft.setAbbrev(true)")
+        collision_rows = dd.read_available(ws) or []
+        assert len(collision_rows) == 2, \
+            "read_available collapsed distinct A. Brown identities: %r" % collision_rows
+        collision_names, _, _ = dd.normalize_available(collision_rows)
+        assert set(collision_names) == {"A.J. Brown", "Amon-Ra St. Brown"}, \
+            "normalization lost an abbreviated identity: %r" % collision_names
         assert dd.click_player(ws, "Amon-Ra St. Brown", "DET", "WR") is True
         drafted = dd.ev(ws, "MockDraft.drafted()") or []
         assert [p["name"] for p in drafted] == ["Amon-Ra St. Brown"], drafted
