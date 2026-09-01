@@ -47,6 +47,13 @@ def _require_loopback(endpoint: str) -> str:
     return endpoint.rstrip("/")
 
 
+def _require_loopback_websocket(url: str) -> str:
+    parsed = urlparse(url)
+    if parsed.scheme not in {"ws", "wss"} or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
+        raise ValueError("CDP websocket URL must use ws/wss on loopback")
+    return url
+
+
 def list_targets(endpoint: str = "http://127.0.0.1:9222", timeout: float = 8) -> list[Target]:
     """Read page targets from a loopback CDP endpoint."""
     endpoint = _require_loopback(endpoint)
@@ -85,15 +92,19 @@ class CdpClient:
         self.timeout = timeout
         self._next_id = 0
         self._ws = websocket.create_connection(
-            target.websocket_url,
+            _require_loopback_websocket(target.websocket_url),
             timeout=timeout,
             origin=self.endpoint,
         )
 
     def __enter__(self) -> "CdpClient":
-        self.call("Runtime.enable")
-        self.call("Page.enable")
-        return self
+        try:
+            self.call("Runtime.enable")
+            self.call("Page.enable")
+            return self
+        except BaseException:
+            self.close()
+            raise
 
     def __exit__(self, *_: object) -> None:
         self.close()

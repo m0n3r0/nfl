@@ -325,7 +325,7 @@ and authoritative `YOUR TEAM (N/15)` transition around every selection. If a
 submission does not produce a roster-count change, it stops without replaying
 the click.
 
-```
+```bash
 python tools/yahoo_mock_draft.py list
 python tools/yahoo_mock_draft.py join --room 10401633 --slot 4
 python tools/yahoo_mock_draft.py run --room 10401633 --log logs/mock-draft.jsonl

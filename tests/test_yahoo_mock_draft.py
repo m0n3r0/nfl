@@ -22,6 +22,7 @@ class FakeSocket:
     def __init__(self, replies):
         self.replies = iter(replies)
         self.sent = []
+        self.closed = False
 
     def send(self, payload):
         self.sent.append(json.loads(payload))
@@ -33,7 +34,7 @@ class FakeSocket:
         return None
 
     def close(self):
-        return None
+        self.closed = True
 
 
 def target(url="https://football.fantasysports.yahoo.com/draftclient/f1/10401633/4"):
@@ -57,6 +58,20 @@ def test_cdp_protocol_error_is_not_swallowed(monkeypatch):
         client.call("Runtime.enable")
 
 
+def test_cdp_rejects_non_loopback_websocket_before_connect(monkeypatch):
+    called = False
+
+    def connect(*_args, **_kwargs):
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr("yahoo.cdp.websocket.create_connection", connect)
+    remote = Target("page", "page", "bad", "https://example.test", "ws://example.test/devtools/page/1")
+    with pytest.raises(ValueError, match="loopback"):
+        CdpClient(remote)
+    assert called is False
+
+
 def test_cdp_javascript_exception_is_not_swallowed(monkeypatch):
     socket = FakeSocket([
         {
@@ -73,6 +88,15 @@ def test_cdp_javascript_exception_is_not_swallowed(monkeypatch):
     client = CdpClient(target())
     with pytest.raises(CdpJavaScriptError, match="ReferenceError"):
         client.evaluate("missing")
+
+
+def test_cdp_context_entry_closes_socket_on_partial_initialization(monkeypatch):
+    socket = FakeSocket([{"id": 1, "error": {"code": -1, "message": "enable failed"}}])
+    monkeypatch.setattr("yahoo.cdp.websocket.create_connection", lambda *args, **kwargs: socket)
+    with pytest.raises(CdpProtocolError, match="enable failed"):
+        with CdpClient(target()):
+            pass
+    assert socket.closed is True
 
 
 class StateClient:
@@ -167,6 +191,31 @@ def test_full_mock_requires_and_confirms_all_15_roster_transitions(monkeypatch):
     assert len(picks) == 15
     assert page.submit_calls == 15
     assert page.read_state().complete is True
+
+
+def test_current_row_is_rendered_for_legacy_identity_and_adp_parser():
+    from driver import draft_driver as driver
+
+    row = PlayerRow("1", "T. Kraft", "GB", "TE", "", 67, 60.5, "current Yahoo layout")
+    text = MockDraftOperator._driver_row_text(row)
+    names, adp, positions = driver.normalize_available([[row.name, row.team, row.pos, text]])
+    assert names == ["Tucker Kraft"]
+    assert adp["tucker kraft"] == 60.5
+    assert positions["tucker kraft"] == "TE"
+
+
+def test_off_board_choice_without_team_or_position_is_identity_safe(monkeypatch):
+    from collections import Counter
+    from driver import draft_driver as driver
+
+    board = driver.static_board()
+    driver.rebuild_abbrev_maps(board)
+    operator = object.__new__(MockDraftOperator)
+    operator.board = board
+    row = PlayerRow("1", "T. Kraft", "GB", "TE", "", 67, 60.5, "current Yahoo layout")
+    state = DraftState("YOUR TURN • ROUND 7, PICK 64", 7, 64, True, 6, 15, False, False, False, (row,))
+    monkeypatch.setattr(driver, "choose_pick", lambda *args, **kwargs: ("Tucker Kraft", None, None, 60.5))
+    assert operator._choose(state, Counter()) == row
 
 
 def test_operator_refuses_mid_draft_without_guessing(monkeypatch):
