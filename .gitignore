@@ -37,6 +37,7 @@ data/scrapes/
 .ipynb_checkpoints/
 
 # --- FD nation draft driver (runtime-generated) ---
-logs/draft_log.txt
+draft_log.txt
+logs/*.txt
 # (__pycache__/ already covered above -- do not duplicate it here)
 .worktrees/

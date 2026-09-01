@@ -23,7 +23,25 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       - name: Run fast (not slow) tests
-        run: pytest -m "not slow" -q
+        run: pytest -m "not slow and not cdp" -q
+      - name: Start isolated headless Chrome for CDP tests
+        run: |
+          google-chrome --headless=new --no-sandbox --disable-gpu \
+            --remote-debugging-port=9222 \
+            --remote-debugging-address=127.0.0.1 \
+            --remote-allow-origins=* \
+            --user-data-dir=/tmp/nfl-cdp-profile about:blank \
+            >/tmp/nfl-chrome.log 2>&1 &
+          for attempt in {1..30}; do
+            curl --fail --silent http://127.0.0.1:9222/json/version >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/nfl-chrome.log
+          exit 1
+      - name: Run isolated CDP browser tests
+        env:
+          RUN_CDP_BROWSER_TESTS: "1"
+        run: pytest -m cdp -q
 
   full:
     name: Full suite (with corpus)
