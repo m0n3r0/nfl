@@ -68,62 +68,13 @@ DEF in the last two rounds.
   K   by round 14
   DEF by round 15
 
---- ROUND-BY-ROUND PLAN (pick #2, snake) ---
+--- CANONICAL ROUND-BY-ROUND PLAN (pick #2, snake) ---
 
-R1  (pick 2):  Jahmyr Gibbs RB — 312 projected. The RB1 by VOR.
-
-R2  (pick 19): Derrick Henry RB — 300 projected. The RB2.
-               Locks the foundation with two elite RBs.
-
-R3  (pick 22): Ja'Marr Chase WR — 234 projected. The WR1.
-
-R4  (pick 39): Justin Jefferson WR — 223 projected. The WR2.
-               Two elite WRs to complement the RB room.
-
-R5  (pick 42): Trey McBride TE — 180 projected. The TE1.
-
-R6  (pick 59): Christian McCaffrey RB — 298 projected.
-               He falls here because of injury risk, but the
-               ceiling is RB1 overall. Massive value at R6.
-
-R7  (pick 62): Saquon Barkley RB — 297 projected.
-               Another RB1-caliber player. Your RB room is
-               now the strongest in the league.
-
-R8  (pick 79): Amon-Ra St. Brown WR — 222 projected. The WR3.
-
-R9  (pick 82): Bijan Robinson RB — 274 projected.
-
-R10 (pick 99): Josh Allen QB — 393 projected. The QB1 by our
-               projections. You waited and still got the best.
-
-R11 (pick 102): Jonathan Taylor RB — 289 projected.
-
-R12 (pick 119): Malik Nabers WR — 201 projected.
-
-R13 (pick 122): Jaxon Smith-Njigba WR — 222 projected.
-
-R14 (pick 139): Austin Seibert K — 176 projected. Your K1.
-
-R15 (pick 142): Ravens DEF — 100 projected. Your DEF1.
-
---- PROJECTED STARTING LINEUP (after the draft) ---
-
-  QB: Tyler Shough (NO)           ~12.5 pts/gm
-  RB: Christian McCaffrey (SF)    ~20.6 pts/gm
-  RB: Kyren Williams (LA)         ~15.0 pts/gm
-  WR: Mike Evans (TB)             ~13.0 pts/gm
-  WR: Rashee Rice (KC)            ~12.9 pts/gm
-  TE: George Kittle (SF)          ~11.5 pts/gm
-  FLEX: David Montgomery (DET)    ~11.7 pts/gm
-  K: Austin Seibert (WAS)
-  DEF: Broncos
-
-  Bench: Brian Thomas Jr. WR, Garrett Wilson WR,
-         Rhamondre Stevenson RB, Tetairoa McMillan WR,
-         Jacory Croskey-Merritt RB, Alec Pierce WR
-
-  Projected weekly total: ~97-107 pts (above the 10-team median)
+The only player-by-player plan is `docs/DRAFT_CHEAT_SHEET.md`. It is generated
+from `data/board/original_board.json` by `tools/gen_cheat_sheet.py --write` and
+carries the board's SHA-256 fingerprint. Do not copy player lists into this
+strategy document: they become stale whenever projections or availability
+change. The anchor schedule above remains the stable policy.
 
 --- THE "IF THE ROBOT FAILS" MANUAL PROTOCOL ---
 

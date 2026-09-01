@@ -16,6 +16,7 @@ K/DEF only R14-15. Value = projected points; ADP = league average pick.
 import json
 import sys
 import datetime
+import hashlib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -48,6 +49,12 @@ def pick_clock(overall):
 def load_board():
     with open(BOARD) as f:
         return json.load(f)
+
+
+def board_hash(board):
+    """Return a stable short fingerprint of the canonical board payload."""
+    payload = json.dumps(board, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(payload).hexdigest()[:12]
 
 
 def rank_by_pos(board):
@@ -211,7 +218,8 @@ def main():
     L.append(f"# FD nation — Manual Draft Cheat Sheet (team #{team} \"Doge\")")
     L.append("")
     L.append(f"_Generated {datetime.datetime.now():%Y-%m-%d %H:%M} from "
-             f"`data/board/original_board.json` ({len(board)} players). "
+             f"`data/board/original_board.json` ({len(board)} players, "
+             f"SHA-256 `{board_hash(board)}`). "
              "Re-run `tools/gen_cheat_sheet.py --write` after the morning-of "
              "ADP re-scrape to refresh._")
     L.append("")

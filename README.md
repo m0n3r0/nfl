@@ -84,8 +84,13 @@ python cli.py matchups 1 --top 25    # 2026 Week 1 start/sit board
 python cli.py sos                     # 2026 team strength-of-schedule ranking
 ```
 
-Presets: `standard`, `ppr`, `half-ppr`. Most commands accept `--season <YEAR>` to
-override the stats year (the schedule command uses `SCHEDULE_SEASON`).
+Presets: `standard`, `ppr`, `half-ppr`, `fd-nation`. The default `fd-nation`
+profile matches the authenticated Yahoo settings verified on 2026-09-01: 0.5
+points per reception, 4-point passing touchdowns, and -1 per interception.
+The generic presets retain nflverse's -2 interception weight so `validate`
+continues to compare like-for-like against nflverse's shipped columns. Most
+commands accept `--season <YEAR>` to override the stats year (the schedule
+command uses `SCHEDULE_SEASON`).
 
 ## 2026 projection engine
 
@@ -196,13 +201,17 @@ breakdowns, and SOS ranking. API: `/api/modelcard`, `/api/predictions`.
 
 ## Scoring
 
-Weights were reverse-engineered from nflverse's own shipped `fantasy_points` /
+The generic preset weights were reverse-engineered from nflverse's own shipped `fantasy_points` /
 `fantasy_points_ppr` columns via least-squares regression (R^2 = 1.000 on the
 2024 weekly table), so `cli.py validate` shows a max delta of 0.00 across all
 presets. Highlights that differ from generic textbook scoring:
 - interceptions: −2.0
 - every fumble LOST: −2.0 (split across rushing / receiving / sack fumbles)
 - 2-point conversions: +2.0
+
+FD nation overrides only interceptions to -1.0 and receptions to 0.5, matching
+the live Yahoo league settings. There are no listed yardage or touchdown
+milestone bonuses.
 
 See `src/config.py` for the full weight table.
 
@@ -212,7 +221,7 @@ See `src/config.py` for the full weight table.
 python -m pytest tests/ -q
 ```
 
-Five test files:
+The suite includes:
 
 | File | Covers |
 |---|---|
@@ -221,6 +230,7 @@ Five test files:
 | `tests/test_model.py` | win-probability model, calibration, time-based split |
 | `tests/test_original_board.py` | nflverse draft board: shape, depth, and the size invariant |
 | `tests/test_draft_driver.py` | driver pick logic: guardrails, DEF name mapping, off-board fallback |
+| `tests/test_cdp_browser.py` | isolated Chromium/CDP checks for identity-safe clicks and a complete 15-round mock draft |
 
 The full suite takes several minutes (`test_scoring.py` and `test_model.py` load the
 ~95 MB PBP corpus). To iterate quickly, run a single file:
@@ -231,6 +241,16 @@ python -m pytest tests/test_draft_driver.py -q
 
 `tests/test_original_board.py` and `tests/test_draft_driver.py` are the two that gate
 draft-day changes; together they run in about 10 seconds.
+
+Browser-level CDP tests are opt-in locally and run on every CI push. Start an
+isolated Chromium instance on `127.0.0.1:9222`, then run:
+
+```bash
+RUN_CDP_BROWSER_TESTS=1 python -m pytest -m cdp -q
+```
+
+The harness creates and closes only local mock-draft tabs; it does not navigate
+to Yahoo or use an authenticated session.
 
 ## Known limitations
 
@@ -250,9 +270,17 @@ Protocol (CDP). Lives as a self-contained module alongside the toolkit above.
 - `driver/draft_driver.py` — live draft driver (board + guardrails + human-like CDP clicks). Runs on Windows via `py.exe`. **This is the only copy in the repo.**
 - `skills/` — Hermes skills (edge-cdp, fantasy-read, fantasy-draft) for reuse in Hermes Desktop. Documentation only; they point at the deployed driver, they do not bundle one.
 - `memory/fantasy_fd_nation.md` — persistent league context for the agent.
-- `data/board/` — original draft board (`original_board.json`, nflverse-derived, zero external deps, **250 players**) + K/DEF ADP reference.
+- `data/board/` — original draft board (`original_board.json`, nflverse-derived,
+  zero external deps, at least **250 players**) + K/DEF ADP reference.
 - `data/scrapes/` — roster/standings/settings extracts from the live tab. **Local-only: gitignored and never committed** (it contains real league member names + session state); the driver reads it from disk at runtime.
-- `tools/` — load-bearing utilities only: `scrape_league_adp.py` (league ADP scrape), `check_login.py` / `login_yahoo.py` (auth), `simulate_draft.py` (offline regression harness, used by `tests/test_simulation.py`), `mock_draft_run.py` + `mock_draft_room.html` (pre-draft click validation), `check_draft_state.py` / `back_to_league.py` / `recover_tab.py` / `edge_alive.py` (CDP health & recovery), and `deploy.ps1` (one-command verified deploy). Throwaway debug probes live in `tools/debug/` and are not part of the pipeline.
+- `yahoo/cdp.py` — shared loopback-only CDP transport with deterministic target
+  selection, monotonic request IDs, deadlines, and explicit protocol/JavaScript
+  errors.
+- `yahoo/mock_draft.py` + `tools/yahoo_mock_draft.py` — inspect, join, and run a
+  current Yahoo ten-team mock draft. This path rejects the seven-digit FD nation
+  league ID and only accepts eight-digit mock-room IDs; it cannot start the real
+  draft driver.
+- `tools/` — load-bearing utilities only: `scrape_league_adp.py` (league ADP scrape), `check_login.py` / `login_yahoo.py` (auth), `simulate_draft.py` (offline regression harness, used by `tests/test_simulation.py`), `mock_draft_run.py` + `mock_draft_room.html` (legacy driver click validation), `test_yahoo_mock_cdp.py` + `yahoo_draft_client_fixture.html` (current Yahoo client regression), `check_draft_state.py` / `back_to_league.py` / `recover_tab.py` / `edge_alive.py` (CDP health & recovery), and `deploy.ps1` (one-command verified deploy). Throwaway debug probes live in `tools/debug/` and are not part of the pipeline.
 - `validation/` — mock-draft + click validation logs (2026-08-21).
 - `docs/REMEDIATION.md` — phase-by-phase log of the 2026-08-31 review.
 
@@ -264,8 +292,9 @@ static board). A change to either file is not live until it is copied there via
 `tools/deploy.ps1` — see "How to run the draft" below.
 - **Log file** — created at draft time; every pick decision logged here. Resolved in
   this order: `$FD_DRAFT_LOG` → Windows default `C:\edge-debug-profile\draft_log.txt`
-  → other platforms `./draft_log.txt`. (`.gitignore` covers `logs/draft_log.txt`; if
-  you point `FD_DRAFT_LOG` somewhere else, keep it out of git.)
+  → other platforms `./draft_log.txt`. (`.gitignore` covers root-level
+  `draft_log.txt` and all `logs/*.txt`; if you point `FD_DRAFT_LOG` somewhere
+  else, keep it out of git.)
 - `images/` — proof screenshots.
 
 ### League facts (verified live 2026-08-28)
@@ -286,6 +315,25 @@ Edge must be open on port 9222, bound to loopback (`--remote-debugging-address=1
 > - Ensure **no firewall / port-forward rule** exposes 9222 to the network.
 > - Close Edge (or the port) when you're not drafting.
 > Treat the debug port like an unlocked door to your accounts.
+
+### Yahoo mock-draft validation (never the real league)
+
+The mock operator is separate from `driver/draft_driver.py`. It only accepts
+Yahoo's eight-digit mock-room IDs and explicitly rejects real league `1329011`.
+It verifies the exact room, slot, player ID/team/position, current overall pick,
+and authoritative `YOUR TEAM (N/15)` transition around every selection. If a
+submission does not produce a roster-count change, it stops without replaying
+the click.
+
+```bash
+python tools/yahoo_mock_draft.py list
+python tools/yahoo_mock_draft.py join --room 10401633 --slot 4
+python tools/yahoo_mock_draft.py run --room 10401633 --log logs/mock-draft.jsonl
+```
+
+`run` requires a fresh room at round 1 with an empty mock roster. It refuses to
+guess or reconstruct a partially completed draft. These commands are for mock
+validation only; do not use them for the FD nation draft.
 
 Then on Windows:
 ```
@@ -332,5 +380,6 @@ Yahoo default pre-rank is the auto-draft fallback if the driver errors.
 
 ### Honest limitations
 - Cannot guarantee wins (real NFL games decide outcomes).
-- Live pick→Draft-button flow validated at mechanism level, not end-to-end (Yahoo mock gated).
+- The current Yahoo mock-client pick flow has been exercised live; the real FD
+  nation driver remains separate and must not be treated as validated by a mock.
 - Keep Edge + machine on at draft time.

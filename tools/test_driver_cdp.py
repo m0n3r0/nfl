@@ -129,7 +129,7 @@ def main():
         print("PASS #23b search_player surfaced deep target: %r" % (row,))
 
         # --- #23c: clicking the now-visible target drafts it ---
-        ok = dd.click_player(ws, DEEP_NAME)
+        ok = dd.click_player(ws, DEEP_NAME, "ZEN", "WR")
         assert ok is True, "click_player returned %r for off-window target" % ok
         drafted = dd.ev(ws, "MockDraft.drafted()")
         drafted_names = [p["name"] for p in (drafted or [])]
@@ -137,6 +137,19 @@ def main():
             "click did not register; drafted=%r" % drafted_names
         print("PASS #23c click_player drafted deep target via search; drafted=%s"
               % drafted_names)
+
+        # --- #43: failed deep identity click also restores the full list ---
+        load_players(ws, players)
+        search_set = dd._set_player_search(ws, DEEP_NAME)
+        assert search_set is True, "could not set deep-player search: %r" % search_set
+        time.sleep(0.3)
+        dd.ev(ws, "MockDraft.removePlayer(%s)" % json.dumps(DEEP_NAME))
+        failed_click = dd.click_player(ws, DEEP_NAME, "ZEN", "WR")
+        assert failed_click is False, "disappeared player click returned %r" % failed_click
+        restored = dd.read_available(ws) or []
+        assert len(restored) == 40, \
+            "failed click left stale search filter; rows=%d" % len(restored)
+        print("PASS #43 failed deep identity click restored unfiltered board")
 
         # --- #26: pick-number read + guard ---
         dd.ev(ws, "document.getElementById('pickno').textContent='Overall Pick 5 of 150'")
@@ -175,7 +188,7 @@ def main():
             "normalize failed CeeDee Lamb; names=%r" % names
         assert "Justin Jefferson" in names, \
             "normalize failed Justin Jefferson; names=%r" % names
-        ok = dd.click_player(ws, "Joe Burrow")
+        ok = dd.click_player(ws, "Joe Burrow", "Cin", "QB")
         assert ok is True, "click_player returned %r for abbreviated row" % ok
         drafted = dd.ev(ws, "MockDraft.drafted()")
         drafted_names = [p["name"] for p in (drafted or [])]
@@ -183,6 +196,32 @@ def main():
             "abbrev click did not register; drafted=%r" % drafted_names
         print("PASS #32 abbreviation resolution: read=%r normalize ok click drafted=%s"
               % (raw_names, drafted_names))
+
+        # --- #58: abbreviation collisions retain team identity through click ---
+        collision = [
+            {"name": "A.J. Brown", "team": "PHI", "pos": "WR"},
+            {"name": "Amon-Ra St. Brown", "team": "DET", "pos": "WR"},
+        ]
+        load_players(ws, collision)
+        dd.ev(ws, "MockDraft.setAbbrev(true)")
+        collision_rows = dd.read_available(ws) or []
+        assert len(collision_rows) == 2, \
+            "read_available collapsed distinct A. Brown identities: %r" % collision_rows
+        collision_names, _, _ = dd.normalize_available(collision_rows)
+        assert set(collision_names) == {"A.J. Brown", "Amon-Ra St. Brown"}, \
+            "normalization lost an abbreviated identity: %r" % collision_names
+        assert dd.click_player(ws, "Amon-Ra St. Brown", "DET", "WR") is True
+        drafted = dd.ev(ws, "MockDraft.drafted()") or []
+        assert [p["name"] for p in drafted] == ["Amon-Ra St. Brown"], drafted
+        print("PASS #58 team-qualified abbreviation click selected Amon-Ra St. Brown")
+
+        # Without team identity, the same two rendered names are ambiguous and
+        # must fail closed instead of clicking whichever row appears first.
+        load_players(ws, collision)
+        dd.ev(ws, "MockDraft.setAbbrev(true)")
+        assert dd.click_player(ws, "Amon-Ra St. Brown", None, "WR") is False
+        assert dd.ev(ws, "MockDraft.drafted()") == []
+        print("PASS #58 ambiguous abbreviation without team failed closed")
 
         print("\nALL CDP BROWSER TESTS PASSED")
         return 0

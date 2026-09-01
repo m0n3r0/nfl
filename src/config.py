@@ -15,7 +15,9 @@ scheme. Key findings:
   * K/DEF/ST players are scored 0 in the *player* stat table (defense is team-level)
 
 The league's scoring preset comes from the ``FP_SCORING`` env var (or the
-repo-root ``.env``), FantasyPros-style: STD / PPR / HALF. See league_preset().
+repo-root ``.env``), FantasyPros-style: STD / PPR / HALF. ``HALF`` selects the
+live-verified FD nation profile, which differs from nflverse half-PPR on the
+interception penalty. See league_preset().
 
 SEASONS
 -------
@@ -85,24 +87,35 @@ PPR_SCORING = dict(STANDARD_SCORING, receptions=1.0)
 # Half-PPR: 0.5 points per reception.
 HALF_PPR_SCORING = dict(STANDARD_SCORING, receptions=0.5)
 
+# FD nation live Yahoo settings, verified through the authenticated league
+# settings page on 2026-09-01. Yahoo uses the same weights represented above
+# except that a thrown interception costs -1 rather than nflverse's -2.
+FD_NATION_SCORING = dict(
+    HALF_PPR_SCORING,
+    passing_interceptions=-1.0,
+)
+
 SCORING_PRESETS = {
     "standard": STANDARD_SCORING,
     "ppr": PPR_SCORING,
     "half-ppr": HALF_PPR_SCORING,
+    "fd-nation": FD_NATION_SCORING,
 }
 
-# Fallback when FP_SCORING is unset/unrecognized: this league is half-PPR
-# (.env FP_SCORING=HALF); matches src/draft_board.py's default.
-DEFAULT_PRESET = "half-ppr"
+# Fallback when FP_SCORING is unset/unrecognized: use the live-verified league
+# profile rather than generic nflverse half-PPR.
+DEFAULT_PRESET = "fd-nation"
 
 # FP_SCORING env values (FantasyPros-style) -> SCORING_PRESETS keys.
 _FP_SCORING_TO_PRESET = {
     "STD": "standard",
     "STANDARD": "standard",
     "PPR": "ppr",
-    "HALF": "half-ppr",
-    "HALF-PPR": "half-ppr",
-    "HALF_PPR": "half-ppr",
+    "HALF": "fd-nation",
+    "HALF-PPR": "fd-nation",
+    "HALF_PPR": "fd-nation",
+    "FD-NATION": "fd-nation",
+    "FD_NATION": "fd-nation",
 }
 
 

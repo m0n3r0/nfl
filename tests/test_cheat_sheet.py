@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SHEET_PATH = ROOT / "tools" / "gen_cheat_sheet.py"
 SIM_PATH = ROOT / "tools" / "simulate_draft.py"
 BOARD_PATH = ROOT / "data" / "board" / "original_board.json"
+GENERATED_SHEET_PATH = ROOT / "docs" / "DRAFT_CHEAT_SHEET.md"
 
 
 def _load(path, name):
@@ -56,6 +57,16 @@ def test_opponent_model_shared_between_tools():
     caps = sheet.opponent_model.RIVAL_CAP
     assert caps.get("K") == 1 and caps.get("DEF") == 1, \
         "rival K/DEF caps missing -- hoarding regression: %s" % caps
+
+
+def test_committed_cheat_sheet_matches_canonical_board():
+    """Issue #56: generated player advice must carry the current board hash."""
+    sheet = _load(SHEET_PATH, "gen_cheat_sheet_hash")
+    with open(BOARD_PATH) as handle:
+        board = json.load(handle)
+    text = GENERATED_SHEET_PATH.read_text(encoding="utf-8")
+    assert f"SHA-256 `{sheet.board_hash(board)}`" in text
+    assert f"({len(board)} players," in text
 
 
 if __name__ == "__main__":

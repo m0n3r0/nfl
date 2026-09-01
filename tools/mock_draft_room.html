@@ -19,6 +19,7 @@
 <body>
   <h2>FD nation — Mock Draft Room</h2>
   <div id="turn" class="waiting"></div>
+  <input id="search" type="search" placeholder="Search players">
   <h3>Available</h3>
   <ul id="available"></ul>
   <h3>Drafted (<span id="count">0</span>)</h3>
@@ -37,7 +38,10 @@
       var ul = document.getElementById("available");
       ul.innerHTML = "";
       var turnOn = document.getElementById("turn").textContent === "YOUR TURN";
-      avail.forEach(function (p) {
+      var query = document.getElementById("search").value.toLowerCase();
+      avail.filter(function (p) {
+        return !query || p.name.toLowerCase().indexOf(query) >= 0;
+      }).forEach(function (p) {
         var li = document.createElement("li");
         var span = document.createElement("span");
         span.className = "nm";
@@ -94,9 +98,13 @@
       // instead of guessing position from a bare name.
       availablePlayers: function () { return avail.map(function (p) { return {name: p.name, pos: p.pos}; }); },
       drafted: function () { return drafted.slice(); },
+      renderForSearch: render,
       clear: function () { avail = []; drafted = []; render(); }
     };
   })();
+  document.getElementById("search").addEventListener("input", function () {
+    window.MockDraft.renderForSearch();
+  });
   </script>
 </body>
 </html>
