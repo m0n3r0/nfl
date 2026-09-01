@@ -4,6 +4,7 @@
 <body>
   <div id="status">YOUR TURN • ROUND 1, PICK 4</div>
   <div id="team">YOUR TEAM (0/15)</div>
+  <div id="roster"></div>
   <button title="Autodraft">Autodraft</button>
   <table><tbody><tr id="row">
     <td><button id="draft">Draft</button></td>
@@ -13,6 +14,8 @@
     document.getElementById('draft').addEventListener('click', function () {
       document.getElementById('row').remove();
       document.getElementById('team').textContent = 'YOUR TEAM (1/15)';
+      document.getElementById('roster').innerHTML =
+        '<div>Round 1, Pick 4 (4th Overall) <span class="ys-player" data-id="40168">P. Nacua LAR - WR</span></div>';
       document.getElementById('status').textContent = "Opponent's Pick • Round 1, Pick 5";
     });
   </script>
