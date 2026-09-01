@@ -65,6 +65,16 @@ class PlayerRow:
 
 
 @dataclass(frozen=True)
+class RosterPick:
+    """One pick reconstructed from Yahoo's authoritative roster history."""
+
+    round: int
+    pick_in_round: int
+    overall: int
+    player: PlayerRow
+
+
+@dataclass(frozen=True)
 class DraftState:
     """Authoritative state visible in the current Yahoo draft client."""
 
@@ -78,6 +88,7 @@ class DraftState:
     forced_autodraft: bool
     autodraft_checked: bool
     rows: tuple[PlayerRow, ...]
+    roster: tuple[RosterPick, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -202,15 +213,14 @@ class MockLobby:
         raise CdpError("Yahoo did not confirm the requested mock room and slot")
 
 
-class MockDraftPage:
+class DraftPage:
     """Current Yahoo draft-client parser and identity-safe submitter."""
 
-    def __init__(self, client: CdpClient, room: str):
-        _validate_mock_room(room)
-        if f"/draftclient/f1/{room}/" not in client.target.url:
-            raise CdpError("connected target is not the requested Yahoo mock draft")
+    def __init__(self, client: CdpClient, contest_id: str):
+        if f"/draftclient/f1/{contest_id}/" not in client.target.url:
+            raise CdpError("connected target is not the requested Yahoo draft")
         self.client = client
-        self.room = room
+        self.contest_id = contest_id
 
     def read_state(self) -> DraftState:
         """Read turn, roster count, autodraft state, and selectable rows."""
@@ -236,13 +246,24 @@ class MockDraftPage:
                   pos: match[3], team: match[4], xrank: Number(match[5]),
                   adp: Number(match[6]), text});
               }
+              const roster = [];
+              for (const player of document.querySelectorAll('.ys-player[data-id]')) {
+                const identity = clean(player.innerText).match(/^(.*?)\s+([A-Za-z]{2,4})\s*-\s*(QB|RB|WR|TE|K|DEF|DST)$/i);
+                const context = clean(player.parentElement?.innerText);
+                const drafted = context.match(/Round\s+(\d+)\s*,\s*Pick\s+(\d+)\s*\((\d+)(?:st|nd|rd|th)\s+Overall\)/i);
+                if (!identity || !drafted) continue;
+                roster.push({round: Number(drafted[1]), pickInRound: Number(drafted[2]),
+                  overall: Number(drafted[3]), player: {id: player.dataset.id,
+                  name: identity[1], team: identity[2], pos: identity[3], injury: '',
+                  xrank: 9999, adp: 9999, text: clean(player.innerText)}});
+              }
               const body = clean(document.body?.innerText);
               const team = body.match(/YOUR TEAM\s*\((\d+)\/(\d+)\)/i);
               const auto = [...document.querySelectorAll('button')]
                 .find(button => clean(button.innerText) === 'Autodraft');
-              return {status, rows, teamCount: Number(team?.[1] || 0),
+              return {status, rows, roster, teamCount: Number(team?.[1] || roster.length),
                 totalRoster: Number(team?.[2] || 15),
-                complete: /DRAFT COMPLETE/i.test(body) || Number(team?.[1] || 0) === 15,
+                complete: /DRAFT COMPLETE/i.test(body) || Number(team?.[1] || roster.length) === 15,
                 forcedAutodraft: /put into autopick mode due to inactivity/i.test(body),
                 autodraftChecked: !!auto?.querySelector('svg[data-icon="checkmark-default"]')};
             })()'''
@@ -261,12 +282,21 @@ class MockDraftPage:
             forced_autodraft=bool(payload.get("forcedAutodraft")),
             autodraft_checked=bool(payload.get("autodraftChecked")),
             rows=tuple(PlayerRow.from_dict(row) for row in payload.get("rows", [])),
+            roster=tuple(
+                RosterPick(
+                    round=int(item["round"]),
+                    pick_in_round=int(item["pickInRound"]),
+                    overall=int(item["overall"]),
+                    player=PlayerRow.from_dict(item["player"]),
+                )
+                for item in payload.get("roster", [])
+            ),
         )
 
     def disable_autodraft(self) -> None:
         """Disable Yahoo autodraft when its checked state is authoritative."""
         state = self.read_state()
-        if not (state.forced_autodraft or state.autodraft_checked):
+        if not state.autodraft_checked:
             return
         clicked = self.client.evaluate(
             r'''(() => {
@@ -314,7 +344,34 @@ class MockDraftPage:
         )
         if not isinstance(result, dict) or result.get("ok") is not True:
             reason = result.get("reason") if isinstance(result, dict) else "invalid submit response"
-            raise CdpError(f"mock pick was not submitted: {reason}")
+            raise CdpError(f"draft pick was not submitted: {reason}")
+
+    def set_search(self, query: str) -> None:
+        """Set Yahoo's player filter using the native input setter."""
+        result = self.client.evaluate(
+            r'''(query => {
+              const input = document.querySelector('input[type="search"]') ||
+                document.querySelector('input[placeholder*="earch" i]') ||
+                document.querySelector('.draft-search input');
+              if (!input) return false;
+              const setter = Object.getOwnPropertyDescriptor(
+                window.HTMLInputElement.prototype, 'value').set;
+              input.focus(); setter.call(input, query);
+              input.dispatchEvent(new Event('input', {bubbles: true}));
+              return true;
+            })(''' + json.dumps(query) + ")"
+        )
+        if result is not True:
+            raise CdpError("Yahoo player search input was not found")
+
+
+class MockDraftPage(DraftPage):
+    """Current draft page with a hard mock-room safety boundary."""
+
+    def __init__(self, client: CdpClient, room: str):
+        _validate_mock_room(room)
+        super().__init__(client, room)
+        self.room = room
 
 
 class MockDraftOperator:

@@ -280,6 +280,9 @@ Protocol (CDP). Lives as a self-contained module alongside the toolkit above.
   current Yahoo ten-team mock draft. This path rejects the seven-digit FD nation
   league ID and only accepts eight-digit mock-room IDs; it cannot start the real
   draft driver.
+- `yahoo/real_draft.py` + `tools/yahoo_real_draft.py` — separately authorized,
+  cron-safe FD nation operator with authoritative roster reconstruction and a
+  durable no-replay journal. See [the real-draft runbook](docs/REAL_DRAFT.md).
 - `tools/` — load-bearing utilities only: `scrape_league_adp.py` (league ADP scrape), `check_login.py` / `login_yahoo.py` (auth), `simulate_draft.py` (offline regression harness, used by `tests/test_simulation.py`), `mock_draft_run.py` + `mock_draft_room.html` (legacy driver click validation), `test_yahoo_mock_cdp.py` + `yahoo_draft_client_fixture.html` (current Yahoo client regression), `check_draft_state.py` / `back_to_league.py` / `recover_tab.py` / `edge_alive.py` (CDP health & recovery), and `deploy.ps1` (one-command verified deploy). Throwaway debug probes live in `tools/debug/` and are not part of the pipeline.
 - `validation/` — mock-draft + click validation logs (2026-08-21).
 - `docs/REMEDIATION.md` — phase-by-phase log of the 2026-08-31 review.
@@ -302,10 +305,16 @@ static board). A change to either file is not live until it is copied there via
 Draft: **Tue Sep 1 2026, 5:00pm EDT** (= 2026-09-02 06:00 JST on the machine).
 
 ### How to run the draft
-> Windows instructions below. For a **headless macOS** deployment (launchd
-> instead of the scheduled task, headless Chromium instead of GUI Edge) see
-> [docs/MAC_SETUP.md](docs/MAC_SETUP.md).
-Edge must be open on port 9222, bound to loopback (`--remote-debugging-address=127.0.0.1`), with `--remote-allow-origins=*` and the user logged in. See the security note below for the required firewall restriction.
+
+Use the separately authorized Mac operator and cron schedule in
+[docs/REAL_DRAFT.md](docs/REAL_DRAFT.md). Do **not** run the legacy
+`driver/draft_driver.py` against the real league: it remains a strategy library
+and regression target, but its raw CDP loop does not provide authoritative
+restart/no-replay safety.
+
+Chrome must be open on port 9222, bound to loopback
+(`--remote-debugging-address=127.0.0.1`), and logged in. See the security note
+below for the required firewall restriction.
 
 > **Security note (read before opening the port).** CDP exposes a *full browser-control
 > interface* on the debug port — anyone who can reach `http://127.0.0.1:9222` can drive
@@ -335,17 +344,15 @@ python tools/yahoo_mock_draft.py run --room 10401633 --log logs/mock-draft.jsonl
 guess or reconstruct a partially completed draft. These commands are for mock
 validation only; do not use them for the FD nation draft.
 
-Then on Windows:
-```
-py.exe driver/draft_driver.py
-```
-Or let the scheduled task **FDnationDraftDriver** fire automatically at draft time.
+The real operator requires an exact league/team confirmation in both its
+environment and command line; see the runbook. There is no Windows scheduled
+task in the active execution path.
 
 #### Draft board (default: original, nflverse-only)
 By default the driver drafts from the **original board** built entirely from our
 own nflverse-derived data — **no FantasyPros, no Yahoo, no third-party feed**.
 Generate it once (needs network the first time) with:
-```
+```bash
 python cli.py original-board
 ```
 This writes `data/board/original_board.json` (skill projections + K from the
