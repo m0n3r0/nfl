@@ -16,7 +16,7 @@ The reader fails closed unless all of these hold:
 
 - the page path is exactly `/f1/1329011/2`;
 - Yahoo is signed in and renders FD nation / Shiba Innu identity;
-- exactly 15 unique Yahoo player IDs are present;
+- 15 unique active-roster Yahoo player IDs are present, plus at most two IR players;
 - the lineup contains the configured nine starters and six bench slots;
 - record, current matchup, and waiver priority parse successfully.
 

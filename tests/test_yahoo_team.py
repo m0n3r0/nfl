@@ -62,6 +62,24 @@ def test_rejects_unexpected_lineup_slots():
         _parse_payload(current)
 
 
+def test_accepts_two_injured_reserve_players_in_addition_to_active_roster():
+    current = payload()
+    current["roster"].extend([
+        {
+            "yahoo_id": "16", "name": "Player 16", "team": "NE",
+            "position": "RB", "slot": "IR", "injury_status": "IR", "game": "",
+        },
+        {
+            "yahoo_id": "17", "name": "Player 17", "team": "NE",
+            "position": "WR", "slot": "IR", "injury_status": "IR", "game": "",
+        },
+    ])
+
+    snapshot = _parse_payload(current)
+
+    assert len(snapshot.roster) == 17
+
+
 def test_reader_only_evaluates_page():
     class Client:
         def __init__(self):

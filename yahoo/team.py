@@ -18,7 +18,8 @@ from .cdp import CdpError, Target, select_target
 LEAGUE_ID = "1329011"
 TEAM_ID = "2"
 TEAM_PATH = f"/f1/{LEAGUE_ID}/{TEAM_ID}"
-EXPECTED_SLOTS = Counter({"QB": 1, "RB": 2, "WR": 2, "TE": 1, "W/R/T": 1, "K": 1, "DEF": 1, "BN": 6})
+EXPECTED_ACTIVE_SLOTS = Counter({"QB": 1, "RB": 2, "WR": 2, "TE": 1, "W/R/T": 1, "K": 1, "DEF": 1, "BN": 6})
+INJURED_RESERVE_SLOTS = {"IR", "IL"}
 
 
 class TeamReadError(CdpError):
@@ -101,13 +102,14 @@ def _parse_payload(payload: Any) -> TeamSnapshot:
             injury_status=str(row.get("injury_status") or "").upper(),
             game=str(row.get("game") or "").strip(),
         ))
-    if len(roster) != 15:
-        raise TeamReadError(f"expected 15 roster players, found {len(roster)}")
+    if not 15 <= len(roster) <= 17:
+        raise TeamReadError(f"expected 15-17 roster players including IR, found {len(roster)}")
     ids = [player.yahoo_id for player in roster]
     if len(ids) != len(set(ids)):
         raise TeamReadError("team roster contains duplicate Yahoo player IDs")
     slots = Counter(player.slot for player in roster)
-    if slots != EXPECTED_SLOTS:
+    injured_reserve = sum(slots.pop(slot, 0) for slot in INJURED_RESERVE_SLOTS)
+    if slots != EXPECTED_ACTIVE_SLOTS or injured_reserve > 2:
         raise TeamReadError(f"unexpected lineup slots: {dict(slots)}")
 
     summary = payload.get("summary")
