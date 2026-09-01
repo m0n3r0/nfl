@@ -270,9 +270,17 @@ Protocol (CDP). Lives as a self-contained module alongside the toolkit above.
 - `driver/draft_driver.py` — live draft driver (board + guardrails + human-like CDP clicks). Runs on Windows via `py.exe`. **This is the only copy in the repo.**
 - `skills/` — Hermes skills (edge-cdp, fantasy-read, fantasy-draft) for reuse in Hermes Desktop. Documentation only; they point at the deployed driver, they do not bundle one.
 - `memory/fantasy_fd_nation.md` — persistent league context for the agent.
-- `data/board/` — original draft board (`original_board.json`, nflverse-derived, zero external deps, **250 players**) + K/DEF ADP reference.
+- `data/board/` — original draft board (`original_board.json`, nflverse-derived,
+  zero external deps, at least **250 players**) + K/DEF ADP reference.
 - `data/scrapes/` — roster/standings/settings extracts from the live tab. **Local-only: gitignored and never committed** (it contains real league member names + session state); the driver reads it from disk at runtime.
-- `tools/` — load-bearing utilities only: `scrape_league_adp.py` (league ADP scrape), `check_login.py` / `login_yahoo.py` (auth), `simulate_draft.py` (offline regression harness, used by `tests/test_simulation.py`), `mock_draft_run.py` + `mock_draft_room.html` (pre-draft click validation), `check_draft_state.py` / `back_to_league.py` / `recover_tab.py` / `edge_alive.py` (CDP health & recovery), and `deploy.ps1` (one-command verified deploy). Throwaway debug probes live in `tools/debug/` and are not part of the pipeline.
+- `yahoo/cdp.py` — shared loopback-only CDP transport with deterministic target
+  selection, monotonic request IDs, deadlines, and explicit protocol/JavaScript
+  errors.
+- `yahoo/mock_draft.py` + `tools/yahoo_mock_draft.py` — inspect, join, and run a
+  current Yahoo ten-team mock draft. This path rejects the seven-digit FD nation
+  league ID and only accepts eight-digit mock-room IDs; it cannot start the real
+  draft driver.
+- `tools/` — load-bearing utilities only: `scrape_league_adp.py` (league ADP scrape), `check_login.py` / `login_yahoo.py` (auth), `simulate_draft.py` (offline regression harness, used by `tests/test_simulation.py`), `mock_draft_run.py` + `mock_draft_room.html` (legacy driver click validation), `test_yahoo_mock_cdp.py` + `yahoo_draft_client_fixture.html` (current Yahoo client regression), `check_draft_state.py` / `back_to_league.py` / `recover_tab.py` / `edge_alive.py` (CDP health & recovery), and `deploy.ps1` (one-command verified deploy). Throwaway debug probes live in `tools/debug/` and are not part of the pipeline.
 - `validation/` — mock-draft + click validation logs (2026-08-21).
 - `docs/REMEDIATION.md` — phase-by-phase log of the 2026-08-31 review.
 
@@ -307,6 +315,25 @@ Edge must be open on port 9222, bound to loopback (`--remote-debugging-address=1
 > - Ensure **no firewall / port-forward rule** exposes 9222 to the network.
 > - Close Edge (or the port) when you're not drafting.
 > Treat the debug port like an unlocked door to your accounts.
+
+### Yahoo mock-draft validation (never the real league)
+
+The mock operator is separate from `driver/draft_driver.py`. It only accepts
+Yahoo's eight-digit mock-room IDs and explicitly rejects real league `1329011`.
+It verifies the exact room, slot, player ID/team/position, current overall pick,
+and authoritative `YOUR TEAM (N/15)` transition around every selection. If a
+submission does not produce a roster-count change, it stops without replaying
+the click.
+
+```
+python tools/yahoo_mock_draft.py list
+python tools/yahoo_mock_draft.py join --room 10401633 --slot 4
+python tools/yahoo_mock_draft.py run --room 10401633 --log logs/mock-draft.jsonl
+```
+
+`run` requires a fresh room at round 1 with an empty mock roster. It refuses to
+guess or reconstruct a partially completed draft. These commands are for mock
+validation only; do not use them for the FD nation draft.
 
 Then on Windows:
 ```
@@ -353,5 +380,6 @@ Yahoo default pre-rank is the auto-draft fallback if the driver errors.
 
 ### Honest limitations
 - Cannot guarantee wins (real NFL games decide outcomes).
-- Live pick→Draft-button flow validated at mechanism level, not end-to-end (Yahoo mock gated).
+- The current Yahoo mock-client pick flow has been exercised live; the real FD
+  nation driver remains separate and must not be treated as validated by a mock.
 - Keep Edge + machine on at draft time.
