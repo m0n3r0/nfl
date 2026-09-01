@@ -199,11 +199,13 @@ class RealDraftOperator:
                 pending = None
         return pending
 
-    def _known_unavailable_names(self) -> set[str]:
+    def _known_unavailable_names(self, round_number: int) -> set[str]:
         return {
             str(record["player"]).lower()
             for record in self._records()
-            if record.get("event") == "search_unavailable" and record.get("player")
+            if record.get("event") == "search_unavailable"
+            and record.get("round") == round_number
+            and record.get("player")
         }
 
     @staticmethod
@@ -271,7 +273,7 @@ class RealDraftOperator:
         if state.round is None:
             raise RealDraftSafetyError("Yahoo did not expose the current round")
         roster_names = self._canonical_roster_names(state.roster)
-        unavailable_names = self._known_unavailable_names()
+        unavailable_names = self._known_unavailable_names(state.round)
         remaining = [value["name"] for value in self.board.values()
                      if value["name"].lower() not in roster_names | unavailable_names]
         choice = None
@@ -283,11 +285,13 @@ class RealDraftOperator:
                 break
             wanted_name, wanted_team, wanted_pos, _ = choice
             self.page.set_search(wanted_name)
-            time.sleep(0.5)
-            searched = self.page.read_state()
-            row = self._resolve_choice(searched.rows, choice)
-            if row:
-                return row
+            search_deadline = time.monotonic() + 0.8
+            while time.monotonic() < search_deadline:
+                searched = self.page.read_state()
+                row = self._resolve_choice(searched.rows, choice)
+                if row:
+                    return row
+                time.sleep(0.1)
             self._log("search_unavailable", round=state.round, overall=state.pick,
                       player=wanted_name, player_team=wanted_team, pos=wanted_pos)
             remaining = [name for name in remaining if name != wanted_name]
@@ -320,6 +324,8 @@ class RealDraftOperator:
             if state.complete and state.team_count == 15:
                 self._log("complete", count=15)
                 return [Pick(p.round, p.overall, p.player) for p in state.roster]
+            if state.forced_autodraft:
+                raise RealDraftSafetyError("Yahoo reports forced autopick mode; refusing manual clicks")
             if not state.my_turn:
                 time.sleep(poll_interval)
                 continue
@@ -343,7 +349,8 @@ class RealDraftOperator:
                 raise UncertainSubmission("real pick outcome is uncertain; no retry will be attempted")
             self._validate_state(after)
             matching = [pick for pick in after.roster if pick.player.id == player.id]
-            if len(matching) != 1 or matching[0].overall != state.pick:
+            if (len(matching) != 1 or matching[0].round != state.round
+                    or matching[0].overall != state.pick):
                 raise RealDraftSafetyError("roster advanced without the exact submitted player/pick")
             self._log("confirmed", round=state.round, overall=state.pick,
                       player_id=player.id, player=player.name, pos=player.pos)

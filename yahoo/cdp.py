@@ -57,8 +57,11 @@ def _require_loopback_websocket(url: str) -> str:
 def list_targets(endpoint: str = "http://127.0.0.1:9222", timeout: float = 8) -> list[Target]:
     """Read page targets from a loopback CDP endpoint."""
     endpoint = _require_loopback(endpoint)
-    with urllib.request.urlopen(endpoint + "/json/list", timeout=timeout) as response:
-        rows = json.load(response)
+    try:
+        with urllib.request.urlopen(endpoint + "/json/list", timeout=timeout) as response:
+            rows = json.load(response)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CdpError(f"CDP target discovery failed: {exc}") from exc
     return [
         Target(
             id=str(row.get("id", "")),
