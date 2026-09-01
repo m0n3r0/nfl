@@ -20,8 +20,12 @@ import argparse
 import sys
 
 from src import ingest, scoring, lineup, corpus, projections, analysis, model, draft_board
-from src.config import SCHEDULE_SEASON
-from src.config import FANTASY_POSITIONS, SCHEDULE_SEASON, STATS_SEASON, league_preset
+from src.config import (FANTASY_POSITIONS, SCORING_PRESETS, SCHEDULE_SEASON,
+                        STATS_SEASON, league_preset)
+
+
+SCORING_CHOICES = list(SCORING_PRESETS)
+NFLVERSE_SCORING_CHOICES = ["standard", "ppr", "half-ppr"]
 
 
 def _df(name: str, refresh: bool, stats_season: int = STATS_SEASON):
@@ -262,7 +266,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     pr = sub.add_parser("rank", help="season rankings by total fantasy points")
     _add_season(pr)
-    pr.add_argument("--preset", default=league_preset(), choices=["standard", "ppr", "half-ppr"])
+    pr.add_argument("--preset", default=league_preset(), choices=SCORING_CHOICES)
     pr.add_argument("--positions", type=_pos_type, default=None, help="QB,RB,WR,TE,K,DEF")
     pr.add_argument("--top", type=int, default=20)
     pr.add_argument("--refresh", action="store_true")
@@ -271,7 +275,7 @@ def build_parser() -> argparse.ArgumentParser:
     pw = sub.add_parser("week", help="rankings for a specific week")
     _add_season(pw)
     pw.add_argument("week", type=int, help="week number")
-    pw.add_argument("--preset", default=league_preset(), choices=["standard", "ppr", "half-ppr"])
+    pw.add_argument("--preset", default=league_preset(), choices=SCORING_CHOICES)
     pw.add_argument("--positions", type=_pos_type, default=None)
     pw.add_argument("--top", type=int, default=20)
     pw.add_argument("--refresh", action="store_true")
@@ -279,13 +283,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     pl = sub.add_parser("lineup", help="greedy optimized starting lineup")
     _add_season(pl)
-    pl.add_argument("--preset", default=league_preset(), choices=["standard", "ppr", "half-ppr"])
+    pl.add_argument("--preset", default=league_preset(), choices=SCORING_CHOICES)
     pl.add_argument("--refresh", action="store_true")
     pl.set_defaults(func=cmd_lineup)
 
     pv = sub.add_parser("validate", help="compare scoring vs nflverse shipped values")
     _add_season(pv)
-    pv.add_argument("--preset", default=league_preset(), choices=["standard", "ppr", "half-ppr"])
+    pv.add_argument("--preset", default="half-ppr", choices=NFLVERSE_SCORING_CHOICES)
     pv.add_argument("--refresh", action="store_true")
     pv.set_defaults(func=cmd_validate)
 
@@ -294,20 +298,20 @@ def build_parser() -> argparse.ArgumentParser:
     pc.set_defaults(func=cmd_corpus)
 
     pj = sub.add_parser("projections", help="2026 projections (multi-year + role + SOS)")
-    pj.add_argument("--preset", default=league_preset(), choices=["standard", "ppr", "half-ppr"])
+    pj.add_argument("--preset", default=league_preset(), choices=SCORING_CHOICES)
     pj.add_argument("--positions", type=_pos_type, default=None)
     pj.add_argument("--top", type=int, default=30)
     pj.set_defaults(func=cmd_projections)
 
     pcons = sub.add_parser("consistency", help="weekly consistency / boom-bust by player")
-    pcons.add_argument("--preset", default=league_preset(), choices=["standard", "ppr", "half-ppr"])
+    pcons.add_argument("--preset", default=league_preset(), choices=SCORING_CHOICES)
     pcons.add_argument("--positions", type=_pos_type, default=None)
     pcons.add_argument("--top", type=int, default=30)
     pcons.set_defaults(func=cmd_consistency)
 
     pm = sub.add_parser("matchups", help="2026 weekly start/sit board")
     pm.add_argument("week", type=int, help="2026 week number")
-    pm.add_argument("--preset", default=league_preset(), choices=["standard", "ppr", "half-ppr"])
+    pm.add_argument("--preset", default=league_preset(), choices=SCORING_CHOICES)
     pm.add_argument("--top", type=int, default=25)
     pm.set_defaults(func=cmd_matchups)
 
@@ -321,8 +325,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     pob = sub.add_parser("original-board",
                          help="build the original nflverse-only draft board -> JSON")
-    pob.add_argument("--preset", default="half-ppr",
-                     choices=["standard", "ppr", "half-ppr"])
+    pob.add_argument("--preset", default=league_preset(), choices=SCORING_CHOICES)
     pob.set_defaults(func=cmd_original_board)
 
     pdc = sub.add_parser("draft-class",

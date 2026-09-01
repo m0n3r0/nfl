@@ -84,8 +84,13 @@ python cli.py matchups 1 --top 25    # 2026 Week 1 start/sit board
 python cli.py sos                     # 2026 team strength-of-schedule ranking
 ```
 
-Presets: `standard`, `ppr`, `half-ppr`. Most commands accept `--season <YEAR>` to
-override the stats year (the schedule command uses `SCHEDULE_SEASON`).
+Presets: `standard`, `ppr`, `half-ppr`, `fd-nation`. The default `fd-nation`
+profile matches the authenticated Yahoo settings verified on 2026-09-01: 0.5
+points per reception, 4-point passing touchdowns, and -1 per interception.
+The generic presets retain nflverse's -2 interception weight so `validate`
+continues to compare like-for-like against nflverse's shipped columns. Most
+commands accept `--season <YEAR>` to override the stats year (the schedule
+command uses `SCHEDULE_SEASON`).
 
 ## 2026 projection engine
 
@@ -196,13 +201,17 @@ breakdowns, and SOS ranking. API: `/api/modelcard`, `/api/predictions`.
 
 ## Scoring
 
-Weights were reverse-engineered from nflverse's own shipped `fantasy_points` /
+The generic preset weights were reverse-engineered from nflverse's own shipped `fantasy_points` /
 `fantasy_points_ppr` columns via least-squares regression (R^2 = 1.000 on the
 2024 weekly table), so `cli.py validate` shows a max delta of 0.00 across all
 presets. Highlights that differ from generic textbook scoring:
 - interceptions: −2.0
 - every fumble LOST: −2.0 (split across rushing / receiving / sack fumbles)
 - 2-point conversions: +2.0
+
+FD nation overrides only interceptions to -1.0 and receptions to 0.5, matching
+the live Yahoo league settings. There are no listed yardage or touchdown
+milestone bonuses.
 
 See `src/config.py` for the full weight table.
 
