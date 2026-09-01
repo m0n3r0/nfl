@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import subprocess
+from collections import Counter
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -27,6 +28,23 @@ def _records(audit_path: Path) -> list[dict[str, Any]]:
     return records
 
 
+def _provenance(decision: dict[str, Any]) -> str:
+    """Return an honest, human-readable source for a recorded decision."""
+    source = decision.get("source")
+    path = decision.get("selection_path")
+    if source == "yahoo_autopick":
+        return "Yahoo autopick"
+    if path == "live_yahoo_rank":
+        return "Yahoo XRank recovery fallback"
+    if path in {"full_board_search", "visible_fallback"}:
+        return "Internal FD nation board"
+    if source == "manual_recovery":
+        return "Manual live recovery"
+    if source == "operator_selection":
+        return "Operator selection; rationale reconstructed retrospectively"
+    return "Unknown or incomplete audit provenance"
+
+
 def render_draft_report(picks: Iterable[Pick], audit_path: Path) -> str:
     """Render pick-specific rationale from Yahoo-confirmed picks and audit data."""
     picks = sorted(picks, key=lambda pick: pick.round)
@@ -37,13 +55,21 @@ def render_draft_report(picks: Iterable[Pick], audit_path: Path) -> str:
         for record in _records(audit_path)
         if record.get("event") == "decision"
     }
+    provenance = Counter(
+        _provenance(decisions.get((pick.round, pick.player.id), {}))
+        for pick in picks
+    )
     lines = [
         "# FD nation 2026 draft results and rationale",
         "",
         f"League `{LEAGUE_ID}`, team `{TEAM_ID}` (Shiba Innu).",
         "",
         "This roster was reconstructed from Yahoo's authoritative completed draft state. "
-        "The rationale below comes from the decision audit captured before each submitted pick.",
+        "Rationales may be contemporaneous or retrospective; each pick states its audited selection provenance.",
+        "",
+        "## Selection-source summary",
+        "",
+        *[f"- {source}: {count}" for source, count in sorted(provenance.items())],
         "",
         "## Picks",
         "",
@@ -54,6 +80,8 @@ def render_draft_report(picks: Iterable[Pick], audit_path: Path) -> str:
         name = str(decision.get("board_player") or player.name)
         lines.extend([
             f"### Round {pick.round}, overall {pick.pick}: {name} ({player.team} — {player.pos})",
+            "",
+            f"Selection provenance: {_provenance(decision)}.",
             "",
             str(decision.get("reason") or
                 "Yahoo confirmed this roster pick, but no contemporaneous operator rationale was recoverable."),
@@ -75,9 +103,9 @@ def render_draft_report(picks: Iterable[Pick], audit_path: Path) -> str:
     lines.extend([
         "## Method",
         "",
-        "Selections used the FD nation scoring board, live Yahoo availability, roster construction, "
-        "positional deadlines, and exact player-identity checks. Yahoo roster history—not local counters—"
-        "was the final authority for every recorded selection.",
+        "Yahoo roster history—not local counters—was the final authority for the completed roster. "
+        "The source summary is derived from each decision's audit fields; it does not infer internal-model use "
+        "from the presence of Yahoo XRank or ADP evidence.",
         "",
         f"Report generated {dt.datetime.now(dt.timezone.utc).isoformat()}.",
         "",
