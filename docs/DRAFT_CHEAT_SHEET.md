@@ -1,6 +1,6 @@
 # FD nation — Manual Draft Cheat Sheet (team #2 "Doge")
 
-_Generated 2026-09-01 22:43 from `data/board/original_board.json` (253 players, SHA-256 `b5fe4d6b8a7f`). Re-run `tools/gen_cheat_sheet.py --write` after the morning-of ADP re-scrape to refresh._
+_Generated 2026-09-01 23:07 from `data/board/original_board.json` (250 players, SHA-256 `1222c2c3db1a`). Re-run `tools/gen_cheat_sheet.py --write` after the morning-of ADP re-scrape to refresh._
 
 ## Your 15 picks (snake, 10-team, 1 min/pick)
 
@@ -143,7 +143,7 @@ _Generated 2026-09-01 22:43 from `data/board/original_board.json` (253 players, 
  8. Packers (GB - DEF)  val 92  ADP -
  9. Bills (BUF - DEF)  val 82  ADP -
 10. Steelers (PIT - DEF)  val 82  ADP -
-11. LA (LA - DEF)  val 82  ADP -
+11. Rams (LAR - DEF)  val 82  ADP -
 12. Patriots (NE - DEF)  val 80  ADP -
 13. Lions (DET - DEF)  val 75  ADP -
 14. Ravens (BAL - DEF)  val 75  ADP -

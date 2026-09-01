@@ -8,6 +8,7 @@ guardrails (anchor deadlines, scarcity premium, K/DEF-late, QB-late).
 """
 
 import json
+import math
 import os
 import sys
 import tempfile
@@ -177,6 +178,41 @@ def test_real_board_is_larger_than_the_whole_draft():
         "board has %d players; MIN_BOARD_SIZE is %d so the late rounds "
         "always have candidates left" % (len(board), draft_board.MIN_BOARD_SIZE)
     )
+
+
+def test_committed_board_is_strict_json_with_finite_values():
+    """The deployed board must be portable JSON with deterministic rankings."""
+    path = ROOT / "data" / "board" / "original_board.json"
+    raw = path.read_text(encoding="utf-8")
+
+    def reject_constant(value):
+        raise ValueError("non-standard JSON constant: %s" % value)
+
+    board = json.loads(raw, parse_constant=reject_constant)
+    assert all(math.isfinite(float(row["value"])) for row in board)
+    assert {"name": "Rams", "team": "LAR"} in [
+        {"name": row["name"], "team": row["team"]}
+        for row in board
+        if row["pos"] == "DEF"
+    ]
+
+
+def test_nonfinite_rookie_projection_is_rejected(monkeypatch):
+    """NaN must not bypass the rookie minimum through unordered comparisons."""
+    projected = pd.DataFrame([
+        {
+            "player_id": "rookie",
+            "player_display_name": "Invalid Rookie",
+            "position": "RB",
+            "last_team": "ARI",
+            "proj_total": float("nan"),
+            "is_rookie": True,
+            "role_share": 0.60,
+        }
+    ])
+    weekly = pd.DataFrame([{"player_id": "rookie", "season": 2025}])
+    monkeypatch.setattr(draft_board.projections, "project_players", lambda _corpus: projected)
+    assert draft_board._skill_board({"weekly_history": weekly}, "fd-nation", {}) == []
 
 
 # --------------------------------------------------------------------------- #

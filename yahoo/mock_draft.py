@@ -343,11 +343,16 @@ class MockDraftOperator:
             with self.log_path.open("a", encoding="utf-8") as handle:
                 handle.write(line + "\n")
 
+    @staticmethod
+    def _driver_row_text(row: PlayerRow) -> str:
+        """Render the legacy driver's structured row and explicit ADP label."""
+        return f"{row.name} {row.team} - {row.pos} ADP {row.adp}"
+
     def _choose(self, state: DraftState, roster: Counter[str]) -> PlayerRow:
         from driver import draft_driver as driver
 
         healthy = [row for row in state.rows if row.injury not in {"O", "IR", "PUP", "CEL"}]
-        raw = [[row.name, row.team, row.pos, row.text] for row in healthy]
+        raw = [[row.name, row.team, row.pos, self._driver_row_text(row)] for row in healthy]
         names, adp, positions = driver.normalize_available(raw, {
             value["team"].upper(): value["name"]
             for value in self.board.values()
@@ -360,10 +365,15 @@ class MockDraftOperator:
             wanted_name, wanted_team, wanted_pos, _ = choice
             for row in healthy:
                 normalized, _, _ = driver.normalize_available(
-                    [[row.name, row.team, row.pos, row.text]],
+                    [[row.name, row.team, row.pos, self._driver_row_text(row)]],
                     {value["team"].upper(): value["name"] for value in self.board.values() if value["pos"] == "DEF"},
                 )
-                if normalized and normalized[0] == wanted_name and row.team.upper() == wanted_team.upper() and row.pos == wanted_pos:
+                if (
+                    normalized
+                    and normalized[0] == wanted_name
+                    and (not wanted_team or row.team.upper() == wanted_team.upper())
+                    and (not wanted_pos or row.pos == wanted_pos)
+                ):
                     return row
         allowed = self._fallback_positions(state.round, roster)
         candidates = [row for row in healthy if row.pos in allowed]

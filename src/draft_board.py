@@ -194,6 +194,8 @@ def _skill_board(corpus: dict, preset: str, injury_flags: dict[str, str] | None 
         if status in INJURY_EXCLUDE_STATUSES:
             continue
         value = float(r["proj_total"])
+        if not np.isfinite(value):
+            continue
         # Penalize (don't exclude) Questionable/Doubtful players.
         if status in INJURY_PENALTY_STATUSES:
             value *= INJURY_PENALTY_FACTOR.get(status, 1.0)
@@ -223,7 +225,8 @@ def _skill_board(corpus: dict, preset: str, injury_flags: dict[str, str] | None 
             continue
         if float(r.get("role_share", 0) or 0) < 0.60:
             continue
-        if float(r["proj_total"]) < _ROOKIE_MIN_PROJ:
+        rookie_value = float(r["proj_total"])
+        if not np.isfinite(rookie_value) or rookie_value < _ROOKIE_MIN_PROJ:
             continue
         key = (r["player_display_name"], r["position"])
         if key in on_board:
@@ -231,7 +234,7 @@ def _skill_board(corpus: dict, preset: str, injury_flags: dict[str, str] | None 
         capped.append({
             "name": r["player_display_name"],
             "team": r["last_team"], "pos": r["position"],
-            "value": float(r["proj_total"]),
+            "value": rookie_value,
         })
         on_board.add(key)
     return capped
@@ -294,7 +297,10 @@ def _defense_board(corpus: dict) -> list[dict]:
     td = td.sort_values("def_value", ascending=False).head(DEF_TOP)
     out = []
     for _, r in td.iterrows():
-        code = r["team"]
+        # nflverse historically used LA for the Rams. Yahoo's current stable
+        # code is LAR, which is also the key expected by TEAM_SHORT and the
+        # identity-qualified draft click path.
+        code = "LAR" if r["team"] == "LA" else r["team"]
         out.append({
             "name": TEAM_SHORT.get(code, code), "team": code,
             "pos": "DEF", "value": float(r["def_value"]),
@@ -434,5 +440,5 @@ def write_original_board(path: str | Path, corpus: dict | None = None,
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     with open(p, "w", encoding="utf-8") as f:
-        json.dump(board, f, indent=2)
+        json.dump(board, f, indent=2, allow_nan=False)
     return board
