@@ -55,6 +55,8 @@ def main() -> int:
             after = page.read_state()
             assert after.team_count == 1 and not after.my_turn, after
             assert not after.rows
+            assert len(after.roster) == 1 and after.roster[0].player.id == "40168", after
+            assert (after.roster[0].round, after.roster[0].overall) == (1, 4), after
         print("CURRENT YAHOO DRAFT-CLIENT FIXTURE PASSED")
         return 0
     finally:

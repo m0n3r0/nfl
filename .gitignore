@@ -39,5 +39,7 @@ data/scrapes/
 # --- FD nation draft driver (runtime-generated) ---
 draft_log.txt
 logs/*.txt
+logs/*.jsonl
+logs/*.lock
 # (__pycache__/ already covered above -- do not duplicate it here)
 .worktrees/
