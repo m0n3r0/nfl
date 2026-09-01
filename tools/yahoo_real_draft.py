@@ -20,7 +20,6 @@ from yahoo.real_draft import (
     RealDraftOperator,
     RealDraftSafetyError,
     UncertainSubmission,
-    find_real_draft_target,
     real_draft_preflight,
     require_real_authorization,
     wait_for_real_draft_target,
@@ -59,9 +58,11 @@ def main() -> int:
         return 0
 
     orchestration_deadline = time.monotonic() + (args.wait_minutes * 60) + (args.deadline_hours * 3600)
-    target = wait_for_real_draft_target(args.endpoint, timeout=args.wait_minutes * 60)
+    target = None
     while time.monotonic() < orchestration_deadline:
         try:
+            if target is None:
+                target = wait_for_real_draft_target(args.endpoint, timeout=args.wait_minutes * 60)
             with CdpClient(target, args.endpoint) as client:
                 picks = RealDraftOperator(client, args.audit).run(args.deadline_hours)
             print(f"REAL DRAFT COMPLETE: {len(picks)}/15", flush=True)
@@ -75,7 +76,7 @@ def main() -> int:
         except CdpError as exc:
             print(f"CDP RECOVERY: {type(exc).__name__}: {exc}", flush=True)
             time.sleep(2)
-            target = find_real_draft_target(args.endpoint)
+            target = None
     print("REAL DRAFT HALTED: orchestration deadline exceeded", flush=True)
     return 4
 

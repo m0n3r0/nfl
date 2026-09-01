@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -23,16 +24,28 @@ def player(index: int, pos: str = "RB") -> PlayerRow:
     return PlayerRow(str(index), f"Player {index}", "NE", pos, "", float(index), float(index), "")
 
 
+def pick_in_round(round_number: int) -> int:
+    return 2 if round_number % 2 else 9
+
+
+def overall_pick(round_number: int) -> int:
+    return (round_number - 1) * 10 + pick_in_round(round_number)
+
+
 def roster(count: int) -> tuple[RosterPick, ...]:
-    return tuple(RosterPick(index, index, index, player(index)) for index in range(1, count + 1))
+    return tuple(
+        RosterPick(index, pick_in_round(index), overall_pick(index), player(index))
+        for index in range(1, count + 1)
+    )
 
 
 def state(count: int, *, my_turn: bool = True, current: PlayerRow | None = None) -> DraftState:
     round_number = min(count + 1, 15)
+    overall = overall_pick(round_number)
     return DraftState(
-        f"YOUR TURN • ROUND {round_number}, PICK {round_number}",
+        f"YOUR TURN • ROUND {round_number}, PICK {overall}",
         round_number,
-        round_number,
+        overall,
         my_turn,
         count,
         15,
@@ -88,7 +101,7 @@ class ResumePage:
 
     def submit(self, selected, overall):
         assert selected == self.current
-        assert overall == self.count + 1
+        assert overall == overall_pick(self.count + 1)
         self.submits += 1
         self.count += 1
 
@@ -131,7 +144,7 @@ def test_unresolved_submit_is_never_replayed(tmp_path):
     audit = tmp_path / "audit.jsonl"
     audit.write_text(json.dumps({
         "event": "submit_intent", "league": "1329011", "team": "2",
-        "round": 5, "overall": 5, "player_id": "5",
+        "round": 5, "overall": overall_pick(5), "player_id": "5",
     }) + "\n")
     operator = operator_for(page, audit)
     with pytest.raises(UncertainSubmission, match="refusing to replay"):
@@ -144,11 +157,32 @@ def test_recovered_submit_is_confirmed_from_roster_without_click(tmp_path):
     audit = tmp_path / "audit.jsonl"
     audit.write_text(json.dumps({
         "event": "submit_intent", "league": "1329011", "team": "2",
-        "round": 5, "overall": 5, "player_id": "5",
+        "round": 5, "overall": overall_pick(5), "player_id": "5",
     }) + "\n")
     operator = operator_for(page, audit)
     operator._reconcile_pending(page.read_state())
     assert operator._pending_submission() is None
+    assert page.submits == 0
+
+
+def test_unavailable_searches_are_scoped_to_the_current_round(tmp_path):
+    page = ResumePage(start=4)
+    audit = tmp_path / "audit.jsonl"
+    audit.write_text(json.dumps({
+        "event": "search_unavailable", "league": "1329011", "team": "2",
+        "round": 5, "player": "Target Player",
+    }) + "\n")
+    operator = operator_for(page, audit)
+    assert operator._known_unavailable_names(5) == {"target player"}
+    assert operator._known_unavailable_names(6) == set()
+
+
+def test_forced_autopick_mode_halts_without_click(tmp_path):
+    page = ResumePage(start=4)
+    page.read_state = lambda: replace(state(4), forced_autodraft=True)
+    operator = operator_for(page, tmp_path / "audit.jsonl")
+    with pytest.raises(RealDraftSafetyError, match="forced autopick"):
+        operator.run(deadline_hours=0.01, poll_interval=0)
     assert page.submits == 0
 
 

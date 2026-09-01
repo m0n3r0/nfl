@@ -58,6 +58,17 @@ def test_cdp_protocol_error_is_not_swallowed(monkeypatch):
         client.call("Runtime.enable")
 
 
+def test_target_discovery_errors_use_cdp_recovery_contract(monkeypatch):
+    monkeypatch.setattr(
+        "yahoo.cdp.urllib.request.urlopen",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("Chrome restarting")),
+    )
+    with pytest.raises(CdpError, match="target discovery failed"):
+        from yahoo.cdp import list_targets
+
+        list_targets()
+
+
 def test_cdp_rejects_non_loopback_websocket_before_connect(monkeypatch):
     called = False
 
