@@ -138,6 +138,19 @@ def main():
         print("PASS #23c click_player drafted deep target via search; drafted=%s"
               % drafted_names)
 
+        # --- #43: failed deep identity click also restores the full list ---
+        load_players(ws, players)
+        search_set = dd._set_player_search(ws, DEEP_NAME)
+        assert search_set is True, "could not set deep-player search: %r" % search_set
+        time.sleep(0.3)
+        dd.ev(ws, "MockDraft.removePlayer(%s)" % json.dumps(DEEP_NAME))
+        failed_click = dd.click_player(ws, DEEP_NAME, "ZEN", "WR")
+        assert failed_click is False, "disappeared player click returned %r" % failed_click
+        restored = dd.read_available(ws) or []
+        assert len(restored) == 40, \
+            "failed click left stale search filter; rows=%d" % len(restored)
+        print("PASS #43 failed deep identity click restored unfiltered board")
+
         # --- #26: pick-number read + guard ---
         dd.ev(ws, "document.getElementById('pickno').textContent='Overall Pick 5 of 150'")
         pn = dd.read_pick_number(ws)
