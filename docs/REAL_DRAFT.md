@@ -44,6 +44,14 @@ FD_REAL_DRAFT_AUTHORIZATION=1329011/2 .venv/bin/python \
 Audit records are written to `logs/real-draft-audit.jsonl`; cron output goes to
 `logs/real-draft-cron.log`.
 
+Each decision records the live roster context, board value, Yahoo rank and ADP,
+unavailable higher-priority targets, and the roster-construction rule that
+justified the pick. Once Yahoo authoritatively reports 15/15, the orchestrator
+writes `docs/drafts/2026-09-02-fd-nation.md`, commits it on
+`draft/2026-fd-nation-results`, pushes that branch to `orign`, and opens a pull
+request. Publication occurs only after the complete roster has been read back
+from Yahoo; it does not run for a partial or halted draft.
+
 ## Failover and rollback
 
 On an uncertain submit, identity mismatch, roster-history mismatch, auth loss,

@@ -15,6 +15,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from yahoo.cdp import CdpClient, CdpError
+from yahoo.draft_report import publish_draft_report, write_draft_report
 from yahoo.real_draft import (
     AUTHORIZATION,
     RealDraftOperator,
@@ -66,6 +67,9 @@ def main() -> int:
             with CdpClient(target, args.endpoint) as client:
                 picks = RealDraftOperator(client, args.audit).run(args.deadline_hours)
             print(f"REAL DRAFT COMPLETE: {len(picks)}/15", flush=True)
+            report = write_draft_report(ROOT, picks, args.audit)
+            pull_request = publish_draft_report(ROOT, report)
+            print(f"DRAFT REPORT PUBLISHED: {pull_request}", flush=True)
             return 0
         except UncertainSubmission as exc:
             print(f"REAL DRAFT HALTED: {exc}", flush=True)
