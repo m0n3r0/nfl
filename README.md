@@ -212,7 +212,7 @@ See `src/config.py` for the full weight table.
 python -m pytest tests/ -q
 ```
 
-Five test files:
+The suite includes:
 
 | File | Covers |
 |---|---|
@@ -221,6 +221,7 @@ Five test files:
 | `tests/test_model.py` | win-probability model, calibration, time-based split |
 | `tests/test_original_board.py` | nflverse draft board: shape, depth, and the size invariant |
 | `tests/test_draft_driver.py` | driver pick logic: guardrails, DEF name mapping, off-board fallback |
+| `tests/test_cdp_browser.py` | isolated Chromium/CDP checks for identity-safe clicks and a complete 15-round mock draft |
 
 The full suite takes several minutes (`test_scoring.py` and `test_model.py` load the
 ~95 MB PBP corpus). To iterate quickly, run a single file:
@@ -231,6 +232,16 @@ python -m pytest tests/test_draft_driver.py -q
 
 `tests/test_original_board.py` and `tests/test_draft_driver.py` are the two that gate
 draft-day changes; together they run in about 10 seconds.
+
+Browser-level CDP tests are opt-in locally and run on every CI push. Start an
+isolated Chromium instance on `127.0.0.1:9222`, then run:
+
+```bash
+RUN_CDP_BROWSER_TESTS=1 python -m pytest -m cdp -q
+```
+
+The harness creates and closes only local mock-draft tabs; it does not navigate
+to Yahoo or use an authenticated session.
 
 ## Known limitations
 
