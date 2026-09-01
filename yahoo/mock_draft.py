@@ -140,7 +140,7 @@ class MockLobby:
                 const row = link.closest('tr') || link.closest('li') || link.parentElement;
                 if (!room || !slot || !row) continue;
                 const text = clean(row.innerText);
-                const count = Number((text.match(/(\d+)\s*Teams?/i) || [])[1]);
+                const count = Number((text.match(/(\d+)\s*[- ]?\s*Teams?/i) || [])[1]);
                 if (!grouped[room]) grouped[room] = {room, teams: count, description: text, slots: []};
                 grouped[room].slots.push(slot);
               }
@@ -188,7 +188,10 @@ class MockLobby:
                 if target.type == "page"
                 and (
                     f"mock_waiting?mlid={room}" in target.url
-                    or f"/draftclient/f1/{room}/{slot}" in target.url
+                    or (
+                        f"/draftclient/f1/{room}/" in target.url
+                        and target.url.split("?", 1)[0].rstrip("/").endswith(f"/{slot}")
+                    )
                 )
             ]
             if len(matches) == 1:
