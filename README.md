@@ -275,8 +275,9 @@ static board). A change to either file is not live until it is copied there via
 `tools/deploy.ps1` — see "How to run the draft" below.
 - **Log file** — created at draft time; every pick decision logged here. Resolved in
   this order: `$FD_DRAFT_LOG` → Windows default `C:\edge-debug-profile\draft_log.txt`
-  → other platforms `./draft_log.txt`. (`.gitignore` covers `logs/draft_log.txt`; if
-  you point `FD_DRAFT_LOG` somewhere else, keep it out of git.)
+  → other platforms `./draft_log.txt`. (`.gitignore` covers root-level
+  `draft_log.txt` and all `logs/*.txt`; if you point `FD_DRAFT_LOG` somewhere
+  else, keep it out of git.)
 - `images/` — proof screenshots.
 
 ### League facts (verified live 2026-08-28)

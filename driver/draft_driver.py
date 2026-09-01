@@ -1203,32 +1203,34 @@ def click_player(ws, name, team=None, pos=None):
     # Match a stable player identity, not a name substring.  The optional fields
     # preserve compatibility with diagnostic tools, while run_draft always
     # supplies both from the selected board row.
-    found = _player_row_target(ws, name, team=team, pos=pos)
-    box = found.get("box") if isinstance(found, dict) else None
-    if not box:
-        count = found.get("count") if isinstance(found, dict) else None
-        log("PICK_ROW_NOT_UNIQUE name=%s team=%s pos=%s matches=%s"
-            % (name, team, pos, count))
-        return False
-    click_at(ws,int(box["x"]),int(box["y"]))
-    time.sleep(random.uniform(0.3,0.8))
-    # Click the DRAFT button inside the chosen player's own row, NOT the first
-    # enabled draft button on the page. The displayed list is sorted by Yahoo
-    # (ADP / default board order), so the value pick we chose is usually NOT the
-    # top row -- clicking the top button would draft the wrong player. Scope the
-    # button search to the row that holds the chosen name.
-    button = _player_row_target(ws, name, team=team, pos=pos, find_button=True)
-    btn = button.get("box") if isinstance(button, dict) else None
-    if btn:
-        click_at(ws,int(btn["x"]),int(btn["y"]))
-    # A deep-player search leaves Yahoo's list filtered. Restore the normal
-    # board before the next turn so read_available() does not become empty when
-    # the selected row disappears (#43).
     try:
-        _set_player_search(ws, "")
-    except Exception:
-        pass
-    return bool(btn)
+        found = _player_row_target(ws, name, team=team, pos=pos)
+        box = found.get("box") if isinstance(found, dict) else None
+        if not box:
+            count = found.get("count") if isinstance(found, dict) else None
+            log("PICK_ROW_NOT_UNIQUE name=%s team=%s pos=%s matches=%s"
+                % (name, team, pos, count))
+            return False
+        click_at(ws,int(box["x"]),int(box["y"]))
+        time.sleep(random.uniform(0.3,0.8))
+        # Click the DRAFT button inside the chosen player's own row, NOT the first
+        # enabled draft button on the page. The displayed list is sorted by Yahoo
+        # (ADP / default board order), so the value pick we chose is usually NOT the
+        # top row -- clicking the top button would draft the wrong player. Scope the
+        # button search to the row that holds the chosen name.
+        button = _player_row_target(ws, name, team=team, pos=pos, find_button=True)
+        btn = button.get("box") if isinstance(button, dict) else None
+        if btn:
+            click_at(ws,int(btn["x"]),int(btn["y"]))
+        return bool(btn)
+    finally:
+        # A deep-player search leaves Yahoo's list filtered. Restore the normal
+        # board on success, a missing row/button, or an input exception so the
+        # next turn never inherits stale search state (#43).
+        try:
+            _set_player_search(ws, "")
+        except Exception:
+            pass
 
 def verify_session(ws):
     """Best-effort pre-draft guard. Confirms we're on the FD nation (league
