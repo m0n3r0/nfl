@@ -179,4 +179,4 @@ def test_real_choice_searches_full_board_for_off_window_player(monkeypatch, tmp_
     chosen = operator._choose(state(4, current=player(5)))
 
     assert chosen == target_player
-    assert searches == ["T. Player"]
+    assert searches == ["Target Player"]
