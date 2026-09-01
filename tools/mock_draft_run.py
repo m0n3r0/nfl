@@ -11,7 +11,7 @@ How it works (all against the LIVE Edge on 127.0.0.1:9222):
   - opens the Yahoo-style mock room (tools/mock_draft_room.html) in a NEW tab
     via CDP Target.createTarget + attachToTarget (sessionId model, so your real
     Yahoo tab is never touched and we don't depend on /json/list);
-  - injects the REAL original board (119 players) + filler players so the
+  - injects the REAL original board (250 players) and uses its available pool
     10-team league has enough bodies for 150 picks;
   - runs a full 15-round snake for team #2, calling the DEPLOYED driver's real
     functions on every turn (no reimplementation);
@@ -312,6 +312,10 @@ def main():
             return 1
         peval(wsw, "window.MockDraft.load(%s)" % json.dumps(players))
         board = mod.load_original_board()
+        active_def_map = {
+            v["team"].upper(): v["name"]
+            for v in board.values() if v["pos"] == "DEF" and v.get("team")
+        }
 
         drafted = {}
         picks, fails = [], []
@@ -320,8 +324,18 @@ def main():
         for rnd in range(1, TOTAL_ROUNDS + 1):
             peval(wsw, "window.MockDraft.setTurn(true)")
             raw = mod.read_available(wsw)
-            available, adp_map = mod.normalize_available(raw)
-            pick = mod.choose_pick(available, drafted, rnd, board, adp_map={})
+            # Match run_draft(): defenses on the nflverse board are normalized
+            # by the active board's team map, not only the legacy static map.
+            available, adp_map, pos_map = mod.normalize_available(
+                raw, def_map=active_def_map)
+            anchor_row = mod.search_forced_anchor(
+                wsw, board, drafted, rnd, available)
+            if anchor_row:
+                raw.append(anchor_row)
+                available, adp_map, pos_map = mod.normalize_available(
+                    raw, def_map=active_def_map)
+            pick = mod.choose_pick(available, drafted, rnd, board,
+                                   adp_map=adp_map, pos_map=pos_map)
             if not pick:
                 fails.append("R%d: NO_PICK (parsed=%d)" % (rnd, len(available)))
                 log("R%-2d NO_PICK parsed=%d" % (rnd, len(available)))
@@ -330,7 +344,7 @@ def main():
             name, team, pos, adp = pick
             log("R%-2d CHOOSE %-22s pos=%s avail_top=%s"
                 % (rnd, name, pos, ",".join(available[:3])))
-            ok = mod.click_player(wsw, name)
+            ok = mod.click_player(wsw, name, team, pos)
             # Immediate post-click check: is the name still on the page?
             after = mod.read_available(wsw)
             after_names = [r[0] for r in after]

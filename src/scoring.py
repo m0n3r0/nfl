@@ -44,7 +44,7 @@ def add_scores(
 ) -> pd.DataFrame:
     """Return a DataFrame with a ``fantasy_points`` column added.
 
-    ``preset`` is one of ``standard`` / ``ppr`` / ``half-ppr``.
+    ``preset`` is one of ``standard`` / ``ppr`` / ``half-ppr`` / ``fd-nation``.
     """
     scoring = SCORING_PRESETS[preset]
     out = df.copy() if copy else df

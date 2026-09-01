@@ -1,6 +1,6 @@
 # FD nation — Manual Draft Cheat Sheet (team #2 "Doge")
 
-_Generated 2026-08-31 18:52 from `data/board/original_board.json` (250 players). Re-run `tools/gen_cheat_sheet.py --write` after the morning-of ADP re-scrape to refresh._
+_Generated 2026-09-01 23:07 from `data/board/original_board.json` (250 players, SHA-256 `1222c2c3db1a`). Re-run `tools/gen_cheat_sheet.py --write` after the morning-of ADP re-scrape to refresh._
 
 ## Your 15 picks (snake, 10-team, 1 min/pick)
 
@@ -26,21 +26,21 @@ _Generated 2026-08-31 18:52 from `data/board/original_board.json` (250 players).
 
 | R | Overall | Player | Role |
 |---|---|---|---|
-| 1 | 2 | Jahmyr Gibbs (DET - RB) val 312 | starter |
-| 2 | 19 | Amon-Ra St. Brown (DET - WR) val 222 | starter |
-| 3 | 22 | Travis Etienne (JAX - RB) val 204 | starter |
-| 4 | 39 | Drake London (ATL - WR) val 159 | starter |
-| 5 | 42 | Mark Andrews (BAL - TE) val 143 | starter |
-| 6 | 59 | Rome Odunze (CHI - WR) val 119 | bench/flex |
-| 7 | 62 | Quinshon Judkins (CLE - RB) val 135 | bench/flex |
-| 8 | 79 | Malik Washington (MIA - WR) val 77 | bench/flex |
-| 9 | 82 | Zach Charbonnet (SEA - RB) val 127 | bench/flex |
-| 10 | 99 | Jameis Winston (NYG - QB) val 76 | starter |
-| 11 | 102 | Tee Higgins (CIN - WR) val 74 | bench/flex |
-| 12 | 119 | Bhayshul Tuten (JAX - RB) val 78 | bench/flex |
-| 13 | 122 | Jordan Addison (MIN - WR) val 70 | bench/flex |
-| 14 | 139 | Chargers (LAC - DEF) val 71 | starter |
-| 15 | 142 | Kenny Gainwell (PIT - RB) val 71 | bench/flex |
+| 1 | 2 | Bijan Robinson (ATL - RB) val 299 | starter |
+| 2 | 19 | Ja'Marr Chase (CIN - WR) val 271 | starter |
+| 3 | 22 | Puka Nacua (LA - WR) val 262 | starter |
+| 4 | 39 | George Kittle (SF - TE) val 181 | starter |
+| 5 | 42 | Rhamondre Stevenson (NE - RB) val 170 | starter |
+| 6 | 59 | Garrett Wilson (NYJ - WR) val 167 | bench/flex |
+| 7 | 62 | Javonte Williams (DAL - RB) val 161 | bench/flex |
+| 8 | 79 | Alec Pierce (IND - WR) val 134 | bench/flex |
+| 9 | 82 | Cam Skattebo (NYG - RB) val 115 | bench/flex |
+| 10 | 99 | Jaxson Dart (NYG - QB) val 245 | starter |
+| 11 | 102 | Malik Washington (MIA - WR) val 73 | bench/flex |
+| 12 | 119 | Woody Marks (HOU - RB) val 55 | bench/flex |
+| 13 | 122 | Xavier Worthy (KC - WR) val 53 | bench/flex |
+| 14 | 139 | Chris Boswell (PIT - K) val 130 | starter |
+| 15 | 142 | Eagles (PHI - DEF) val 114 | starter |
 
 ## Anchor rules (same as the bot)
 - Rounds 1-5: take RB/WR. Anchor **2nd RB by R5**, **WR by R5/R9**.
@@ -53,122 +53,122 @@ _Generated 2026-08-31 18:52 from `data/board/original_board.json` (250 players).
 ## Position menus (top of board by projected value)
 
 ### RB
- 1. Jahmyr Gibbs (DET - RB)  val 312  ADP -
- 2. Derrick Henry (BAL - RB)  val 300  ADP -
+ 1. Jahmyr Gibbs (DET - RB)  val 310  ADP -
+ 2. Bijan Robinson (ATL - RB)  val 299  ADP -
  3. Christian McCaffrey (SF - RB)  val 298  ADP -
- 4. Saquon Barkley (PHI - RB)  val 297  ADP -
- 5. Bijan Robinson (ATL - RB)  val 274  ADP -
- 6. Jonathan Taylor (IND - RB)  val 272  ADP -
- 7. James Cook (BUF - RB)  val 231  ADP -
- 8. Kyren Williams (LA - RB)  val 217  ADP -
- 9. Josh Jacobs (GB - RB)  val 213  ADP -
-10. Travis Etienne (JAX - RB)  val 204  ADP -
-11. Ashton Jeanty (LV - RB)  val 196  ADP -
-12. Chase Brown (CIN - RB)  val 194  ADP -
-13. Kenneth Walker III (SEA - RB)  val 185  ADP -
-14. D'Andre Swift (CHI - RB)  val 178  ADP -
-15. Bucky Irving (TB - RB)  val 174  ADP -
-16. Tony Pollard (TEN - RB)  val 171  ADP -
-17. David Montgomery (DET - RB)  val 170  ADP -
-18. Rhamondre Stevenson (NE - RB)  val 162  ADP -
+ 4. Derrick Henry (BAL - RB)  val 293  ADP -
+ 5. Saquon Barkley (PHI - RB)  val 280  ADP -
+ 6. Jonathan Taylor (IND - RB)  val 262  ADP -
+ 7. De'Von Achane (MIA - RB)  val 259  ADP -
+ 8. James Cook (BUF - RB)  val 225  ADP -
+ 9. Kyren Williams (LA - RB)  val 222  ADP -
+10. Travis Etienne (JAX - RB)  val 205  ADP -
+11. Chase Brown (CIN - RB)  val 201  ADP -
+12. Breece Hall (NYJ - RB)  val 198  ADP -
+13. Bucky Irving (TB - RB)  val 198  ADP -
+14. Tony Pollard (TEN - RB)  val 193  ADP -
+15. David Montgomery (DET - RB)  val 190  ADP -
+16. D'Andre Swift (CHI - RB)  val 190  ADP -
+17. Kenneth Walker III (SEA - RB)  val 190  ADP -
+18. Ashton Jeanty (LV - RB)  val 189  ADP -
 
 ### WR
- 1. Ja'Marr Chase (CIN - WR)  val 234  ADP -
- 2. Justin Jefferson (MIN - WR)  val 223  ADP -
- 3. Amon-Ra St. Brown (DET - WR)  val 222  ADP -
- 4. Malik Nabers (NYG - WR)  val 201  ADP -
- 5. Jaxon Smith-Njigba (SEA - WR)  val 190  ADP -
- 6. Mike Evans (TB - WR)  val 188  ADP -
- 7. Courtland Sutton (DEN - WR)  val 180  ADP -
- 8. Ladd McConkey (LAC - WR)  val 180  ADP -
- 9. Drake London (ATL - WR)  val 159  ADP -
-10. DJ Moore (CHI - WR)  val 158  ADP -
-11. Zay Flowers (BAL - WR)  val 158  ADP -
-12. DK Metcalf (PIT - WR)  val 152  ADP -
-13. Tetairoa McMillan (CAR - WR)  val 142  ADP -
-14. Jerry Jeudy (CLE - WR)  val 132  ADP -
-15. Christian Watson (GB - WR)  val 131  ADP -
-16. Emeka Egbuka (TB - WR)  val 129  ADP -
-17. Marvin Harrison Jr. (ARI - WR)  val 126  ADP -
-18. Rome Odunze (CHI - WR)  val 119  ADP -
+ 1. Ja'Marr Chase (CIN - WR)  val 271  ADP -
+ 2. Amon-Ra St. Brown (DET - WR)  val 262  ADP -
+ 3. Puka Nacua (LA - WR)  val 262  ADP -
+ 4. CeeDee Lamb (DAL - WR)  val 244  ADP -
+ 5. A.J. Brown (PHI - WR)  val 232  ADP -
+ 6. Justin Jefferson (MIN - WR)  val 224  ADP -
+ 7. Jaxon Smith-Njigba (SEA - WR)  val 223  ADP -
+ 8. Nico Collins (HOU - WR)  val 204  ADP -
+ 9. Mike Evans (TB - WR)  val 199  ADP -
+10. Drake London (ATL - WR)  val 193  ADP -
+11. Zay Flowers (BAL - WR)  val 192  ADP -
+12. Chris Olave (NO - WR)  val 187  ADP -
+13. Brian Thomas Jr. (JAX - WR)  val 185  ADP -
+14. Terry McLaurin (WAS - WR)  val 184  ADP -
+15. Malik Nabers (NYG - WR)  val 182  ADP -
+16. DK Metcalf (PIT - WR)  val 182  ADP -
+17. DJ Moore (CHI - WR)  val 175  ADP -
+18. Courtland Sutton (DEN - WR)  val 174  ADP -
 
 ### TE
- 1. Trey McBride (ARI - TE)  val 180  ADP -
- 2. George Kittle (SF - TE)  val 166  ADP -
- 3. Mark Andrews (BAL - TE)  val 143  ADP -
- 4. Hunter Henry (NE - TE)  val 124  ADP -
- 5. Colston Loveland (CHI - TE)  val 122  ADP -
- 6. Tucker Kraft (GB - TE)  val 118  ADP -
- 7. Tyler Warren (IND - TE)  val 115  ADP -
- 8. Brock Bowers (LV - TE)  val 113  ADP -
- 9. Pat Freiermuth (PIT - TE)  val 111  ADP -
-10. Dalton Kincaid (BUF - TE)  val 108  ADP -
-11. Jake Ferguson (DAL - TE)  val 104  ADP -
-12. Kyle Pitts (ATL - TE)  val 104  ADP -
-13. Dalton Schultz (HOU - TE)  val 100  ADP -
-14. Juwan Johnson (NO - TE)  val 100  ADP -
-15. AJ Barner (SEA - TE)  val 85  ADP -
-16. Colby Parkinson (LA - TE)  val 84  ADP -
-17. Isaiah Likely (BAL - TE)  val 84  ADP -
-18. Travis Kelce (KC - TE)  val 79  ADP -
+ 1. George Kittle (SF - TE)  val 181  ADP -
+ 2. Brock Bowers (LV - TE)  val 181  ADP -
+ 3. Trey McBride (ARI - TE)  val 179  ADP -
+ 4. Sam LaPorta (DET - TE)  val 157  ADP -
+ 5. Dallas Goedert (PHI - TE)  val 144  ADP -
+ 6. Harold Fannin Jr. (CLE - TE)  val 142  ADP -
+ 7. Mark Andrews (BAL - TE)  val 142  ADP -
+ 8. Tyler Warren (IND - TE)  val 138  ADP -
+ 9. T.J. Hockenson (MIN - TE)  val 128  ADP -
+10. Kyle Pitts (ATL - TE)  val 125  ADP -
+11. Tucker Kraft (GB - TE)  val 125  ADP -
+12. Dalton Schultz (HOU - TE)  val 123  ADP -
+13. Juwan Johnson (NO - TE)  val 121  ADP -
+14. Colston Loveland (CHI - TE)  val 119  ADP -
+15. Hunter Henry (NE - TE)  val 117  ADP -
+16. Jake Ferguson (DAL - TE)  val 113  ADP -
+17. Evan Engram (DEN - TE)  val 112  ADP -
+18. Pat Freiermuth (PIT - TE)  val 112  ADP -
 
 ### QB
- 1. Josh Allen (BUF - QB)  val 393  ADP -
- 2. Jalen Hurts (PHI - QB)  val 356  ADP -
- 3. Patrick Mahomes (KC - QB)  val 337  ADP -
- 4. Dak Prescott (DAL - QB)  val 309  ADP -
- 5. Drake Maye (NE - QB)  val 299  ADP -
- 6. Jared Goff (DET - QB)  val 296  ADP -
- 7. Trevor Lawrence (JAX - QB)  val 296  ADP -
- 8. Matthew Stafford (LA - QB)  val 291  ADP -
- 9. Caleb Williams (CHI - QB)  val 290  ADP -
-10. Baker Mayfield (TB - QB)  val 260  ADP -
-11. Brock Purdy (SF - QB)  val 252  ADP -
-12. Daniel Jones (IND - QB)  val 250  ADP -
-13. Jacoby Brissett (ARI - QB)  val 246  ADP -
-14. Tua Tagovailoa (MIA - QB)  val 242  ADP -
-15. Kyler Murray (ARI - QB)  val 242  ADP -
-16. Justin Herbert (LAC - QB)  val 238  ADP -
-17. Lamar Jackson (BAL - QB)  val 213  ADP -
-18. Tyler Shough (NO - QB)  val 213  ADP -
+ 1. Josh Allen (BUF - QB)  val 383  ADP -
+ 2. Jalen Hurts (PHI - QB)  val 369  ADP -
+ 3. Lamar Jackson (BAL - QB)  val 348  ADP -
+ 4. Patrick Mahomes (KC - QB)  val 328  ADP -
+ 5. Jared Goff (DET - QB)  val 315  ADP -
+ 6. Bo Nix (DEN - QB)  val 314  ADP -
+ 7. Joe Burrow (CIN - QB)  val 302  ADP -
+ 8. Trevor Lawrence (JAX - QB)  val 300  ADP -
+ 9. Baker Mayfield (TB - QB)  val 297  ADP -
+10. Jayden Daniels (WAS - QB)  val 296  ADP -
+11. Caleb Williams (CHI - QB)  val 285  ADP -
+12. Drake Maye (NE - QB)  val 285  ADP -
+13. Dak Prescott (DAL - QB)  val 284  ADP -
+14. Justin Herbert (LAC - QB)  val 281  ADP -
+15. Matthew Stafford (LA - QB)  val 265  ADP -
+16. Brock Purdy (SF - QB)  val 265  ADP -
+17. C.J. Stroud (HOU - QB)  val 260  ADP -
+18. Jordan Love (GB - QB)  val 245  ADP -
 
 ### DEF
- 1. Ravens (BAL - DEF)  val 104  ADP -
- 2. Steelers (PIT - DEF)  val 100  ADP -
- 3. Patriots (NE - DEF)  val 100  ADP -
- 4. Seahawks (SEA - DEF)  val 82  ADP -
- 5. Eagles (PHI - DEF)  val 80  ADP -
- 6. Packers (GB - DEF)  val 76  ADP -
- 7. Bills (BUF - DEF)  val 75  ADP -
- 8. Chiefs (KC - DEF)  val 75  ADP -
- 9. Bears (CHI - DEF)  val 75  ADP -
-10. Broncos (DEN - DEF)  val 73  ADP -
-11. Buccaneers (TB - DEF)  val 73  ADP -
-12. Chargers (LAC - DEF)  val 71  ADP -
-13. Dolphins (MIA - DEF)  val 71  ADP -
-14. SD (SD - DEF)  val 70  ADP -
-15. LA (LA - DEF)  val 70  ADP -
-16. Jaguars (JAX - DEF)  val 68  ADP -
-17. Jets (NYJ - DEF)  val 68  ADP -
-18. Cowboys (DAL - DEF)  val 68  ADP -
+ 1. Broncos (DEN - DEF)  val 116  ADP -
+ 2. Eagles (PHI - DEF)  val 114  ADP -
+ 3. Chargers (LAC - DEF)  val 110  ADP -
+ 4. Chiefs (KC - DEF)  val 105  ADP -
+ 5. Seahawks (SEA - DEF)  val 104  ADP -
+ 6. Vikings (MIN - DEF)  val 102  ADP -
+ 7. Texans (HOU - DEF)  val 102  ADP -
+ 8. Packers (GB - DEF)  val 92  ADP -
+ 9. Bills (BUF - DEF)  val 82  ADP -
+10. Steelers (PIT - DEF)  val 82  ADP -
+11. Rams (LAR - DEF)  val 82  ADP -
+12. Patriots (NE - DEF)  val 80  ADP -
+13. Lions (DET - DEF)  val 75  ADP -
+14. Ravens (BAL - DEF)  val 75  ADP -
+15. Jaguars (JAX - DEF)  val 71  ADP -
+16. Saints (NO - DEF)  val 68  ADP -
+17. Dolphins (MIA - DEF)  val 66  ADP -
+18. Bears (CHI - DEF)  val 66  ADP -
 
 ### K
  1. Austin Seibert (WAS - K)  val 176  ADP -
- 2. Ka'imi Fairbairn (HOU - K)  val 162  ADP -
+ 2. Ka'imi Fairbairn (HOU - K)  val 164  ADP -
  3. Brandon Aubrey (DAL - K)  val 150  ADP -
  4. Ben Sauls (NYG - K)  val 142  ADP -
- 5. Jason Sanders (MIA - K)  val 140  ADP -
- 6. Cameron Dicker (LAC - K)  val 137  ADP -
+ 5. Cameron Dicker (LAC - K)  val 140  ADP -
+ 6. Jason Sanders (MIA - K)  val 140  ADP -
  7. Charlie Smyth (NO - K)  val 133  ADP -
- 8. Jason Myers (SEA - K)  val 133  ADP -
- 9. Chris Boswell (PIT - K)  val 126  ADP -
-10. Will Reichard (MIN - K)  val 124  ADP -
+ 8. Jason Myers (SEA - K)  val 131  ADP -
+ 9. Chris Boswell (PIT - K)  val 130  ADP -
+10. Will Reichard (MIN - K)  val 126  ADP -
 11. Matthew Wright (KC - K)  val 123  ADP -
 12. Anders Carlson (NYJ - K)  val 121  ADP -
-13. Zane Gonzalez (ATL - K)  val 121  ADP -
-14. Chase McLaughlin (TB - K)  val 118  ADP -
-15. Spencer Shrader (IND - K)  val 117  ADP -
-16. Greg Joseph (NYG - K)  val 117  ADP -
+13. Chase McLaughlin (TB - K)  val 118  ADP -
+14. Spencer Shrader (IND - K)  val 117  ADP -
+15. Greg Joseph (NYG - K)  val 117  ADP -
+16. Zane Gonzalez (ATL - K)  val 116  ADP -
 17. Jake Moody (SF - K)  val 113  ADP -
 18. John Parker Romo (ATL - K)  val 112  ADP -
 
