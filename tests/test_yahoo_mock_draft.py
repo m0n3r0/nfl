@@ -196,6 +196,7 @@ def test_full_mock_requires_and_confirms_all_15_roster_transitions(monkeypatch):
 def test_current_row_is_rendered_for_legacy_identity_and_adp_parser():
     from driver import draft_driver as driver
 
+    driver.rebuild_abbrev_maps(driver.static_board())
     row = PlayerRow("1", "T. Kraft", "GB", "TE", "", 67, 60.5, "current Yahoo layout")
     text = MockDraftOperator._driver_row_text(row)
     names, adp, positions = driver.normalize_available([[row.name, row.team, row.pos, text]])
