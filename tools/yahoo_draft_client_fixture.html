@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Yahoo current draft-client fixture</title></head>
+<body>
+  <div id="status">YOUR TURN • ROUND 1, PICK 4</div>
+  <div id="team">YOUR TEAM (0/15)</div>
+  <button title="Autodraft">Autodraft</button>
+  <table><tbody><tr id="row">
+    <td><button id="draft">Draft</button></td>
+    <td><span class="ys-player" data-id="40168">P. Nacua</span> Q WR LAR Bye 8 4 4.9</td>
+  </tr></tbody></table>
+  <script>
+    document.getElementById('draft').addEventListener('click', function () {
+      document.getElementById('row').remove();
+      document.getElementById('team').textContent = 'YOUR TEAM (1/15)';
+      document.getElementById('status').textContent = "Opponent's Pick • Round 1, Pick 5";
+    });
+  </script>
+</body>
+</html>
