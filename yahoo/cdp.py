@@ -91,11 +91,14 @@ class CdpClient:
         self.target = target
         self.timeout = timeout
         self._next_id = 0
-        self._ws = websocket.create_connection(
-            _require_loopback_websocket(target.websocket_url),
-            timeout=timeout,
-            origin=self.endpoint,
-        )
+        try:
+            self._ws = websocket.create_connection(
+                _require_loopback_websocket(target.websocket_url),
+                timeout=timeout,
+                origin=self.endpoint,
+            )
+        except (OSError, websocket.WebSocketException) as exc:
+            raise CdpError(f"CDP websocket connection failed: {exc}") from exc
 
     def __enter__(self) -> "CdpClient":
         try:
@@ -118,7 +121,10 @@ class CdpClient:
         self._next_id += 1
         message_id = self._next_id
         deadline = time.monotonic() + (self.timeout if timeout is None else timeout)
-        self._ws.send(json.dumps({"id": message_id, "method": method, "params": params or {}}))
+        try:
+            self._ws.send(json.dumps({"id": message_id, "method": method, "params": params or {}}))
+        except (OSError, websocket.WebSocketException) as exc:
+            raise CdpError(f"{method} send failed: {exc}") from exc
         while True:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -128,6 +134,8 @@ class CdpClient:
                 reply = json.loads(self._ws.recv())
             except (socket.timeout, websocket.WebSocketTimeoutException) as exc:
                 raise CdpTimeout(f"{method} timed out") from exc
+            except (OSError, websocket.WebSocketException, json.JSONDecodeError) as exc:
+                raise CdpError(f"{method} receive failed: {exc}") from exc
             if reply.get("id") != message_id:
                 continue
             if "error" in reply:
