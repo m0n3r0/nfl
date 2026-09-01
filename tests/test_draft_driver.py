@@ -426,10 +426,10 @@ def _run_draft_controlled(off_window_name, on_window_names):
           lambda raw, def_map=None: ([r[0] for r in raw], {}, {}))
     patch("choose_pick", lambda *a, **k: (off_window_name, "Tm", "RB", 99))
     patch("search_player",
-          lambda ws, name: (calls.__setitem__("search", calls["search"] + 1)
+          lambda ws, name, team=None, pos=None: (calls.__setitem__("search", calls["search"] + 1)
                             or [name, "c9", "RB", "ADP 99"]))
     patch("click_player",
-          lambda ws, name: (calls.__setitem__("click", calls["click"] + 1)
+          lambda ws, name, team=None, pos=None: (calls.__setitem__("click", calls["click"] + 1)
                             or True))
     patch("is_my_pick", lambda ws: True)
     patch("_confirm_pick", lambda ws, name, timeout=8: True)
@@ -465,6 +465,51 @@ def test_on_window_target_skips_search_player():
     calls = _run_draft_controlled("Vis A", ["Vis A", "Vis B"])
     assert calls["search"] == 0, calls
     assert calls["click"] == 1, calls
+
+
+def test_search_player_rejects_wrong_identity_and_clears_search(monkeypatch):
+    queries = []
+    monkeypatch.setattr(dd, "_set_player_search",
+                        lambda ws, query: queries.append(query) or True)
+    monkeypatch.setattr(dd, "read_available", lambda ws: [
+        ["A. Brown", "DET", "WR", "A. Brown DET - WR"],
+    ])
+    monkeypatch.setattr(dd.time, "sleep", lambda seconds: None)
+
+    assert dd.search_player("WS", "A.J. Brown", "PHI", "WR") is None
+    assert queries == ["A.J. Brown", ""]
+
+
+def test_search_player_matches_abbreviation_team_and_position(monkeypatch):
+    monkeypatch.setattr(dd, "_set_player_search", lambda ws, query: True)
+    row = ["A. Brown", "PHI", "WR", "A. Brown PHI - WR"]
+    monkeypatch.setattr(dd, "read_available", lambda ws: [row])
+    monkeypatch.setattr(dd.time, "sleep", lambda seconds: None)
+
+    assert dd.search_player("WS", "A.J. Brown", "PHI", "WR") == row
+
+
+def test_forced_anchor_searches_hidden_required_position(monkeypatch):
+    board = {
+        "Ravens": {"name": "Ravens", "team": "BAL", "pos": "DEF", "value": 10},
+        "Steelers": {"name": "Steelers", "team": "PIT", "pos": "DEF", "value": 9},
+    }
+    calls = []
+
+    def fake_search(ws, name, team, pos):
+        calls.append((name, team, pos))
+        if name == "Steelers":
+            return [name, team, pos, "%s %s - %s" % (name, team, pos)]
+        return None
+
+    monkeypatch.setattr(dd, "search_player", fake_search)
+    drafted = {"QB": 1, "RB": 2, "WR": 2, "TE": 1, "K": 1}
+    row = dd.search_forced_anchor(
+        "WS", board, drafted, dd.TOTAL_ROUNDS, ["Skill Player"])
+
+    assert row is not None
+    assert row[:3] == ["Steelers", "PIT", "DEF"]
+    assert calls == [("Ravens", "BAL", "DEF"), ("Steelers", "PIT", "DEF")]
 
 
 if __name__ == "__main__":

@@ -129,7 +129,7 @@ def main():
         print("PASS #23b search_player surfaced deep target: %r" % (row,))
 
         # --- #23c: clicking the now-visible target drafts it ---
-        ok = dd.click_player(ws, DEEP_NAME)
+        ok = dd.click_player(ws, DEEP_NAME, "ZEN", "WR")
         assert ok is True, "click_player returned %r for off-window target" % ok
         drafted = dd.ev(ws, "MockDraft.drafted()")
         drafted_names = [p["name"] for p in (drafted or [])]
@@ -175,7 +175,7 @@ def main():
             "normalize failed CeeDee Lamb; names=%r" % names
         assert "Justin Jefferson" in names, \
             "normalize failed Justin Jefferson; names=%r" % names
-        ok = dd.click_player(ws, "Joe Burrow")
+        ok = dd.click_player(ws, "Joe Burrow", "Cin", "QB")
         assert ok is True, "click_player returned %r for abbreviated row" % ok
         drafted = dd.ev(ws, "MockDraft.drafted()")
         drafted_names = [p["name"] for p in (drafted or [])]
@@ -183,6 +183,26 @@ def main():
             "abbrev click did not register; drafted=%r" % drafted_names
         print("PASS #32 abbreviation resolution: read=%r normalize ok click drafted=%s"
               % (raw_names, drafted_names))
+
+        # --- #58: abbreviation collisions retain team identity through click ---
+        collision = [
+            {"name": "A.J. Brown", "team": "NE", "pos": "WR"},
+            {"name": "Amon-Ra St. Brown", "team": "DET", "pos": "WR"},
+        ]
+        load_players(ws, collision)
+        dd.ev(ws, "MockDraft.setAbbrev(true)")
+        assert dd.click_player(ws, "Amon-Ra St. Brown", "DET", "WR") is True
+        drafted = dd.ev(ws, "MockDraft.drafted()") or []
+        assert [p["name"] for p in drafted] == ["Amon-Ra St. Brown"], drafted
+        print("PASS #58 team-qualified abbreviation click selected Amon-Ra St. Brown")
+
+        # Without team identity, the same two rendered names are ambiguous and
+        # must fail closed instead of clicking whichever row appears first.
+        load_players(ws, collision)
+        dd.ev(ws, "MockDraft.setAbbrev(true)")
+        assert dd.click_player(ws, "Amon-Ra St. Brown", None, "WR") is False
+        assert dd.ev(ws, "MockDraft.drafted()") == []
+        print("PASS #58 ambiguous abbreviation without team failed closed")
 
         print("\nALL CDP BROWSER TESTS PASSED")
         return 0

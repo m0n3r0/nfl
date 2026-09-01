@@ -747,32 +747,85 @@ def read_available(ws):
     })()""")
 
 
-def search_player(ws, name):
+def _set_player_search(ws, query):
+    """Set Yahoo's player search through the native value setter."""
+    return ev(ws, """(function(q){
+      var inp=document.querySelector('input[type=search]')
+           || document.querySelector('input[placeholder*="earch" i]')
+           || document.querySelector('.draft-search input');
+      if(!inp) return false;
+      var setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
+      inp.focus();
+      setter.call(inp,q); inp.dispatchEvent(new Event('input',{bubbles:true}));
+      return true;
+    })(""" + json.dumps(query) + ")")
+
+
+def search_player(ws, name, team=None, pos=None):
     """Bring a specific player into the Yahoo draft search box and return the
     (now-filtered) row, so a player below read_available()'s first-40 virtualized
     window is still selectable (issue #23). Returns [name, code, pos, text] or None
     on any failure; the caller then proceeds with the plain 40-row list."""
     q = name.replace("'", "").strip()
     try:
-        ev(ws, """(function(q){
-          var inp=document.querySelector('input[type=search]')
-               || document.querySelector('input[placeholder*="earch" i]')
-               || document.querySelector('.draft-search input');
-          if(!inp) return;
-          var setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
-          inp.focus();
-          setter.call(inp,''); inp.dispatchEvent(new Event('input',{bubbles:true}));
-          setter.call(inp,q); inp.dispatchEvent(new Event('input',{bubbles:true}));
-        })(""" + json.dumps(q) + ")")
+        if not _set_player_search(ws, q):
+            return None
         time.sleep(1.0)
         rows = read_available(ws)
+        wanted_names = {name.lower(), to_display(name, team).lower()}
+        wanted_team = (team or "").upper()
+        wanted_pos = (pos or "").upper().replace("DST", "DEF")
         for r in rows:
-            if r[0].lower() == q.lower() or q.lower() in r[0].lower():
+            row_name = str(r[0]).lower()
+            row_team = str(r[1]).upper()
+            row_pos = str(r[2]).upper().replace("DST", "DEF")
+            if (row_name in wanted_names
+                    and (not wanted_team or row_team == wanted_team)
+                    and (not wanted_pos or row_pos == wanted_pos)):
                 return r
-        return rows[0] if rows else None
+        # A substring result is not proof of identity. Restore the normal list
+        # and fail closed rather than returning Yahoo's first suggestion (#43).
+        _set_player_search(ws, "")
+        return None
     except Exception as e:
         log("SEARCH_PLAYER_FAIL " + name + " " + repr(e))
+        try:
+            _set_player_search(ws, "")
+        except Exception:
+            pass
         return None
+
+
+def search_forced_anchor(ws, board, drafted, round_num, available):
+    """Expose one required anchor candidate hidden below the 40-row window.
+
+    `choose_pick` can only score rows returned by `read_available`. At a slot's
+    deadline, search the best board candidates for that slot until Yahoo returns
+    an exact identity. The successful search remains active so `click_player`
+    acts on the same filtered row.
+    """
+    visible = {n.lower() for n in available}
+    for pos, need in REQUIRED.items():
+        have = drafted.get(pos, 0)
+        if have >= need or round_num < ANCHOR_BY_ROUND[pos][have]:
+            continue
+        if any(v["pos"] == pos and v["name"].lower() in visible
+               for v in board.values()):
+            return None
+        candidates = sorted(
+            (v for v in board.values() if v["pos"] == pos),
+            key=lambda v: float(v.get("value") or 0),
+            reverse=True,
+        )
+        for candidate in candidates:
+            row = search_player(ws, candidate["name"], candidate.get("team"), pos)
+            if row:
+                log("ANCHOR_SEARCH round=%d pos=%s found=%s"
+                    % (round_num, pos, candidate["name"]))
+                return row
+        log("ANCHOR_SEARCH_FAILED round=%d pos=%s" % (round_num, pos))
+        return None
+    return None
 
 def normalize_available(raw, def_map=None):
     """Convert read_available() rows ([name, code, pos, text]) into the form
@@ -1094,34 +1147,68 @@ def choose_pick(available, drafted, round_num, board, adp_map=None, pos_map=None
     return _fallback_pick(available, board, drafted, round_num,
                           adp_map or {}, pos_map or {})
 
-def click_player(ws,name):
-    # Robust name-based row finder (Yahoo holds the name in a cell, not in the
-    # /nfl/players/ anchor). Climb to the nearest TR/LI, scroll into view, click center.
-    # `name` is the full board name ("Joe Burrow") but Yahoo renders it abbreviated
-    # ("J. Burrow"); try BOTH so we match whatever the room actually displays.
-    disp = to_display(name, NAME_TO_TEAM.get(name))
-    candidates = [name, disp]
-    box = None
-    for cand in candidates:
-        box = ev(ws,"""(function(){
-      var name=%r;
-      var all=document.querySelectorAll('*');
-      for(var i=0;i<all.length;i++){
-        if(all[i].children.length<4 && all[i].textContent.indexOf(name)>=0){
-          var el=all[i];
-          while(el && el.parentElement && el.tagName!=='TR' && el.tagName!=='LI'){ el=el.parentElement; }
-          if(el && (el.tagName==='TR'||el.tagName==='LI')){
-            el.scrollIntoView({block:'center'});
-            var r=el.getBoundingClientRect();
-            return {x:Math.round(r.left+r.width/2), y:Math.round(r.top+r.height/2)};
+def _player_row_target(ws, name, team=None, pos=None, find_button=False):
+    """Find exactly one Yahoo player row by name plus stable identity fields.
+
+    Yahoo abbreviates names, so name alone is not an identity: A.J. Brown and
+    Amon-Ra St. Brown can both render as ``A. Brown``.  Team and position are
+    carried from the selected board row and checked here before any input event.
+    If the available identity is ambiguous, return the match count but no box so
+    the caller fails closed instead of drafting the first substring match.
+    """
+    target = json.dumps({
+        "name": name,
+        "display": to_display(name, team),
+        "team": (team or "").upper(),
+        "pos": (pos or "").upper(),
+        "button": bool(find_button),
+    })
+    return ev(ws, r"""(function(target){
+      function clean(s){ return (s||'').replace(/\s+/g,' ').trim().toLowerCase(); }
+      var rows=document.querySelectorAll('tr, li');
+      var matches=[];
+      for(var i=0;i<rows.length;i++){
+        var text=(rows[i].innerText||'').replace(/\s+/g,' ').trim();
+        var m=text.match(/^(?:\d+\.?\s*)?(.*?)\s+([A-Za-z]{2,4})\s*-\s*(QB|RB|WR|TE|K|DEF|DST)\b/i);
+        if(!m) continue;
+        var rowName=clean(m[1]);
+        var nameOK=rowName===clean(target.name)||rowName===clean(target.display);
+        var teamOK=!target.team||m[2].toUpperCase()===target.team;
+        var rowPos=m[3].toUpperCase()==='DST'?'DEF':m[3].toUpperCase();
+        var wantPos=target.pos==='DST'?'DEF':target.pos;
+        var posOK=!wantPos||rowPos===wantPos;
+        if(nameOK&&teamOK&&posOK) matches.push(rows[i]);
+      }
+      if(matches.length!==1) return {count:matches.length, box:null};
+      var el=matches[0];
+      if(target.button){
+        var buttons=el.querySelectorAll('button');
+        el=null;
+        for(var j=0;j<buttons.length;j++){
+          if(/draft|select|confirm/i.test(buttons[j].textContent)&&!buttons[j].disabled){
+            if(el) return {count:2, box:null};
+            el=buttons[j];
           }
         }
+        if(!el) return {count:0, box:null};
       }
-      return null;
-    })()"""%cand)
-        if box:
-            break
-    if not box: return False
+      el.scrollIntoView({block:'center'});
+      var r=el.getBoundingClientRect();
+      return {count:1, box:{x:Math.round(r.left+r.width/2), y:Math.round(r.top+r.height/2)}};
+    })(""" + target + ")")
+
+
+def click_player(ws, name, team=None, pos=None):
+    # Match a stable player identity, not a name substring.  The optional fields
+    # preserve compatibility with diagnostic tools, while run_draft always
+    # supplies both from the selected board row.
+    found = _player_row_target(ws, name, team=team, pos=pos)
+    box = found.get("box") if isinstance(found, dict) else None
+    if not box:
+        count = found.get("count") if isinstance(found, dict) else None
+        log("PICK_ROW_NOT_UNIQUE name=%s team=%s pos=%s matches=%s"
+            % (name, team, pos, count))
+        return False
     click_at(ws,int(box["x"]),int(box["y"]))
     time.sleep(random.uniform(0.3,0.8))
     # Click the DRAFT button inside the chosen player's own row, NOT the first
@@ -1129,35 +1216,18 @@ def click_player(ws,name):
     # (ADP / default board order), so the value pick we chose is usually NOT the
     # top row -- clicking the top button would draft the wrong player. Scope the
     # button search to the row that holds the chosen name.
-    btn = None
-    for cand in candidates:
-        btn = ev(ws,"""(function(){
-      var name=%r;
-      var all=document.querySelectorAll('*');
-      var row=null;
-      for(var i=0;i<all.length;i++){
-        if(all[i].children.length<4 && all[i].textContent.indexOf(name)>=0){
-          var el=all[i];
-          while(el && el.parentElement && el.tagName!=='TR' && el.tagName!=='LI'){ el=el.parentElement; }
-          if(el && (el.tagName==='TR'||el.tagName==='LI')){ row=el; break; }
-        }
-      }
-      if(row){
-        var bs=row.querySelectorAll('button');
-        for(var j=0;j<bs.length;j++){
-          if(/draft|select|confirm/i.test(bs[j].textContent) && !bs[j].disabled){
-            var r=bs[j].getBoundingClientRect();
-            return {x:Math.round(r.left+r.width/2), y:Math.round(r.top+r.height/2)};
-          }
-        }
-      }
-      return null; })()"""%cand)
-        if btn:
-            break
+    button = _player_row_target(ws, name, team=team, pos=pos, find_button=True)
+    btn = button.get("box") if isinstance(button, dict) else None
     if btn:
         click_at(ws,int(btn["x"]),int(btn["y"]))
-        return True
-    return False
+    # A deep-player search leaves Yahoo's list filtered. Restore the normal
+    # board before the next turn so read_available() does not become empty when
+    # the selected row disappears (#43).
+    try:
+        _set_player_search(ws, "")
+    except Exception:
+        pass
+    return bool(btn)
 
 def verify_session(ws):
     """Best-effort pre-draft guard. Confirms we're on the FD nation (league
@@ -1270,7 +1340,7 @@ def run_draft():
                     continue
                 # read_available returns [name, code, pos, text]; normalize maps
                 # DEF codes to ACTIVE-board keys and parses live Yahoo ADP per row.
-                raw_rows = read_available(ws)
+                raw_rows = read_available(ws) or []
                 available, adp_map, pos_map = normalize_available(raw_rows, def_map=def_map)
                 # Issue #44: round_num is our own counter and drifts if the driver
                 # is restarted mid-draft or a pick is missed/auto-drafted, which
@@ -1283,6 +1353,12 @@ def run_draft():
                     log("ROUND_RESYNC page_round=%d local_round=%d (using page)"
                         % (page_round, round_num))
                     round_num = page_round
+                anchor_row = search_forced_anchor(
+                    ws, board, drafted, round_num, available)
+                if anchor_row:
+                    raw_rows.append(anchor_row)
+                    available, adp_map, pos_map = normalize_available(
+                        raw_rows, def_map=def_map)
                 log("MY_PICK round="+str(round_num)+" page_round="+str(page_round)
                     + " avail="+str(len(available))
                     + " yahoo_adp="+str(len(adp_map)))
@@ -1298,8 +1374,8 @@ def run_draft():
                     # before we click, so deep targets are still selectable.
                     if name.lower() not in {n.lower() for n in available}:
                         log("OFF_WINDOW_SEARCH for " + name)
-                        search_player(ws, name)
-                    ok=click_player(ws,name)
+                        search_player(ws, name, team, pos)
+                    ok=click_player(ws,name,team,pos)
                     if ok:
                         # Best-effort confirmation: wait (bounded) for the pick to
                         # register before advancing local state, so a missed click
