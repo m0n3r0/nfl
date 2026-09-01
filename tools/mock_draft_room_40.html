@@ -106,6 +106,10 @@
       load: function (list) { all = list.slice(); drafted = []; query = ""; inp.value = ""; setTurn(false); render(); },
       setAbbrev: function (on) { abbrev = !!on; render(); },
       setTurn: setTurn,
+      removePlayer: function (name) {
+        var i = all.findIndex(function (p) { return p.name === name; });
+        if (i >= 0) { all.splice(i, 1); render(); }
+      },
       drafted: function () { return drafted.slice(); },
       domNames: function () {
         return Array.prototype.slice.call(document.querySelectorAll("#available li .nm"))
