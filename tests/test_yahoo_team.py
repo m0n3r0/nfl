@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from yahoo.team import TeamReadError, YahooTeamReader, _parse_payload
+from yahoo.cdp import Target
+from yahoo.team import TeamReadError, YahooTeamReader, _parse_payload, is_team_target
 
 
 SLOTS = ["QB", "RB", "RB", "WR", "WR", "TE", "W/R/T", "BN", "BN", "BN", "BN", "BN", "BN", "K", "DEF"]
@@ -95,3 +96,12 @@ def test_reader_only_evaluates_page():
     assert len(snapshot.roster) == 15
     assert "querySelectorAll('tr.editable')" in client.expression
     assert not hasattr(client, "navigate")
+
+
+def test_team_target_requires_exact_yahoo_https_origin():
+    def target(url):
+        return Target("id", "page", "", url, "ws://127.0.0.1:9222/devtools/page/id")
+
+    assert is_team_target(target("https://football.fantasysports.yahoo.com/f1/1329011/2"))
+    assert not is_team_target(target("https://example.com/f1/1329011/2"))
+    assert not is_team_target(target("http://football.fantasysports.yahoo.com/f1/1329011/2"))

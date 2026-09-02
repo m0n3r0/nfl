@@ -18,6 +18,7 @@ from .cdp import CdpError, Target, select_target
 LEAGUE_ID = "1329011"
 TEAM_ID = "2"
 TEAM_PATH = f"/f1/{LEAGUE_ID}/{TEAM_ID}"
+YAHOO_FANTASY_HOST = "football.fantasysports.yahoo.com"
 EXPECTED_ACTIVE_SLOTS = Counter({"QB": 1, "RB": 2, "WR": 2, "TE": 1, "W/R/T": 1, "K": 1, "DEF": 1, "BN": 6})
 INJURED_RESERVE_SLOTS = {"IR", "IL"}
 
@@ -68,10 +69,16 @@ class TeamSnapshot:
         return value
 
 
+def is_team_target(target: Target) -> bool:
+    """Return whether a target is the exact authorized Yahoo team origin/route."""
+    parsed = urlparse(target.url)
+    return parsed.scheme == "https" and parsed.hostname == YAHOO_FANTASY_HOST and parsed.path.rstrip("/") == TEAM_PATH
+
+
 def find_team_target(endpoint: str = "http://127.0.0.1:9222") -> Target:
     """Return exactly one browser tab on the authorized team route."""
     return select_target(
-        lambda target: urlparse(target.url).path.rstrip("/") == TEAM_PATH,
+        is_team_target,
         endpoint,
     )
 
