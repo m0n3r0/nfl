@@ -283,6 +283,9 @@ Protocol (CDP). Lives as a self-contained module alongside the toolkit above.
 - `yahoo/real_draft.py` + `tools/yahoo_real_draft.py` — separately authorized,
   cron-safe FD nation operator with authoritative roster reconstruction and a
   durable no-replay journal. See [the real-draft runbook](docs/REAL_DRAFT.md).
+- `yahoo/team.py` + `tools/yahoo_team.py` — read-only, identity-checked snapshot
+  of the current Yahoo roster, lineup slots, matchup, injuries, and waiver
+  priority. See [the team-operator runbook](docs/TEAM_OPERATOR.md).
 - `tools/` — load-bearing utilities only: `scrape_league_adp.py` (league ADP scrape), `check_login.py` / `login_yahoo.py` (auth), `simulate_draft.py` (offline regression harness, used by `tests/test_simulation.py`), `mock_draft_run.py` + `mock_draft_room.html` (legacy driver click validation), `test_yahoo_mock_cdp.py` + `yahoo_draft_client_fixture.html` (current Yahoo client regression), `check_draft_state.py` / `back_to_league.py` / `recover_tab.py` / `edge_alive.py` (CDP health & recovery), and `deploy.ps1` (one-command verified deploy). Throwaway debug probes live in `tools/debug/` and are not part of the pipeline.
 - `validation/` — mock-draft + click validation logs (2026-08-21).
 - `docs/REMEDIATION.md` — phase-by-phase log of the 2026-08-31 review.
@@ -347,6 +350,20 @@ validation only; do not use them for the FD nation draft.
 The real operator requires an exact league/team confirmation in both its
 environment and command line; see the runbook. There is no Windows scheduled
 task in the active execution path.
+
+### In-season team snapshot
+
+With the authenticated FD nation team page open in the loopback CDP browser:
+
+```bash
+python tools/yahoo_team.py
+```
+
+This first in-season milestone is read-only. It validates the exact team route,
+15 unique Yahoo player IDs, lineup-slot composition, matchup, and waiver
+priority, then prints JSON. Lineup and transaction mutations remain disabled
+until their separate precondition and read-back checks are implemented under
+issue #62.
 
 #### Draft board (default: original, nflverse-only)
 By default the driver drafts from the **original board** built entirely from our
