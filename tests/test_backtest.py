@@ -1,6 +1,12 @@
 """Hermetic tests for historical fantasy projection backtests."""
 
+import sys
+from pathlib import Path
+
 import pandas as pd
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
 from src.backtest import backtest_metrics, project_historical_season
 
