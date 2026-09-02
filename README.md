@@ -289,6 +289,9 @@ Protocol (CDP). Lives as a self-contained module alongside the toolkit above.
 - `yahoo/lineup.py` + `tools/yahoo_lineup.py` — exact-ID lineup permutations
   with expected-slot, eligibility, legality, idempotency, and authoritative
   read-back checks. It does not perform transactions or choose players.
+- `yahoo/players.py`, `yahoo/identity.py`, and `tools/yahoo_identity_map.py` —
+  read-only available-player pages and a persisted Yahoo-ID/internal-ID bridge.
+  Ambiguous, unmapped, and current-team-mismatched projections fail closed.
 - `tools/` — load-bearing utilities only: `scrape_league_adp.py` (league ADP scrape), `check_login.py` / `login_yahoo.py` (auth), `simulate_draft.py` (offline regression harness, used by `tests/test_simulation.py`), `mock_draft_run.py` + `mock_draft_room.html` (legacy driver click validation), `test_yahoo_mock_cdp.py` + `yahoo_draft_client_fixture.html` (current Yahoo client regression), `check_draft_state.py` / `back_to_league.py` / `recover_tab.py` / `edge_alive.py` (CDP health & recovery), and `deploy.ps1` (one-command verified deploy). Throwaway debug probes live in `tools/debug/` and are not part of the pipeline.
 - `validation/` — mock-draft + click validation logs (2026-08-21).
 - `docs/REMEDIATION.md` — phase-by-phase log of the 2026-08-31 review.
