@@ -142,6 +142,11 @@ summaries) with strict leakage control.
 - Probability calibration (Platt) + accuracy / log-loss / Brier reported.
 - Reported **both with and without** the Vegas spread as a feature.
 
+Fantasy-player projections have a separate leakage-controlled historical
+backtest. Run `python tools/backtest_projections.py` and see
+[`docs/PROJECTION_BACKTEST.md`](docs/PROJECTION_BACKTEST.md) for 2025 rank
+correlation, PPG error, positional hit rates, and baseline comparisons.
+
 Real results (2022–2025 PBP, 1,071 games after dropping the 16 with no
 leakage-free prior; train 2022–23 = 527, test 2024–25 = 544):
 
