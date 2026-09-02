@@ -45,12 +45,36 @@ second submission.
 The tool never chooses players. A recommendation/model layer must produce the
 IDs and explain the projected delta separately.
 
-## Planned transaction stages
+## Waiver claims
 
-Issue #62 tracks add/drop, waiver/FAAB, and trade execution. Each transaction
-will require exact Yahoo IDs, explicit intent, game-lock and eligibility checks,
-a durable audit record, and authoritative read-back before success is reported.
-Read-only recommendations and mutations remain separate.
+Prepare an exact claim without creating it:
+
+```bash
+python tools/yahoo_waiver.py \
+  --add-id 30971 --add-name "Baker Mayfield" \
+  --drop-id 34054 --drop-name "Brian Robinson"
+```
+
+The default stops on Yahoo's final confirmation and returns the browser to the
+team page. `--apply` creates the claim. Both paths verify the drop player against
+the authoritative roster, verify Yahoo's exact add/drop IDs at selection and
+confirmation, and never retry a POST. Applied claims succeed only when the same
+add/drop names appear together in Yahoo's waiver-transactions view. Repeating a
+pending claim returns `already_pending` without submission. Every run appends a
+redacted intent/result record to `logs/yahoo-waiver-audit.jsonl`.
+
+The operator does not decide whether a claim is strategically worthwhile. Run
+the identity map first and reject candidates whose model mapping is not
+actionable.
+
+## Remaining transaction scope
+
+Immediate free-agent adds use the same Yahoo add/drop form and exact-ID
+preconditions, but have an immediate roster read-back rather than a pending
+claim. Trade execution is intentionally not generalized before a real offer
+exists: proposal shape, roster constraints, and the authoritative confirmation
+page must be captured from that offer instead of guessed in advance. Read-only
+recommendations and mutations remain separate.
 
 ## Yahoo/model identity map
 
