@@ -51,3 +51,24 @@ Issue #62 tracks add/drop, waiver/FAAB, and trade execution. Each transaction
 will require exact Yahoo IDs, explicit intent, game-lock and eligibility checks,
 a durable audit record, and authoritative read-back before success is reported.
 Read-only recommendations and mutations remain separate.
+
+## Yahoo/model identity map
+
+Before using an internal projection for a Yahoo player, build the current
+read-only reconciliation report:
+
+```bash
+python tools/yahoo_identity_map.py
+```
+
+The tool reads the current roster and every available QB/RB/WR/TE result page,
+then persists Yahoo ID, full name, position, current Yahoo team, internal ID,
+and mapping status. It never expands initials or surname abbreviations. A
+projection is actionable only when exactly one full-name/position match exists
+and Yahoo's current NFL team agrees with the model. Team changes, unknown
+players, and collisions remain visible as `team_mismatch`, `unmapped`, or
+`ambiguous`; they cannot silently fall back to Yahoo ranking.
+
+The default output is `logs/yahoo-player-map.json`, which is runtime state and
+must not be committed. Rebuild it before each recommendation or mutation rather
+than treating IDs, availability, or NFL teams as static season data.
