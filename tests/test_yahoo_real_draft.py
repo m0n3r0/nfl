@@ -236,6 +236,7 @@ def test_completed_report_uses_authoritative_picks_and_audit_reasoning(tmp_path)
         "event": "decision", "league": "1329011", "team": "2",
         "round": 1, "overall": 2, "player_id": "1", "player": "Player 1",
         "board_player": "Canonical Player 1", "board_value": 299,
+        "selection_path": "full_board_search",
         "yahoo_xrank": 2.0, "yahoo_adp": 2.3,
         "reason": "Build the starting RB/WR core.",
         "alternatives_unavailable": ["First Choice"],
@@ -249,7 +250,36 @@ def test_completed_report_uses_authoritative_picks_and_audit_reasoning(tmp_path)
 
     assert "Round 1, overall 2: Canonical Player 1" in report
     assert "Build the starting RB/WR core." in report
+    assert "Selection provenance: Internal FD nation board." in report
+    assert "- Internal FD nation board: 1" in report
+    assert "- Unknown or incomplete audit provenance: 14" in report
     assert "board value 299" in report
     assert "First Choice" in report
     assert "Round 15, overall 142: Player 15" in report
     assert report.count("### Round ") == 15
+
+
+def test_completed_report_distinguishes_autopick_from_yahoo_rank_fallback(tmp_path):
+    audit = tmp_path / "audit.jsonl"
+    records = [
+        {
+            "event": "decision", "league": "1329011", "team": "2",
+            "round": 1, "player_id": "1", "source": "yahoo_autopick",
+        },
+        {
+            "event": "decision", "league": "1329011", "team": "2",
+            "round": 2, "player_id": "2", "selection_path": "live_yahoo_rank",
+        },
+    ]
+    audit.write_text("".join(json.dumps(record) + "\n" for record in records))
+    picks = [
+        Pick(round_number, overall_pick(round_number), player(round_number))
+        for round_number in range(1, 16)
+    ]
+
+    report = render_draft_report(picks, audit)
+
+    assert "- Yahoo autopick: 1" in report
+    assert "- Yahoo XRank recovery fallback: 1" in report
+    assert "Selection provenance: Yahoo autopick." in report
+    assert "Selection provenance: Yahoo XRank recovery fallback." in report
