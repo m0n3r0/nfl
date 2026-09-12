@@ -132,6 +132,8 @@ def build_depth_roles(season: int = SCHEDULE_SEASON) -> pd.DataFrame:
 
 def build(preset: str = "ppr") -> dict:
     """Assemble the full corpus. Returns a dict of tidy tables."""
+    from . import injuries
+
     weekly = _weekly_history(preset=preset)
     team_def = build_team_defense()
     schedule = build_schedule_2026()
@@ -143,4 +145,5 @@ def build(preset: str = "ppr") -> dict:
         "schedule_2026": schedule,
         "depth_roles": roles,
         "players": players,
+        "injuries": injuries.build_injuries(),
     }

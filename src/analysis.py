@@ -68,10 +68,14 @@ def weekly_matchups(corpus: dict, week: int, preset: str = "ppr", top_n: int = 2
     startable."""
     from . import projections
 
+    from .injuries import INJURY_EXCLUDE_STATUSES
+
     proj = projections.project_for_week(corpus, week=week)
     board = proj[proj["position"].isin(["QB", "RB", "WR", "TE"])].copy()
     if "on_bye" in board.columns:
         board = board[~board["on_bye"]]
+    if "injury_status" in board.columns:
+        board = board[~board["injury_status"].isin(INJURY_EXCLUDE_STATUSES)]
     board = board.sort_values("proj_week", ascending=False).reset_index(drop=True)
     board = board.drop(columns=[c for c in ["rank"] if c in board.columns])
     board.insert(0, "rank", board.index + 1)
@@ -82,5 +86,6 @@ def weekly_matchups(corpus: dict, week: int, preset: str = "ppr", top_n: int = 2
     )
     board = board.merge(wk, on="last_team", how="left")
     out_cols = ["rank", "player_display_name", "position", "last_team", "opponent",
-                "week_sos", "proj_week"]
+                "week_sos", "injury_status", "proj_week"]
+    out_cols = [c for c in out_cols if c in board.columns]
     return board[out_cols].head(top_n)

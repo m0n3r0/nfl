@@ -175,7 +175,14 @@ def _mark_byes(proj: pd.DataFrame, schedule: pd.DataFrame, week: int) -> pd.Data
 
 
 def project_for_week(corpus: dict, week: int) -> pd.DataFrame:
-    """Projected fantasy points for a specific 2026 week (uses that week's SOS)."""
+    """Projected fantasy points for a specific 2026 week (uses that week's SOS).
+
+    Injury-adjusted (when the corpus carries an injuries table): Out/IR-level
+    statuses zero the week, Doubtful/Questionable discount it, and the status
+    is carried in injury_status so callers can show or filter on it.
+    """
+    from . import injuries as injuries_mod
+
     proj = project_players(corpus)
     schedule = corpus["schedule_2026"]
     team_def = corpus["team_defense"]
@@ -193,4 +200,14 @@ def project_for_week(corpus: dict, week: int) -> pd.DataFrame:
     # re-apply just this week's opponent SOS.
     base_role = proj["proj_ppg"] / (1 + proj["team_sos"].fillna(0.0))
     proj["proj_week"] = (base_role * (1 + proj["week_sos"])).round(2)
-    return _mark_byes(proj, schedule, week)
+    proj = _mark_byes(proj, schedule, week)
+
+    injuries = corpus.get("injuries")
+    if injuries is not None and not injuries.empty:
+        proj = proj.merge(injuries, on="player_id", how="left")
+        factors = [injuries_mod.penalty_factor(status) for status in proj["injury_status"]]
+        proj["proj_week"] = (proj["proj_week"] * factors).round(2)
+    else:
+        proj["injury_status"] = ""
+    proj["injury_status"] = proj["injury_status"].fillna("")
+    return proj
