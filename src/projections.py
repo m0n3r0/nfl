@@ -142,7 +142,9 @@ def project_players(corpus: dict) -> pd.DataFrame:
     ).drop(columns=["opp_team"]).groupby("team")["def_sos_factor"].mean().rename("team_sos").reset_index()
     base = base.merge(team_sos, left_on="last_team", right_on="team", how="left")
     base["team_sos"] = base["team_sos"].fillna(0.0)
-    base["proj_ppg"] = base["role_ppg"] * (1 + base["team_sos"])
+    # Negative baselines (tiny-sample negative scorers, e.g. punters) floor at
+    # zero -- a negative projection is a rounding artifact, never a forecast.
+    base["proj_ppg"] = (base["role_ppg"] * (1 + base["team_sos"])).clip(lower=0.0)
     # Scale totals by observed availability.  The floor keeps a small sample
     # from becoming a zero-season projection while still pricing in durability.
     # The current season is only partly played, so for players appearing in it
@@ -211,7 +213,7 @@ def project_for_week(corpus: dict, week: int) -> pd.DataFrame:
     # Recover the role-only per-game baseline (strip the season-long SOS) and
     # re-apply just this week's opponent SOS.
     base_role = proj["proj_ppg"] / (1 + proj["team_sos"].fillna(0.0))
-    proj["proj_week"] = (base_role * (1 + proj["week_sos"])).round(2)
+    proj["proj_week"] = (base_role * (1 + proj["week_sos"])).clip(lower=0.0).round(2)
     proj = _mark_byes(proj, schedule, week)
 
     injuries = corpus.get("injuries")

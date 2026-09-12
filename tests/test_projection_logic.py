@@ -94,3 +94,56 @@ def test_current_season_availability_uses_elapsed_weeks(monkeypatch):
 
     assert result.loc["a", "expected_games"] == 17.0
     assert result.loc["b", "expected_games"] == 17.0
+
+def _negative_baseline_corpus():
+    rows = [
+        {"player_id": "p", "player_display_name": "Punter", "position": "P",
+         "recent_team": "NEW", "season": 2025, "week": w, "fantasy_points": -1.0}
+        for w in range(1, 21)
+    ]
+    rows.append({"player_id": "v", "player_display_name": "Veteran", "position": "RB",
+                 "recent_team": "NEW", "season": 2025, "week": 1, "fantasy_points": 20.0})
+    schedule = pd.DataFrame([
+        {"team": "NEW", "opponent": "DEF", "week": 1},
+        {"team": "DEF", "opponent": "NEW", "week": 1},
+        {"team": "NEW", "opponent": "MID", "week": 2},
+        {"team": "MID", "opponent": "NEW", "week": 2},
+    ])
+    roles = pd.DataFrame([
+        {"gsis_id": "p", "team": "NEW", "role_share": 0.60},
+        {"gsis_id": "v", "team": "NEW", "role_share": 0.60},
+    ])
+    return {
+        "weekly_history": pd.DataFrame(rows),
+        "depth_roles": roles,
+        "schedule_2026": schedule,
+        "team_defense": pd.DataFrame([
+            {"team": "DEF", "def_sos_factor": -1.0},
+            {"team": "MID", "def_sos_factor": 0.0},
+        ]),
+    }
+
+
+def test_negative_baseline_floors_at_zero_not_negative(monkeypatch):
+    monkeypatch.setattr(projections, "HISTORY_SEASONS", (2025,))
+    result = projections.project_players(_negative_baseline_corpus())
+    punter = result[result["player_id"] == "p"].iloc[0]
+
+    assert punter["baseline_ppg"] < 0
+    assert punter["proj_ppg"] == 0.0
+    assert punter["proj_total"] == 0.0
+
+
+def test_week_projection_never_negative_and_shutout_sos_zeroes(monkeypatch):
+    monkeypatch.setattr(projections, "HISTORY_SEASONS", (2025,))
+    corp = _negative_baseline_corpus()
+
+    shutout = projections.project_for_week(corp, 1)  # NEW faces DEF (-1.0)
+    assert (shutout["proj_week"] >= 0).all()
+    assert shutout[shutout["player_id"] == "v"].iloc[0]["proj_week"] == 0.0
+
+    normal = projections.project_for_week(corp, 2)  # NEW faces MID (0.0)
+    punter = normal[normal["player_id"] == "p"].iloc[0]
+    veteran = normal[normal["player_id"] == "v"].iloc[0]
+    assert punter["proj_week"] == 0.0  # clamped at source, not negative
+    assert veteran["proj_week"] > 0.0  # clamp leaves real projections untouched
