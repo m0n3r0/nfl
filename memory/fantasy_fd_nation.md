@@ -344,3 +344,12 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
   it cookies are memory-only). Profile backup: tools/profile_backup.py ->
   ~/edge-profile-backups/; launchd com.fdnation.browser re-runs preflight at
   login. Browser on 9222 must NEVER be killed (user rule).
+
+## In-season transactions + strategy (2026-09-13)
+- Deep-dive (all 10 rosters vs model): team ranks 5/10 season-long (1430.4 vs
+  leader 1577.7); QB slot 10/10 (Purdy), RB 3/10, TE 3/10, WR1 8/10. Week-8 bye
+  landmine: Purdy+McCaffrey+Kittle+Olave ALL out. Trackers: #102 (wk8 byes),
+  #103 (trade RB surplus for WR1), #104 (league-strength tool).
+- TX 1 (2026-09-13): ADDED Baker Mayfield (FA, no priority spent), DROPPED
+  Brian Robinson (was team_mismatch dead spot). #101 closed. Waiver tool's
+  false HALT on immediate FA adds filed as #105.
