@@ -174,3 +174,27 @@ Suggested crontab (times are JST, the host's local zone). Replace
   earlier ET, still ahead of kickoff.
 - Wednesday 20:11 (= Wednesday ~07:11 ET): waiver scan after Yahoo's
   overnight waiver run, plus a data refresh for the new week's projections.
+
+## Manual team analyzer
+
+`tools/team_analyzer.py` answers "is my team doing well, and what needs
+doing" on demand (read-only, ~2 min with the wire scan):
+
+```bash
+python tools/team_analyzer.py            # human-readable report
+python tools/team_analyzer.py --json     # machine-readable
+python tools/team_analyzer.py --no-wire  # skip the wire scan (fast)
+```
+
+It pulls every league roster live, maps them to the model's projections, and
+reports: matchup status, optimal-lineup strength rank across the league,
+per-position ranks vs league (best rostered), alerts (locks, injuries, unevaluated
+players, bye-week concentration), and a ranked recommendation list (lineup,
+weak slots, waiver upgrades with drop candidates, dead spots, bye planning).
+The pure analysis lives in `yahoo/league_strength.py` and is hermetically
+tested; the tool is the browser glue.
+
+Politeness: all Yahoo reads are paced, the wire scan covers the first pages
+per position only (top targets sort first), and a Yahoo 'Request denied'
+page aborts the scan instantly (reported as a skipped section, never a
+crash). Do not run heavy scans back-to-back — Yahoo's WAF rate-limits.

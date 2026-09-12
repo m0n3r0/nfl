@@ -13,7 +13,7 @@ from urllib.parse import urlencode, urlparse
 import pandas as pd
 
 from .identity import YahooPlayerIdentity, reconcile_identities
-from .players import AvailablePlayer, YahooPlayerReader
+from .players import AvailablePlayer, PlayerReadError, YahooPlayerReader
 from .team import LEAGUE_ID
 
 BASE = "https://football.fantasysports.yahoo.com"
@@ -26,11 +26,27 @@ class WireClient(Protocol):
     def navigate(self, url: str, expected: Callable[[str], bool], timeout: float = 20) -> str: ...
 
 
+class WireScanBlocked(PlayerReadError):
+    """Yahoo is serving its 'Request denied' WAF page; abort immediately."""
+
+
+def _denied(client: WireClient) -> bool:
+    try:
+        return bool(client.evaluate(
+            "!!document.body && /Request denied/i.test(document.body.innerText)"))
+    except Exception:
+        return False
+
+
 def scan_available(client: WireClient, week: int, positions: tuple[str, ...] = POSITIONS,
-                   max_pages: int = 12, pause: float = 0.5) -> dict[str, AvailablePlayer]:
+                   max_pages: int = 4, pause: float = 2.0) -> dict[str, AvailablePlayer]:
     """Paginate the available-player lists; return yahoo_id -> AvailablePlayer.
 
-    Navigates only (never clicks). Stops at the last page of each position.
+    Navigates only (never clicks). Pages are sorted by projected points, so
+    the best targets sit on the first pages — the default 4 pages per position
+    keeps coverage of every plausible add while staying polite with Yahoo's
+    WAF (a full 12-page sweep tripped a 'Request denied' block on 2026-09-13).
+    A denial page aborts the whole scan instantly instead of hammering on.
     """
     available: dict[str, AvailablePlayer] = {}
     reader = YahooPlayerReader(client)
@@ -40,8 +56,25 @@ def scan_available(client: WireClient, week: int, positions: tuple[str, ...] = P
                                "stat1": f"S_PW_{week}", "count": count})
             client.navigate(f"{BASE}{PLAYERS_PATH}?{query}",
                             lambda url: urlparse(url).path == PLAYERS_PATH, 30)
-            time.sleep(pause)
-            page = reader.page()
+            time.sleep(pause)  # pace every page; the WAF watches bursts
+            # The SPA renders asynchronously after the URL matches: retry the
+            # parse until the players page has actually rendered (identity +
+            # rows), not just changed location. Still fail-closed: a page that
+            # never renders raises after the deadline.
+            deadline = time.monotonic() + 10
+            while True:
+                try:
+                    page = reader.page()
+                    if page or count > 0 or time.monotonic() > deadline:
+                        break
+                    time.sleep(pause)  # first page: empty may mean rows not rendered yet
+                except PlayerReadError:
+                    if _denied(client):
+                        raise WireScanBlocked(
+                            "Yahoo served 'Request denied'; aborting the scan") from None
+                    if time.monotonic() > deadline:
+                        raise
+                    time.sleep(pause)
             if not page:
                 break
             for player in page:
