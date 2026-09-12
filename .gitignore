@@ -36,10 +36,8 @@ data/scrapes/
 # --- Jupyter checkpoints ---
 .ipynb_checkpoints/
 
-# --- FD nation draft driver (runtime-generated) ---
+# --- Runtime logs / local state (never commit) ---
 draft_log.txt
-logs/*.txt
-logs/*.jsonl
-logs/*.lock
+logs/
 # (__pycache__/ already covered above -- do not duplicate it here)
 .worktrees/

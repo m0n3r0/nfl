@@ -5,9 +5,9 @@ players, and builds a weekly lineup.
 
 > **Two parts, one repo:**
 > 1. **Toolkit** — ingest, score, rank, project, and model NFL players (sections below).
-> 2. **FD nation draft automation** — a self-contained module that auto-drafts a
->    specific Yahoo league through the Edge browser. See
->    [FD nation draft automation (module)](#fd-nation-draft-automation-module).
+> 2. **FD nation Yahoo operation** — a self-contained module that reads and
+>    maintains a specific Yahoo league's roster through the browser. See
+>    [FD nation Yahoo operation (module)](#fd-nation--yahoo-league-operation-module).
 
 ## What is fantasy football? (ELI5)
 
@@ -23,7 +23,7 @@ the league. It's a season-long game of "which real players will do best?"
 It depends on the league — this repo doesn't decide that. Many leagues are free
 and just-for-fun among friends; others have a small buy-in or prizes. **This
 codebase is a pure analysis + automation tool**: it builds projections, ranks
-players, and (for FD nation) auto-drafts. It is **not** a betting or gambling
+players, and (for FD nation) operates the roster. It is **not** a betting or gambling
 system and it places no wagers. See the honesty notes under
 [Known limitations](#known-limitations) and
 [FD nation → Honest limitations](#honest-limitations).
@@ -41,7 +41,7 @@ system and it places no wagers. See the honesty notes under
 - [Scoring](#scoring)
 - [Tests](#tests)
 - [Known limitations](#known-limitations)
-- [FD nation draft automation (module)](#fd-nation-draft-automation-module)
+- [FD nation Yahoo operation (module)](#fd-nation--yahoo-league-operation-module)
 - [Data sources & winning strategy](docs/DATA_SOURCES.md)
 
 ## Data source
@@ -233,29 +233,16 @@ The suite includes:
 | `tests/test_scoring.py` | our scoring reproduces nflverse's numbers within rounding; PPR = standard + receptions |
 | `tests/test_projections.py` | 2026 projection engine (corpus, weighting, consistency, SOS) |
 | `tests/test_model.py` | win-probability model, calibration, time-based split |
-| `tests/test_original_board.py` | nflverse draft board: shape, depth, and the size invariant |
-| `tests/test_draft_driver.py` | driver pick logic: guardrails, DEF name mapping, off-board fallback |
-| `tests/test_cdp_browser.py` | isolated Chromium/CDP checks for identity-safe clicks and a complete 15-round mock draft |
+| `tests/test_yahoo_team.py` | live roster-snapshot parser: identity, slots, locked players |
+| `tests/test_yahoo_lineup.py` | lineup operator: preconditions, legality, idempotent apply |
+| `tests/test_yahoo_waivers.py` | waiver operator: staged confirmation, no-replay, audit |
 
 The full suite takes several minutes (`test_scoring.py` and `test_model.py` load the
-~95 MB PBP corpus). To iterate quickly, run a single file:
+~95 MB PBP corpus). The fast, hermetic selection (what CI runs on every push) is:
 
 ```bash
-python -m pytest tests/test_draft_driver.py -q
+python -m pytest -m "not slow and not cdp" -q
 ```
-
-`tests/test_original_board.py` and `tests/test_draft_driver.py` are the two that gate
-draft-day changes; together they run in about 10 seconds.
-
-Browser-level CDP tests are opt-in locally and run on every CI push. Start an
-isolated Chromium instance on `127.0.0.1:9222`, then run:
-
-```bash
-RUN_CDP_BROWSER_TESTS=1 python -m pytest -m cdp -q
-```
-
-The harness creates and closes only local mock-draft tabs; it does not navigate
-to Yahoo or use an authenticated session.
 
 ## Known limitations
 
@@ -265,32 +252,26 @@ to Yahoo or use an authenticated session.
 - The lineup optimizer is a greedy "best available" heuristic, not an optimal
   integer-program solver.
 
-## FD nation draft automation (module)
+## FD nation — Yahoo league operation (module)
 
-Yahoo Fantasy Football league **"FD nation"** (ID `1329011`), manager **Doge** (team #2).
-An automated draft driver + read-only scrapers driven via Edge Chrome DevTools
-Protocol (CDP). Lives as a self-contained module alongside the toolkit above.
+Yahoo Fantasy Football league **"FD nation"** (ID `1329011`), manager **Doge** (team "Shiba Innu", #2).
+Loopback-only Chrome DevTools Protocol (CDP) operators for reading and
+maintaining the roster through the season.
+
+**Status:** the 2026 draft completed on Sep 1–2 (15/15 picks; final roster and
+provenance in [docs/drafts/2026-09-02-fd-nation.md](docs/drafts/2026-09-02-fd-nation.md)).
+The draft-era driver, mock operators, and one-shot probes were removed after the
+draft (recoverable from git history). Current focus: **in-season team
+maintenance** — see [CODEBASE_REVIEW_INSEASON.md](CODEBASE_REVIEW_INSEASON.md)
+and the operator runbook [docs/TEAM_OPERATOR.md](docs/TEAM_OPERATOR.md).
 
 ### Layout
-- `driver/draft_driver.py` — live draft driver (board + guardrails + human-like CDP clicks). Runs on Windows via `py.exe`. **This is the only copy in the repo.**
-- `skills/` — Hermes skills (edge-cdp, fantasy-read, fantasy-draft) for reuse in Hermes Desktop. Documentation only; they point at the deployed driver, they do not bundle one.
-- `memory/fantasy_fd_nation.md` — persistent league context for the agent.
-- `data/board/` — original draft board (`original_board.json`, nflverse-derived,
-  zero external deps, at least **250 players**) + K/DEF ADP reference.
-- `data/scrapes/` — roster/standings/settings extracts from the live tab. **Local-only: gitignored and never committed** (it contains real league member names + session state); the driver reads it from disk at runtime.
 - `yahoo/cdp.py` — shared loopback-only CDP transport with deterministic target
   selection, monotonic request IDs, deadlines, and explicit protocol/JavaScript
   errors.
-- `yahoo/mock_draft.py` + `tools/yahoo_mock_draft.py` — inspect, join, and run a
-  current Yahoo ten-team mock draft. This path rejects the seven-digit FD nation
-  league ID and only accepts eight-digit mock-room IDs; it cannot start the real
-  draft driver.
-- `yahoo/real_draft.py` + `tools/yahoo_real_draft.py` — separately authorized,
-  cron-safe FD nation operator with authoritative roster reconstruction and a
-  durable no-replay journal. See [the real-draft runbook](docs/REAL_DRAFT.md).
 - `yahoo/team.py` + `tools/yahoo_team.py` — read-only, identity-checked snapshot
-  of the current Yahoo roster, lineup slots, matchup, injuries, and waiver
-  priority. See [the team-operator runbook](docs/TEAM_OPERATOR.md).
+  of the current Yahoo roster, lineup slots (including game-locked players),
+  matchup, injuries, and waiver priority.
 - `yahoo/lineup.py` + `tools/yahoo_lineup.py` — exact-ID lineup permutations
   with expected-slot, eligibility, legality, idempotency, and authoritative
   read-back checks. It does not perform transactions or choose players.
@@ -299,125 +280,54 @@ Protocol (CDP). Lives as a self-contained module alongside the toolkit above.
   Ambiguous, unmapped, and current-team-mismatched projections fail closed.
 - `yahoo/waivers.py` + `tools/yahoo_waiver.py` — exact-ID waiver preparation
   and submission with roster preconditions, two-stage confirmation validation,
-  no-replay behavior, pending-transaction read-back, and a durable audit log.
-- `tools/` — load-bearing utilities only: `scrape_league_adp.py` (league ADP scrape), `check_login.py` / `login_yahoo.py` (auth), `simulate_draft.py` (offline regression harness, used by `tests/test_simulation.py`), `mock_draft_run.py` + `mock_draft_room.html` (legacy driver click validation), `test_yahoo_mock_cdp.py` + `yahoo_draft_client_fixture.html` (current Yahoo client regression), `check_draft_state.py` / `back_to_league.py` / `recover_tab.py` / `edge_alive.py` (CDP health & recovery), and `deploy.ps1` (one-command verified deploy). Throwaway debug probes live in `tools/debug/` and are not part of the pipeline.
-- `validation/` — mock-draft + click validation logs (2026-08-21).
+  no-replay behavior, pending-transaction read-back, and a durable audit log
+  (`logs/yahoo-waiver-audit.jsonl`).
+- `tools/` — load-bearing utilities only: `edge_alive.py` (CDP liveness),
+  `check_login.py` / `login_yahoo.py` (auth), `recover_tab.py` (tab recovery),
+  `backtest_projections.py` (projection backtest harness).
+- `scripts/yahoo_oauth.py` — Yahoo Fantasy API OAuth2 helper (token refresh;
+  not yet consumed by the operators).
+- `skills/fantasy-read/` — read-only Yahoo endpoint inventory (agent skill doc).
+- `memory/fantasy_fd_nation.md` — persistent league context for the agent.
 - `docs/REMEDIATION.md` — phase-by-phase log of the 2026-08-31 review.
 
-**Deploy target:** the driver does not run from the repo. Copy it and the board to
-`C:\edge-debug-profile\` (the driver resolves `original_board.json` next to itself,
-and also checks `data/board/` in the repo, so `py.exe driver/draft_driver.py` from
-the repo root works too — neither documented invocation can silently downgrade to the
-static board). A change to either file is not live until it is copied there via
-`tools/deploy.ps1` — see "How to run the draft" below.
-- **Log file** — created at draft time; every pick decision logged here. Resolved in
-  this order: `$FD_DRAFT_LOG` → Windows default `C:\edge-debug-profile\draft_log.txt`
-  → other platforms `./draft_log.txt`. (`.gitignore` covers root-level
-  `draft_log.txt` and all `logs/*.txt`; if you point `FD_DRAFT_LOG` somewhere
-  else, keep it out of git.)
-- `images/` — proof screenshots.
+### League facts (verified live 2026-09-12)
+.5 PPR, H2H, **10 teams**. Roster: 1QB/2WR/2RB/1TE/1WRT/1K/1DEF/6BN/2IR.
+Waivers: 2-day rolling list (priority claims). Playoffs: top 4, weeks 16–17.
 
-### League facts (verified live 2026-08-28)
-.5 PPR, H2H, 15 rounds, 1 min/pick, snake, **10 teams**. Roster: 1QB/2WR/2RB/1TE/1WRT/1K/1DEF/6BN/2IR.
-Draft: **Tue Sep 1 2026, 5:00pm EDT** (= 2026-09-02 06:00 JST on the machine).
+### Running the operators
+A Chromium browser must be open on port 9222, bound to loopback
+(`--remote-debugging-address=127.0.0.1 --remote-allow-origins=*`), with the
+profile `~/edge-draft-profile` logged into Yahoo. Verify with:
 
-### How to run the draft
-
-Use the separately authorized Mac operator and cron schedule in
-[docs/REAL_DRAFT.md](docs/REAL_DRAFT.md). Do **not** run the legacy
-`driver/draft_driver.py` against the real league: it remains a strategy library
-and regression target, but its raw CDP loop does not provide authoritative
-restart/no-replay safety.
-
-Chrome must be open on port 9222, bound to loopback
-(`--remote-debugging-address=127.0.0.1`), and logged in. See the security note
-below for the required firewall restriction.
+```bash
+python tools/edge_alive.py
+python tools/check_login.py
+python tools/yahoo_team.py
+```
 
 > **Security note (read before opening the port).** CDP exposes a *full browser-control
 > interface* on the debug port — anyone who can reach `http://127.0.0.1:9222` can drive
 > the browser and read every open tab, **including your logged-in Yahoo session**.
-> - Bind to loopback only: launch Edge with `--remote-debugging-address=127.0.0.1`
+> - Bind to loopback only: launch the browser with `--remote-debugging-address=127.0.0.1`
 >   (pass it alongside `--remote-debugging-port=9222 --remote-allow-origins=*`).
 > - Ensure **no firewall / port-forward rule** exposes 9222 to the network.
-> - Close Edge (or the port) when you're not drafting.
+> - Close the browser (or the port) when you're not using it.
 > Treat the debug port like an unlocked door to your accounts.
 
-### Yahoo mock-draft validation (never the real league)
-
-The mock operator is separate from `driver/draft_driver.py`. It only accepts
-Yahoo's eight-digit mock-room IDs and explicitly rejects real league `1329011`.
-It verifies the exact room, slot, player ID/team/position, current overall pick,
-and authoritative `YOUR TEAM (N/15)` transition around every selection. If a
-submission does not produce a roster-count change, it stops without replaying
-the click.
+### In-season mutations (dry-run by default, fail closed)
 
 ```bash
-python tools/yahoo_mock_draft.py list
-python tools/yahoo_mock_draft.py join --room 10401633 --slot 4
-python tools/yahoo_mock_draft.py run --room 10401633 --log logs/mock-draft.jsonl
+python tools/yahoo_lineup.py --move <yahoo-id>:<from-slot>:<to-slot>            # dry run
+python tools/yahoo_lineup.py --move <yahoo-id>:<from-slot>:<to-slot> --apply   # submit
+python tools/yahoo_waiver.py --add-id <yahoo-id> --drop-id <yahoo-id>          # prepare only
+python tools/yahoo_waiver.py --add-id <yahoo-id> --drop-id <yahoo-id> --apply  # submit
 ```
 
-`run` requires a fresh room at round 1 with an empty mock roster. It refuses to
-guess or reconstruct a partially completed draft. These commands are for mock
-validation only; do not use them for the FD nation draft.
-
-The real operator requires an exact league/team confirmation in both its
-environment and command line; see the runbook. There is no Windows scheduled
-task in the active execution path.
-
-### In-season team snapshot
-
-With the authenticated FD nation team page open in the loopback CDP browser:
-
-```bash
-python tools/yahoo_team.py
-```
-
-The snapshot validates the exact team route,
-15 unique Yahoo player IDs, lineup-slot composition, matchup, and waiver
-priority, then prints JSON. Exact starter/bench permutations are available via
-`tools/yahoo_lineup.py`; see the runbook for its dry-run and `--apply` workflow.
-Add/drop, waiver/FAAB, and trade mutations remain disabled under issue #62.
-
-#### Draft board (default: original, nflverse-only)
-By default the driver drafts from the **original board** built entirely from our
-own nflverse-derived data — **no FantasyPros, no Yahoo, no third-party feed**.
-Generate it once (needs network the first time) with:
-```bash
-python cli.py original-board
-```
-This writes `data/board/original_board.json` (skill projections + K from the
-weekly kicking columns + DEF from derived team defense). Copy it next to the
-deployed driver (`C:\edge-debug-profile\original_board.json`) before the draft.
-The driver reads it and drafts best-player-available by projected value + 10-team
-scarcity/anchor guardrails, and logs `BOARD_MODE=ORIGINAL(nflverse)`. Without
-this file it falls back to the built-in static board (regardless of `FP_API_KEY`).
-
-#### FantasyPros cross-check (optional, opt-in)
-Only if you set `DRAFT_ENGINE=fantasypros` (and a key is present) does the driver
-instead build a FantasyPros value board (ECR + Real-Time ADP scrape, Yahoo ADP as a
-live patch) — the legacy path described in
-[docs/DATA_SOURCES.md](docs/DATA_SOURCES.md). The mere presence of `FP_API_KEY`
-does NOT switch engines; the original nflverse board is the hard default.
-
-```bat
-setx FP_API_KEY "your-free-key"
-```
-```ini
-# .env  (repo root; already git-ignored)
-FP_API_KEY=your-free-key
-# or the short alias the driver also accepts:
-API=your-free-key
-```
-
-See [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md) for the full strategy,
-pricing, and setup.
-
-### Safety net
-Yahoo default pre-rank is the auto-draft fallback if the driver errors.
+See [docs/TEAM_OPERATOR.md](docs/TEAM_OPERATOR.md) for the full runbook.
 
 ### Honest limitations
 - Cannot guarantee wins (real NFL games decide outcomes).
-- The current Yahoo mock-client pick flow has been exercised live; the real FD
-  nation driver remains separate and must not be treated as validated by a mock.
-- Keep Edge + machine on at draft time.
+- The operators execute exact, pre-verified instructions; the strategy /
+  recommendation layer is tracked in the in-season epic (#80) and
+  [CODEBASE_REVIEW_INSEASON.md](CODEBASE_REVIEW_INSEASON.md).

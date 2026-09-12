@@ -1,5 +1,9 @@
 # Yahoo mock-draft operator
 
+> **STATUS: HISTORICAL.** The mock operator `tools/yahoo_mock_draft.py` was
+> removed post-draft (recoverable from git history); this doc remains as the
+> record of the mock validation approach.
+
 `tools/yahoo_mock_draft.py` consolidates the temporary lobby inspection, exact
 room/slot join, current draft-client parser, player selection, and postcondition
 checks used during live mock validation.

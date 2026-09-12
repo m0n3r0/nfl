@@ -107,8 +107,10 @@ WAIVER WIRE:
   - First waiver run: after Week 1 (Tuesday morning).
   - Target breakout performances (a rookie RB with 15+ carries).
   - Drop the weakest bench player, not a starter.
-  - FAAB budget: save 60%+ for mid-season, spend 10-15% on
-    Week 1-2 breakout claims.
+  - FD nation uses a 2-day rolling waiver list (priority claims, no
+    FAAB): file claims early after breakout games; a successful claim
+    sends you to the back of the priority line, so spend top priority
+    only on true season-changers.
 
 TRADES:
   - Sell high: if a player outperforms his projection by 30%+

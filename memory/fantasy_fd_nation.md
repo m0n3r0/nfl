@@ -291,3 +291,31 @@ Verified: `tools/_test_abbrev.py` (regex + map asserts) and a new `tools/test_dr
 #32 case drive the REAL driver against a Yahoo-style mock in abbreviated mode — read ->
 normalize -> click all succeed. Deployed to `C:\edge-debug-profile\` (DEPLOY_SHA == HEAD).
 This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
+
+## Post-draft + in-season pivot (2026-09-12)
+- Draft COMPLETED Sep 1-2 (JST): 15/15 via the Mac real-draft operator. Roster:
+  McCaffrey, C. Brown, Olave, Rice, Kittle, Tuten, B. Robinson, Watson, Tate,
+  Purdy, Downs, Croskey-Merritt, Pierce, Loop (K), Steelers DEF. Report:
+  docs/drafts/2026-09-02-fd-nation.md; audit: logs/real-draft-audit.jsonl.
+- Week 1 vs "QB Sack Corey"; waiver priority 4th. Purdy/McCaffrey/Kittle played
+  Thu (SF W 27-7 @ LAR) and are locked for the week.
+- Platform: this Mac (JST) is now the ONLY machine. Chrome for Testing from
+  /tmp/cft (shared with ~/games; /tmp clears on reboot — see #81) on CDP 9222,
+  profile ~/edge-draft-profile; login verified (team_page_has_doge: true).
+  The Windows setup (py.exe, C:\edge-debug-profile, FDnationDraftDriver,
+  deploy.ps1) is RETIRED.
+- #79 FIXED: yahoo/team.py parses game-locked roster rows (the tr.editable-only
+  selector broke every Thu-Mon; locked players now flagged `locked: true`).
+- #89 FIXED repo-side: images/human_demo.png exposed the live league invite URL
+  (key/ikey tokens) — file purged from git history + force-pushed. League
+  invite ROTATION still pending (Yahoo/commissioner action, user-side).
+- Repo pivot to in-season maintenance: epic #80 (operator, manual+cron);
+  data gaps #83 (week/kickoff), #84 (byes), #85 (injuries), #86 (2026 stats);
+  lineup recommender #87; live read/write gaps #88; keepalive #81; cleanup #82.
+  Full review: CODEBASE_REVIEW_INSEASON.md.
+- Draft-era code REMOVED in the 2026-09-12 cleanup: driver/, yahoo/real_draft +
+  mock_draft + draft_report, 14 draft-only tools (incl. deploy.ps1, mock
+  harnesses, gen_cheat_sheet, simulate_draft), tools/debug/, validation/, 8
+  draft-only tests, skills/fantasy-draft + skills/edge-cdp, src/draft_board.py
+  and cli.py original-board/draft-class. All recoverable from git history
+  (pre-cleanup commit cd16d8c).

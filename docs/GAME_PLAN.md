@@ -1,5 +1,11 @@
 # 🏈 FD nation — The Complete Game Plan (for absolute beginners)
 
+> **STATUS: the draft (Part 3) is DONE** — completed 2026-09-01/02, 15/15 picks
+> (see [drafts/2026-09-02-fd-nation.md](drafts/2026-09-02-fd-nation.md)). Parts 4–5
+> (waivers, weekly lineup) are the live game now. Some commands in Part 6 were
+> draft-only and have been removed (`original-board`, `draft-class`,
+> `tools/gen_cheat_sheet.py`); the draft-day scheduled task is retired.
+
 Everything you need to know to *win this fantasy football league*, explained like
 you've never played before. No jargon left unexplained.
 

@@ -1,5 +1,12 @@
 # 🍎 Headless macOS deployment (portable setup)
 
+> **STATUS: draft-era, partially historical.** Written to get the draft bot
+> running on this Mac — the draft completed 2026-09-01/02 and the draft tooling
+> (`tools/mock_draft_run.py`, `tools/deploy.ps1`, the Windows profile copy) was
+> removed post-draft. Still current: the browser launch flags + profile
+> (§3), the Yahoo login options, and the **launchd/caffeinate scheduling
+> pattern (§5)** — reuse that pattern for the in-season maintenance cron (#80).
+
 Everything in this repo is **pure Python except the browser automation**, so a
 headless Mac works — with four concrete differences from the Windows box. This
 guide gets you from clone → validated draft bot on a Mac with no display.

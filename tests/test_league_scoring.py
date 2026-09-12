@@ -29,6 +29,5 @@ def test_cli_uses_league_profile_but_validation_stays_nflverse(monkeypatch):
 
     assert parser.parse_args(["rank"]).preset == "fd-nation"
     assert parser.parse_args(["projections"]).preset == "fd-nation"
-    assert parser.parse_args(["original-board"]).preset == "fd-nation"
     assert parser.parse_args(["validate"]).preset == "half-ppr"
     assert parser.parse_args(["rank", "--preset", "fd-nation"]).preset == "fd-nation"

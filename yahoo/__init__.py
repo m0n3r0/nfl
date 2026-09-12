@@ -1,7 +1,7 @@
 """Yahoo Fantasy browser integration.
 
-Mutating tools are deliberately split by workflow.  The mock-draft operator
-cannot target the configured real league.
+Mutating tools are deliberately split by workflow (read, lineup, waivers);
+each is dry-run by default and fails closed on identity mismatch.
 """
 
 from .cdp import CdpClient, CdpError, CdpJavaScriptError, CdpProtocolError

@@ -19,7 +19,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from src import ingest, scoring, lineup, corpus, projections, analysis, model, draft_board
+from src import ingest, scoring, lineup, corpus, projections, analysis, model
 from src.config import (FANTASY_POSITIONS, SCORING_PRESETS, SCHEDULE_SEASON,
                         STATS_SEASON, league_preset)
 
@@ -156,56 +156,6 @@ def cmd_sos(args) -> int:
     return 0
 
 
-def cmd_original_board(args) -> int:
-    """Build the original, nflverse-only draft board and write it to JSON.
-
-    No FantasyPros / Yahoo dependency: skill positions come from the projection
-    engine, K from the weekly kicking columns, DEF from derived team defense.
-    The JSON is consumed by the stdlib-only deployed driver.
-    """
-    board = draft_board.write_original_board(
-        "data/board/original_board.json", preset=args.preset
-    )
-    adp_hits = sum(1 for b in board if b.get("adp") is not None)
-    from collections import Counter
-    counts = Counter(b["pos"] for b in board)
-    print(f"\n=== Original draft board ({args.preset}) -> data/board/original_board.json ===")
-    print(f"  total players: {len(board)}")
-    print(f"  league ADP merged: {adp_hits} players (from data/scrapes/yahoo_league_adp.json)")
-    for pos in ("QB", "RB", "WR", "TE", "K", "DEF"):
-        print(f"  {pos}: {counts.get(pos, 0)}")
-    print("  top 5 by projected value:")
-    for b in board[:5]:
-        print(f"    {b['name']} ({b['team']} {b['pos']}) -> {b['value']}")
-    return 0
-
-
-def cmd_draft_class(args) -> int:
-    """Summarize a real NFL draft class (default 2026) from nflverse data."""
-    picks = ingest.load_draft_picks(season=args.season, refresh=args.refresh)
-    players = ingest.load("players")
-    merged = picks.merge(
-        players[["gsis_id", "display_name", "position"]].rename(
-            columns={"position": "roster_position"}
-        ),
-        on="gsis_id", how="left", suffixes=("", "_players")
-    )
-    merged["display_name"] = merged["display_name"].fillna(merged["pfr_player_name"])
-    merged["position"] = merged["position"].fillna(merged["roster_position"])
-    out = merged[["round", "pick", "team", "display_name", "position",
-                  "college", "age", "gsis_id"]].rename(
-        columns={"team": "draft_team", "age": "age_at_draft"}
-    )
-    dest = f"data/processed/draft_class_{args.season}.csv"
-    out.to_csv(dest, index=False)
-    print(f"=== {args.season} NFL draft class: {len(out)} picks -> {dest} ===")
-    print(f"  fantasy-relevant (QB/RB/WR/TE): {len(out[out['position'].isin(['QB', 'RB', 'WR', 'TE'])])}")
-    print("  round 1:")
-    for _, r in out[out["round"] == 1].iterrows():
-        print(f"    {int(r.pick):>2}. {r.display_name} ({r.draft_team} {r.position}, {r.college})")
-    return 0
-
-
 def cmd_predict(args) -> int:
     preds = model.predict_2026(week=args.week)
     title = f"2026" + (f" Week {args.week}" if args.week else " (all weeks)")
@@ -322,18 +272,6 @@ def build_parser() -> argparse.ArgumentParser:
     ppred = sub.add_parser("predict", help="2026 win probabilities")
     ppred.add_argument("week", type=int, nargs="?", default=None, help="2026 week (omit for all)")
     ppred.set_defaults(func=cmd_predict)
-
-    pob = sub.add_parser("original-board",
-                         help="build the original nflverse-only draft board -> JSON")
-    pob.add_argument("--preset", default=league_preset(), choices=SCORING_CHOICES)
-    pob.set_defaults(func=cmd_original_board)
-
-    pdc = sub.add_parser("draft-class",
-                         help="summarize a real NFL draft class (nflverse)")
-    pdc.add_argument("--season", type=int, default=2026)
-    pdc.add_argument("--refresh", action="store_true",
-                     help="re-download draft_picks.csv")
-    pdc.set_defaults(func=cmd_draft_class)
 
     pw = sub.add_parser("web", help="launch the local web UI")
     pw.add_argument("--port", type=int, default=5000)

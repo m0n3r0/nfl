@@ -1,5 +1,8 @@
 # Manual failover plan — FD nation auto-draft
 
+> **STATUS: COMPLETED (historical).** Written for the 2026-09-01 draft, which
+> completed 15/15. The driver and scheduled task described here are retired.
+
 **Draft:** Tue Sep 1 2026, 5:00pm EDT · 10-team .5 PPR · 15-round snake · 1 min/pick ·
 team #2 "Doge".
 

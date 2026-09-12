@@ -1,5 +1,10 @@
 # FD nation real-draft runbook
 
+> **STATUS: COMPLETED (historical).** The draft described here ran to 15/15 on
+> 2026-09-01/02 — results in [drafts/2026-09-02-fd-nation.md](drafts/2026-09-02-fd-nation.md).
+> The operator (`tools/yahoo_real_draft.py`) and its cron entry were removed
+> post-draft; this document remains as the record of what ran.
+
 The real-draft operator is intentionally separate from the mock operator. It can
 only target league `1329011`, team `2`, and requires the exact value
 `1329011/2` in both `--confirm-real-draft` and
