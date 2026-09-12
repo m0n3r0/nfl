@@ -78,19 +78,20 @@ def build_team_defense(schedule_season: int = SCHEDULE_SEASON) -> pd.DataFrame:
 
 
 def build_schedule_2026() -> pd.DataFrame:
-    """2026 schedule with each team's weekly opponent and home/away."""
+    """2026 schedule with each team's weekly opponent, home/away, and kickoff data."""
     games = ingest.load_schedule(season=SCHEDULE_SEASON)
     games = games[games["game_type"].isin(["REG", "POST"])]
     out = []
     for _, r in games.iterrows():
-        out.append({
-            "week": int(r["week"]), "team": r["home_team"], "opponent": r["away_team"],
-            "home": True, "game_id": r["game_id"],
-        })
-        out.append({
-            "week": int(r["week"]), "team": r["away_team"], "opponent": r["home_team"],
-            "home": False, "game_id": r["game_id"],
-        })
+        for team, opponent, home in ((r["home_team"], r["away_team"], True),
+                                     (r["away_team"], r["home_team"], False)):
+            out.append({
+                "week": int(r["week"]), "team": team, "opponent": opponent,
+                "home": home, "game_id": r["game_id"],
+                "game_type": r["game_type"],
+                "gameday": r.get("gameday"), "gametime": r.get("gametime"),
+                "weekday": r.get("weekday"),
+            })
     sched = pd.DataFrame(out)
     return sched.sort_values(["team", "week"]).reset_index(drop=True)
 

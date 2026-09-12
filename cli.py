@@ -45,8 +45,8 @@ def cmd_schedule(args) -> int:
     season = args.season or SCHEDULE_SEASON
     games = ingest.load_schedule(season=season, refresh=args.refresh)
     print(f"\n=== {season} schedule ({len(games)} games) ===")
-    cols = ["week", "gameday", "away_team", "home_team", "game_type"]
-    _print_table(games[cols].sort_values(["week", "gameday"]))
+    cols = ["week", "gameday", "weekday", "gametime", "away_team", "home_team", "game_type"]
+    _print_table(games[cols].sort_values(["week", "gameday", "gametime"]))
     return 0
 
 
