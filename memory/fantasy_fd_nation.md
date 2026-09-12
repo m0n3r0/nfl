@@ -308,7 +308,8 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
   selector broke every Thu-Mon; locked players now flagged `locked: true`).
 - #89 FIXED repo-side: images/human_demo.png exposed the live league invite URL
   (key/ikey tokens) — file purged from git history + force-pushed. League
-  invite ROTATION still pending (Yahoo/commissioner action, user-side).
+  invite ROTATION declined by the user (2026-09-12): casual league, accepted
+  risk, #89 closed. Revisit only if the league ever opens a slot or expands.
 - Repo pivot to in-season maintenance: epic #80 (operator, manual+cron);
   data gaps #83 (week/kickoff), #84 (byes), #85 (injuries), #86 (2026 stats);
   lineup recommender #87; live read/write gaps #88; keepalive #81; cleanup #82.
