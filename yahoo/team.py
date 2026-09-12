@@ -45,8 +45,9 @@ class RosterPlayer:
     slot: str
     injury_status: str
     game: str
+    locked: bool = False
 
-    def as_dict(self) -> dict[str, str]:
+    def as_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -108,6 +109,7 @@ def _parse_payload(payload: Any) -> TeamSnapshot:
             slot=str(row["slot"]).upper(),
             injury_status=str(row.get("injury_status") or "").upper(),
             game=str(row.get("game") or "").strip(),
+            locked=bool(row.get("locked")),
         ))
     if not 15 <= len(roster) <= 17:
         raise TeamReadError(f"expected 15-17 roster players including IR, found {len(roster)}")
@@ -153,20 +155,28 @@ class YahooTeamReader:
             r'''(() => {
               const path = location.pathname.replace(/\/$/, '');
               const body = document.body?.innerText || '';
-              const roster = [...document.querySelectorAll('tr.editable')].map(row => {
+              const SLOT_RE = /^(QB|RB|WR|TE|W\/R\/T|K|DEF|BN|IR)$/;
+              const scope = document.querySelector('section.ysf-rosterswap-manager') || document;
+              const roster = [...scope.querySelectorAll('tr')]
+                .filter(row => row.querySelector('.ysf-player-name'))
+                .map(row => {
                 const link = row.querySelector('.ysf-player-name a[data-ys-playerid]');
                 const playerCell = row.querySelector('td.player');
                 const playerText = playerCell?.innerText || '';
                 const teamPos = playerText.match(/\b([A-Za-z]{2,3})\s+-\s+(QB|RB|WR|TE|K|DEF)\b/i);
                 const select = row.querySelector('select');
-                const slot = select?.selectedOptions?.[0]?.value || row.querySelector('.pos-label')?.dataset?.pos || '';
+                const editable = !!select && !select.disabled;
+                const firstCell = row.querySelector('td')?.innerText?.trim() || '';
+                const slot = select?.selectedOptions?.[0]?.value
+                  || row.querySelector('.pos-label')?.dataset?.pos
+                  || (SLOT_RE.test(firstCell) ? firstCell : '');
                 const status = row.querySelector('.ysf-player-status')?.innerText?.trim() || '';
                 const game = row.querySelector('.ysf-game-status a')?.innerText?.trim() || '';
                 return {
                   yahoo_id: link?.dataset?.ysPlayerid || select?.name || '',
                   name: link?.title || link?.innerText?.trim() || '',
                   team: teamPos?.[1] || '', position: teamPos?.[2] || '',
-                  slot, injury_status: status, game,
+                  slot, injury_status: status, game, locked: !editable,
                 };
               }).filter(row => row.yahoo_id || row.name);
               const matchup = body.match(/Week\s+\d+\s+vs\s+[^\n]+/i)?.[0] || '';

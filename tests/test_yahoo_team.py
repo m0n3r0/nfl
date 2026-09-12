@@ -94,8 +94,21 @@ def test_reader_only_evaluates_page():
     snapshot = YahooTeamReader(client).snapshot()
 
     assert len(snapshot.roster) == 15
-    assert "querySelectorAll('tr.editable')" in client.expression
+    assert "tr.editable" not in client.expression
+    assert "ysf-rosterswap-manager" in client.expression
+    assert "SLOT_RE" in client.expression
     assert not hasattr(client, "navigate")
+
+
+def test_locked_rows_are_kept_and_flagged():
+    current = payload()
+    for row in current["roster"][:3]:
+        row["locked"] = True
+
+    snapshot = _parse_payload(current)
+
+    assert len(snapshot.roster) == 15
+    assert [player.locked for player in snapshot.roster] == [True] * 3 + [False] * 12
 
 
 def test_team_target_requires_exact_yahoo_https_origin():
