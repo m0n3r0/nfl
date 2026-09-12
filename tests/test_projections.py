@@ -58,6 +58,22 @@ def test_matchups_week1():
     assert (board["proj_week"] > 0).all()
 
 
+def test_bye_week_zeroes_and_excludes():
+    c = _corpus()
+    sched = c["schedule_2026"]
+    bye_week = 6  # 2026 regular-season bye weeks span 5-11, 13, 14
+    playing = set(sched[sched["week"] == bye_week]["team"])
+    assert 22 <= len(playing) <= 30  # sanity: real bye week, not a full slate
+
+    proj = projections.project_for_week(c, week=bye_week)
+    assert proj.loc[~proj["last_team"].isin(playing), "on_bye"].all()
+    assert (proj.loc[proj["on_bye"], "proj_week"] == 0.0).all()
+    assert (proj.loc[~proj["on_bye"], "proj_week"] > 0.0).any()
+
+    board = analysis.weekly_matchups(c, week=bye_week, preset="ppr", top_n=50)
+    assert board["last_team"].isin(playing).all()
+
+
 def test_consistency_skill_only():
     c = _corpus()
     cons = analysis.consistency(c, preset="ppr")

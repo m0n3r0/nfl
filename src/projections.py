@@ -161,6 +161,19 @@ def project_players(corpus: dict) -> pd.DataFrame:
     return out
 
 
+def _mark_byes(proj: pd.DataFrame, schedule: pd.DataFrame, week: int) -> pd.DataFrame:
+    """Flag players whose team has no game in `week` and zero their projection.
+
+    A bye-week player can never score, so he must never outrank a playing one:
+    proj_week is set to 0.0 and on_bye marks why.
+    """
+    playing = set(schedule[schedule["week"] == week]["team"])
+    proj = proj.copy()
+    proj["on_bye"] = ~proj["last_team"].isin(playing)
+    proj.loc[proj["on_bye"], "proj_week"] = 0.0
+    return proj
+
+
 def project_for_week(corpus: dict, week: int) -> pd.DataFrame:
     """Projected fantasy points for a specific 2026 week (uses that week's SOS)."""
     proj = project_players(corpus)
@@ -180,4 +193,4 @@ def project_for_week(corpus: dict, week: int) -> pd.DataFrame:
     # re-apply just this week's opponent SOS.
     base_role = proj["proj_ppg"] / (1 + proj["team_sos"].fillna(0.0))
     proj["proj_week"] = (base_role * (1 + proj["week_sos"])).round(2)
-    return proj
+    return _mark_byes(proj, schedule, week)

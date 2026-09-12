@@ -64,11 +64,14 @@ def sos_ranking(corpus: dict) -> pd.DataFrame:
 
 def weekly_matchups(corpus: dict, week: int, preset: str = "ppr", top_n: int = 25):
     """Start/sit-style board for a 2026 week: each skill player vs that week's
-    opponent defensive strength."""
+    opponent defensive strength. Bye-week players are excluded — they are never
+    startable."""
     from . import projections
 
     proj = projections.project_for_week(corpus, week=week)
     board = proj[proj["position"].isin(["QB", "RB", "WR", "TE"])].copy()
+    if "on_bye" in board.columns:
+        board = board[~board["on_bye"]]
     board = board.sort_values("proj_week", ascending=False).reset_index(drop=True)
     board = board.drop(columns=[c for c in ["rank"] if c in board.columns])
     board.insert(0, "rank", board.index + 1)
