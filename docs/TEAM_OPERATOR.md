@@ -147,3 +147,30 @@ players, and collisions remain visible as `team_mismatch`, `unmapped`, or
 The default output is `logs/yahoo-player-map.json`, which is runtime state and
 must not be committed. Rebuild it before each recommendation or mutation rather
 than treating IDs, availability, or NFL teams as static season data.
+
+## Scheduled operation
+
+`tools/team_operator.py` is the single entry point for in-season maintenance:
+preflight, roster snapshot, corpus build, current-week projections, monitor
+report, lineup proposal, matchup context, and one JSON report plus an audit
+line in `logs/team-operator.jsonl`. An flock (`logs/team-operator.lock`)
+prevents overlapping cron/manual runs. Read-only by default; `--apply` submits
+only the recommended lineup moves through the verified operator. Waiver claims
+are never auto-submitted — `--waiver-scan` only ranks targets for a human.
+
+Suggested crontab (times are JST, the host's local zone). Replace
+`/path/to/nfl` with the local clone path — the launchd installer
+(`tools/install_launchd.py`) renders repo paths the same way:
+
+```cron
+24 8,20 * * *   cd /path/to/nfl && .venv/bin/python tools/team_operator.py >> logs/team-operator-cron.log 2>&1
+23 1 * * 1      cd /path/to/nfl && .venv/bin/python tools/team_operator.py --apply >> logs/team-operator-cron.log 2>&1
+11 20 * * 3     cd /path/to/nfl && .venv/bin/python tools/team_operator.py --waiver-scan --refresh-data >> logs/team-operator-cron.log 2>&1
+```
+
+- twice daily (08:24 / 20:24): monitor + report; catches injury/lineup news.
+- Monday 01:23 (= Sunday ~12:23 ET): final lineup set with `--apply`, before
+  the Sunday 1pm ET kickoff window. During EST the same fire lands an hour
+  earlier ET, still ahead of kickoff.
+- Wednesday 20:11 (= Wednesday ~07:11 ET): waiver scan after Yahoo's
+  overnight waiver run, plus a data refresh for the new week's projections.

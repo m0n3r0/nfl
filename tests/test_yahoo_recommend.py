@@ -221,3 +221,43 @@ def test_injured_reserve_rows_are_not_cross_checked():
 
     assert warnings == ()
     assert next(p for p in adjusted.roster if p.yahoo_id == "16").locked
+
+
+def test_monitor_report_flags_attention_items():
+    values = dict(BASE, **{"Rb Two": 0.0})
+    proj = projections(values, on_bye=("Rb Two",), injuries={"Wr One": "Questionable"})
+    proj = proj[proj["player_display_name"] != "Rb Bench"]  # one unmapped bench
+    from yahoo.recommend import monitor_report
+
+    report = monitor_report(snapshot(locked={"1"}), proj, week=6)
+
+    assert report["locked_starters"] == ["Qb One"]
+    assert report["bye_players"] == ["Rb Two (RB)"]
+    assert report["injury_tags"] == ["Wr One (Questionable, WR)"]
+    assert report["unevaluated"] == ["Rb Bench (unmapped)"]
+    assert report["needs_attention"] is True
+    assert report["starter_count"] == 9
+
+
+def test_monitor_report_quiet_when_clean():
+    from yahoo.recommend import monitor_report
+
+    report = monitor_report(snapshot(), projections(BASE), week=1)
+
+    assert report["locked_starters"] == []
+    assert report["bye_players"] == []
+    assert report["injury_tags"] == []
+    assert report["unevaluated"] == []
+    assert report["needs_attention"] is False
+
+
+def test_monitor_report_uses_yahoo_only_injury_tag():
+    snap = snapshot()
+    tagged = replace(snap.roster[1], injury_status="Questionable")  # Rb One
+    snap = replace(snap, roster=(snap.roster[0], tagged) + snap.roster[2:])
+    from yahoo.recommend import monitor_report
+
+    report = monitor_report(snap, projections(BASE), week=1)
+
+    assert any(i.startswith("Rb One (Questionable") for i in report["injury_tags"])
+    assert report["needs_attention"] is True

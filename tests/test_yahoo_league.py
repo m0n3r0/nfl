@@ -113,3 +113,29 @@ def test_opponent_team_id_excludes_authorized_team():
     ambiguous = Client({"yahoo-league-opponent-id": ["2", "7", "9"]})
     with pytest.raises(LeagueReadError, match="could not isolate"):
         opponent_team_id(ambiguous)
+
+
+def test_wire_rank_targets_orders_and_skips():
+    import pandas as pd
+
+    from yahoo.identity import YahooPlayerIdentity, reconcile_identities
+    from yahoo.players import AvailablePlayer
+    from yahoo.wire import rank_targets
+
+    available = {
+        "1": AvailablePlayer("1", "Wire One", "KC", "WR", "FA", "", "Sun"),
+        "2": AvailablePlayer("2", "Wire Two", "KC", "RB", "W (Sep 16)", "Q", "Sun"),
+        "3": AvailablePlayer("3", "Ghost Player", "KC", "RB", "FA", "", "Sun"),
+    }
+    proj = pd.DataFrame([
+        {"player_id": "00-1", "player_display_name": "Wire One", "position": "WR",
+         "last_team": "KC", "proj_week": 9.0},
+        {"player_id": "00-2", "player_display_name": "Wire Two", "position": "RB",
+         "last_team": "KC", "proj_week": 12.5},
+    ])
+
+    ranked, skipped = rank_targets(available, proj)
+
+    assert [r["name"] for r in ranked] == ["Wire Two", "Wire One"]
+    assert ranked[0]["proj_week"] == 12.5
+    assert skipped == {"unmapped": 1}

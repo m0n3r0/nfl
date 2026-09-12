@@ -245,3 +245,45 @@ def apply_schedule_locks(snapshot: TeamSnapshot, locked_teams: set[str]) -> tupl
             )
         roster.append(replace(player, locked=player.locked or schedule_locked))
     return replace(snapshot, roster=tuple(roster)), tuple(warnings)
+
+
+def monitor_report(snapshot: TeamSnapshot, projections: pd.DataFrame, week: int) -> dict[str, Any]:
+    """Pure daily-monitor block: what on this roster needs a human eye.
+
+    Flags starters who are locked, players on bye or carrying an injury tag,
+    and players the model cannot evaluate. Read-only; pairs with
+    propose_lineup for the fix.
+    """
+    identities = [
+        YahooPlayerIdentity(yahoo_id=p.yahoo_id, name=p.name, team=p.team, position=p.position)
+        for p in snapshot.roster
+    ]
+    mappings = {m.yahoo_id: m for m in reconcile_identities(identities, projections)}
+    proj_week, on_bye, injury = _evaluation_maps(projections)
+
+    locked, bye, injured, unevaluated = [], [], [], []
+    starters = [p for p in snapshot.roster if p.slot not in {"BN", "IR", "IL"}]
+    for player in snapshot.roster:
+        mapping = mappings[player.yahoo_id]
+        if player.locked and player.slot not in {"BN", "IR", "IL"}:
+            locked.append(player.name)
+        if not mapping.actionable:
+            if player.position not in {"K", "DEF"}:
+                unevaluated.append(f"{player.name} ({mapping.status})")
+            continue
+        if on_bye.get(mapping.internal_id):
+            bye.append(f"{player.name} ({player.slot})")
+        status = player.injury_status or injury.get(mapping.internal_id)
+        if status:
+            injured.append(f"{player.name} ({status}, {player.slot})")
+
+    return {
+        "week": week,
+        "locked_starters": locked,
+        "bye_players": bye,
+        "injury_tags": injured,
+        "unevaluated": unevaluated,
+        "starter_count": len(starters),
+        "roster_count": len(snapshot.roster),
+        "needs_attention": bool(bye or injured or unevaluated),
+    }
