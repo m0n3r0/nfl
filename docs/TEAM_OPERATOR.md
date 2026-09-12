@@ -1,9 +1,60 @@
 # Yahoo team operator
 
 The in-season Yahoo operator is being delivered in fail-closed stages. It can
-read authoritative team state and apply an exact starter/bench permutation for
-league `1329011`, team `2`. Add/drop, waiver, FAAB, and trade mutations remain
-disabled.
+read authoritative team state, apply an exact starter/bench permutation, and
+prepare/submit an exact waiver claim for league `1329011`, team `2`. Free-agent
+adds and trades remain limited (see "Remaining transaction scope").
+
+## Browser keepalive and preflight
+
+The operators need a Chromium browser with CDP on `127.0.0.1:9222` and a live
+Yahoo session in the `~/edge-draft-profile` profile. `tools/preflight.py`
+verifies the whole chain and heals what it can:
+
+```bash
+python tools/preflight.py        # exits 0 only when cdp + team tab + auth are green
+```
+
+It launches the browser when CDP is down (`yahoo/browser.py`: finds the binary
+via `CHROME_PATH`, the `/tmp/cft` install shared with the games repo, or a
+persistent install under `~/Applications` — downloading Chrome for Testing
+there when nothing exists), opens the team page in a **new** tab when none is
+present (it never navigates a tab it didn't create), and checks the session
+with the same credentialed fetch `tools/check_login.py` uses. When only the
+auth check is red, a human (or `tools/login_yahoo.py`) must re-login; preflight
+reports it and exits 2.
+
+A launchd agent re-runs this preflight at every login so the browser survives
+reboots (`/tmp` clears). The plist is a template; the installer renders the
+actual repo paths and loads it:
+
+```bash
+python tools/install_launchd.py
+```
+
+## Profile backup and session persistence
+
+The launcher always passes `--use-mock-keychain`. Chrome for Testing is
+ad-hoc signed and cannot use the macOS Keychain, so without that flag its
+cookie store is memory-only and every login dies with the browser process.
+With the flag, cookies persist to disk (encrypted with Chrome's built-in mock
+key) and later launches decrypt them. Tradeoff: anyone with read access to
+`~/edge-draft-profile` can decrypt its cookies — keep the profile dir
+user-private; the CDP endpoint stays loopback-only for the same reason.
+
+`tools/profile_backup.py` snapshots the profile (cookies + saved logins) to
+`~/edge-profile-backups/`:
+
+```bash
+python tools/profile_backup.py                    # live snapshot
+python tools/profile_backup.py --stop-browser     # consistent snapshot + auto relaunch
+python tools/profile_backup.py --restore          # restore the profile from backup
+```
+
+Backups restore and decrypt only on the machine/user that created them. When
+the profile dir is missing, `ensure_browser` restores the backup automatically
+before launching, so a wiped profile (or a fresh machine image with the
+backup synced over) comes back logged in without human involvement.
 
 ## Read-only snapshot
 

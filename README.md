@@ -282,7 +282,9 @@ and the operator runbook [docs/TEAM_OPERATOR.md](docs/TEAM_OPERATOR.md).
   and submission with roster preconditions, two-stage confirmation validation,
   no-replay behavior, pending-transaction read-back, and a durable audit log
   (`logs/yahoo-waiver-audit.jsonl`).
-- `tools/` — load-bearing utilities only: `edge_alive.py` (CDP liveness),
+- `tools/` — load-bearing utilities only: `preflight.py` (browser/session
+  health chain, heals and reports), `launch_browser.py` (idempotent CDP
+  browser launcher), `edge_alive.py` (CDP liveness),
   `check_login.py` / `login_yahoo.py` (auth), `recover_tab.py` (tab recovery),
   `backtest_projections.py` (projection backtest harness).
 - `scripts/yahoo_oauth.py` — Yahoo Fantasy API OAuth2 helper (token refresh;

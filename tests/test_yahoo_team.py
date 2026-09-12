@@ -118,3 +118,15 @@ def test_team_target_requires_exact_yahoo_https_origin():
     assert is_team_target(target("https://football.fantasysports.yahoo.com/f1/1329011/2"))
     assert not is_team_target(target("https://example.com/f1/1329011/2"))
     assert not is_team_target(target("http://football.fantasysports.yahoo.com/f1/1329011/2"))
+
+
+def test_is_team_url_requires_exact_authorized_route():
+    from yahoo.team import is_team_url
+
+    assert is_team_url("https://football.fantasysports.yahoo.com/f1/1329011/2")
+    assert is_team_url("https://football.fantasysports.yahoo.com/f1/1329011/2/")
+    assert not is_team_url("https://example.com/f1/1329011/2")
+    assert not is_team_url("http://football.fantasysports.yahoo.com/f1/1329011/2")
+    assert not is_team_url("https://football.fantasysports.yahoo.com/f1/1329011/2/editroster")
+    assert not is_team_url("about:blank")
+    assert not is_team_url("")

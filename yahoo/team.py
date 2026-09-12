@@ -70,10 +70,15 @@ class TeamSnapshot:
         return value
 
 
+def is_team_url(url: str) -> bool:
+    """Return whether a URL is exactly the authorized team route."""
+    parsed = urlparse(url)
+    return parsed.scheme == "https" and parsed.hostname == YAHOO_FANTASY_HOST and parsed.path.rstrip("/") == TEAM_PATH
+
+
 def is_team_target(target: Target) -> bool:
     """Return whether a target is the exact authorized Yahoo team origin/route."""
-    parsed = urlparse(target.url)
-    return parsed.scheme == "https" and parsed.hostname == YAHOO_FANTASY_HOST and parsed.path.rstrip("/") == TEAM_PATH
+    return is_team_url(target.url)
 
 
 def find_team_target(endpoint: str = "http://127.0.0.1:9222") -> Target:

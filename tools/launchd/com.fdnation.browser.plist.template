@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+ "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!--
+    FD nation browser keepalive template. Do NOT copy this file directly:
+    tools/install_launchd.py renders @REPO_ROOT@ to the actual repo location
+    and installs the result to ~/Library/LaunchAgents.
+  -->
+  <key>Label</key><string>com.fdnation.browser</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>@REPO_ROOT@/.venv/bin/python</string>
+    <string>@REPO_ROOT@/tools/preflight.py</string>
+  </array>
+  <key>WorkingDirectory</key><string>@REPO_ROOT@</string>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>@REPO_ROOT@/logs/preflight-launchd.log</string>
+  <key>StandardErrorPath</key><string>@REPO_ROOT@/logs/preflight-launchd.log</string>
+  <key>EnvironmentVariables</key>
+  <dict><key>PYTHONIOENCODING</key><string>utf-8</string></dict>
+</dict>
+</plist>
