@@ -26,12 +26,15 @@ class WaiverClient(Protocol):
     def navigate(self, url: str, expected: Callable[[str], bool], timeout: float = 20) -> str: ...
 
 
+ACTIVE_ROSTER_SIZE = 15
+
+
 @dataclass(frozen=True)
 class WaiverClaim:
     add_yahoo_id: str
     add_name: str
-    drop_yahoo_id: str
-    drop_name: str
+    drop_yahoo_id: str = ""
+    drop_name: str = ""
 
 
 @dataclass(frozen=True)
@@ -76,7 +79,10 @@ class YahooWaiverOperator:
             raise WaiverError("waiver transaction rows are missing")
         add = claim.add_name.casefold()
         drop = claim.drop_name.casefold()
-        return any(add in str(row).casefold() and drop in str(row).casefold() for row in rows)
+        return any(
+            add in str(row).casefold() and (not drop or drop in str(row).casefold())
+            for row in rows
+        )
 
     def _stage(self) -> Any:
         return self.client.evaluate(
@@ -100,9 +106,12 @@ class YahooWaiverOperator:
               const intent = {payload};
               const form = [...document.forms].find(form => new URL(form.action).pathname === {TEAM_ADD_PATH!r});
               if (!form || form.elements.namedItem('stage')?.value !== '2' || form.elements.namedItem('apid')?.value !== intent.add) return false;
-              const drop = [...form.querySelectorAll('input[name=dpid]')].find(input => input.value === intent.drop && !input.disabled);
-              if (!drop) return false;
-              drop.checked = true; form.submit(); return true;
+              if (intent.drop) {{
+                const drop = [...form.querySelectorAll('input[name=dpid]')].find(input => input.value === intent.drop && !input.disabled);
+                if (!drop) return false;
+                drop.checked = true;
+              }}
+              form.submit(); return true;
             }})()'''
         )
         if submitted is not True:
@@ -114,8 +123,12 @@ class YahooWaiverOperator:
             stage = self._stage()
             hidden = stage.get("hidden", {}) if isinstance(stage, dict) else {}
             if stage and stage.get("path") == TEAM_ADD_PATH and hidden.get("stage") == "3":
-                if hidden.get("apid") != claim.add_yahoo_id or hidden.get("dpid") != claim.drop_yahoo_id:
+                if hidden.get("apid") != claim.add_yahoo_id:
                     raise WaiverError("waiver confirmation IDs disagree with intent")
+                if claim.drop_yahoo_id and hidden.get("dpid") != claim.drop_yahoo_id:
+                    raise WaiverError("waiver confirmation IDs disagree with intent")
+                if not claim.drop_yahoo_id and hidden.get("dpid"):
+                    raise WaiverError("add-only claim was offered a confirmation that includes a drop")
                 return
             time.sleep(0.1)
         raise WaiverError("waiver confirmation page did not load")
@@ -123,9 +136,14 @@ class YahooWaiverOperator:
     def prepare(self, claim: WaiverClaim) -> WaiverReceipt:
         snapshot = self._team()
         roster = {player.yahoo_id: player for player in snapshot.roster}
-        drop = roster.get(claim.drop_yahoo_id)
-        if drop is None or drop.name != claim.drop_name:
-            raise WaiverError("drop-player precondition failed")
+        if claim.drop_yahoo_id:
+            drop = roster.get(claim.drop_yahoo_id)
+            if drop is None or drop.name != claim.drop_name:
+                raise WaiverError("drop-player precondition failed")
+        else:
+            active = sum(1 for player in snapshot.roster if player.slot not in {"IR", "IL"})
+            if active >= ACTIVE_ROSTER_SIZE:
+                raise WaiverError("roster is full; a free-agent add requires a drop player")
         if self._pending(claim):
             self._restore_team()
             return WaiverReceipt("already_pending", claim)
@@ -140,7 +158,7 @@ class YahooWaiverOperator:
         drops = stage.get("drops", {}) if isinstance(stage, dict) else {}
         if not stage or hidden.get("stage") != "2" or hidden.get("apid") != claim.add_yahoo_id:
             raise WaiverError("waiver selection page identity failed")
-        if drops.get(claim.drop_yahoo_id) != claim.drop_name:
+        if claim.drop_yahoo_id and drops.get(claim.drop_yahoo_id) != claim.drop_name:
             raise WaiverError("drop player is not offered with the expected identity")
         self._submit_stage_two(claim)
         self._wait_stage_three(claim)

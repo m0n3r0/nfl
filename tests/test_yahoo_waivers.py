@@ -99,3 +99,57 @@ def test_rejects_confirmation_id_drift():
     client.evaluate = drift
     with pytest.raises(WaiverError, match="confirmation IDs disagree"):
         YahooWaiverOperator(client, snapshot, timeout=0.01).prepare(claim())
+
+
+class AddOnlyClient(Client):
+    def evaluate(self, expression):
+        if "yahoo-waiver-pending" in expression:
+            return ["Add: Baker Mayfield"] if self.pending else ["No recent transactions"]
+        if "yahoo-waiver-stage" in expression and "two-submit" not in expression:
+            if self.page == "add3":
+                return {"path": "/f1/1329011/2/addplayer", "action": "/f1/1329011/2/addplayer",
+                        "hidden": {"stage": "3", "apid": "30971"}, "drops": {}}
+        return super().evaluate(expression)
+
+
+class DropLeakingAddOnlyClient(AddOnlyClient):
+    """Stage three comes back with an unexpected dpid for an add-only claim."""
+
+    def evaluate(self, expression):
+        if "yahoo-waiver-stage" in expression and "two-submit" not in expression:
+            if self.page == "add3":
+                return {"path": "/f1/1329011/2/addplayer", "action": "/f1/1329011/2/addplayer",
+                        "hidden": {"stage": "3", "apid": "30971", "dpid": "34054"}, "drops": {}}
+        return super().evaluate(expression)
+
+
+def test_add_only_claim_full_flow():
+    client = AddOnlyClient()
+    operator = YahooWaiverOperator(client, snapshot=snapshot)
+    claim = WaiverClaim(add_yahoo_id="30971", add_name="Baker Mayfield")
+
+    receipt = operator.apply(claim)
+
+    assert receipt.status == "pending"
+    assert client.stage_two_submits == 1
+    assert client.confirm_submits == 1
+
+
+def test_add_only_rejected_when_roster_full():
+    players = [
+        RosterPlayer(str(i), f"Player {i}", "KC", "RB", "BN" if i > 9 else "WR", "", "Sun")
+        for i in range(1, 16)
+    ]
+    full = TeamSnapshot("1329011", "2", "Shiba Innu", "0-0-0", 1, "Opponent", 4, tuple(players))
+    operator = YahooWaiverOperator(AddOnlyClient(), snapshot=lambda: full)
+
+    with pytest.raises(WaiverError, match="roster is full"):
+        operator.prepare(WaiverClaim(add_yahoo_id="30971", add_name="Baker Mayfield"))
+
+
+def test_add_only_rejects_confirmation_that_includes_a_drop():
+    client = DropLeakingAddOnlyClient()
+    operator = YahooWaiverOperator(client, snapshot=snapshot)
+
+    with pytest.raises(WaiverError, match="includes a drop"):
+        operator.apply(WaiverClaim(add_yahoo_id="30971", add_name="Baker Mayfield"))
