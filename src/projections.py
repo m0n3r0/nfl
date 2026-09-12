@@ -2,8 +2,11 @@
 
 Method (transparent and defensible, no black box):
 
-1. Baseline per-game fantasy points from 2022-2025 weekly history.
-   - Recent seasons weighted more heavily (1.0 / 1.5 / 2.0 / 2.5 for 2022..2025).
+1. Baseline per-game fantasy points from 2022-2026 weekly history (2026
+   in-season results included as they publish).
+   - Recent seasons weighted more heavily (1.0 / 1.5 / 2.0 / 2.5 / 3.0 for
+     2022..2026); the current season pulls hardest per game, so form changes
+     show up quickly without a small sample dominating (confidence blend, #2).
    - Per-game mean computed only over games the player actually appeared in.
 2. Regression to the mean: blend the player's baseline with the position's
    league mean using a "confidence" weight that grows with games played, so
@@ -31,8 +34,8 @@ import pandas as pd
 from .config import SCHEDULE_SEASON, STATS_SEASON, HISTORY_SEASONS, SKILL_POSITIONS
 from . import corpus as corpus_mod
 
-# Season weights (most recent gets the most say).
-_SEASON_WEIGHTS = {y: w for y, w in zip(HISTORY_SEASONS, [1.0, 1.5, 2.0, 2.5][-len(HISTORY_SEASONS):])}
+# Season weights (most recent gets the most say; current season highest).
+_SEASON_WEIGHTS = {y: w for y, w in zip(HISTORY_SEASONS, [1.0, 1.5, 2.0, 2.5, 3.0][-len(HISTORY_SEASONS):])}
 
 # Games played needed to be fully confident in a player's own baseline.
 _GAMES_FOR_CONFIDENCE = 20.0
@@ -142,7 +145,16 @@ def project_players(corpus: dict) -> pd.DataFrame:
     base["proj_ppg"] = base["role_ppg"] * (1 + base["team_sos"])
     # Scale totals by observed availability.  The floor keeps a small sample
     # from becoming a zero-season projection while still pricing in durability.
-    availability = (base["games"] / (17.0 * base["seasons_played"])).clip(upper=1.0)
+    # The current season is only partly played, so for players appearing in it
+    # the denominator counts the weeks elapsed (max week observed in that
+    # season's rows), not a full 17-game slate -- otherwise a single 2026
+    # appearance would price a durable starter below an inactive player.
+    elapsed = weekly.loc[weekly["season"] == STATS_SEASON, "week"].max()
+    current_weeks = min(int(elapsed), REGULAR_SEASON_GAMES) if pd.notna(elapsed) else REGULAR_SEASON_GAMES
+    in_current = base["last_season"] == STATS_SEASON
+    possible = (REGULAR_SEASON_GAMES * base["seasons_played"]
+                - in_current * (REGULAR_SEASON_GAMES - current_weeks))
+    availability = (base["games"] / possible).clip(upper=1.0)
     base["expected_games"] = REGULAR_SEASON_GAMES * (0.5 + 0.5 * availability)
     base["proj_total"] = (base["proj_ppg"] * base["expected_games"]).round(1)
     base["proj_ppg"] = base["proj_ppg"].round(2)

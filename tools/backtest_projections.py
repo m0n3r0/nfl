@@ -13,7 +13,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src import backtest, corpus
-from src.config import HISTORY_SEASONS, league_preset
+from src.config import HISTORY_SEASONS, STATS_SEASON, league_preset
 
 
 def _table(metrics):
@@ -26,7 +26,9 @@ def _table(metrics):
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--target-season", type=int, default=max(HISTORY_SEASONS))
+    # Default to the last completed season: STATS_SEASON is in progress, so a
+    # default run against it would backtest a 1-2-week sample.
+    parser.add_argument("--target-season", type=int, default=STATS_SEASON - 1)
     parser.add_argument("--write-doc", type=Path)
     args = parser.parse_args()
     target = args.target_season

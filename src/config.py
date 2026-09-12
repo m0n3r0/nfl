@@ -22,23 +22,26 @@ interception penalty. See league_preset().
 SEASONS
 -------
 SCHEDULE_SEASON is the season whose game schedule we pull (2026 by default).
-STATS_SEASON is the most recent season with published *player* stats. As of late
-August 2026 the 2026 regular season has not yet produced game stats, so the latest
-available player stat year is 2025. When nflverse publishes 2026 weekly stats, bump
-STATS_SEASON to 2026 and re-run ``python cli.py ingest --refresh``.
+STATS_SEASON is the most recent season with published *player* stats. The 2026
+regular season is underway, so 2026 weekly stats now publish every week and
+STATS_SEASON = 2026; re-run ``python cli.py ingest --refresh`` (or
+``corpus --refresh``) to pull the latest week.
 """
 
 # Season whose game schedule we use for the "current" year.
 SCHEDULE_SEASON = 2026
 
-# Most recent season with published player stats (2026 stats not out yet).
-STATS_SEASON = 2025
+# Most recent season with published player stats (2026 weekly stats now
+# publish in-season; pull them with ``cli.py ingest --refresh``).
+STATS_SEASON = 2026
 
 # Seasons of historical weekly player stats used to build 2026 projections.
-HISTORY_SEASONS = (2022, 2023, 2024, 2025)
+# The current season is included so in-season results pull the baseline
+# toward current form (weighted highest, see projections._SEASON_WEIGHTS).
+HISTORY_SEASONS = (2022, 2023, 2024, 2025, 2026)
 
 # Seasons of play-by-play data used for strategy / team-efficiency features.
-PBP_SEASONS = (2022, 2023, 2024, 2025)
+PBP_SEASONS = (2022, 2023, 2024, 2025, 2026)
 
 # Backwards-compatible alias used by ingest/ranking.
 DEFAULT_SEASON = STATS_SEASON

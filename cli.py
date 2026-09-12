@@ -2,7 +2,7 @@
 """Command-line interface for the fantasy football toolkit.
 
 The "current" season is driven by src/config.py: SCHEDULE_SEASON (2026) for the
-game schedule, STATS_SEASON (2025) for the most recent published player stats.
+game schedule, STATS_SEASON (2026) for the most recent published player stats.
 
 Examples
 --------

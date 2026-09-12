@@ -1,7 +1,7 @@
 """Assemble the 2026 fantasy projection corpus from raw nflverse tables.
 
 Combines:
-  * historical weekly player stats (2022-2025) -> per-player game-level fantasy points
+  * historical weekly player stats (2022-2026) -> per-player game-level fantasy points
   * the 2026 roster (players) and 2026 depth charts -> role / starter status
   * the 2026 schedule -> each team's opponents and a Strength-of-Schedule signal
   * derived team defense (points allowed) from the games table

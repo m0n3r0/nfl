@@ -168,7 +168,7 @@ _WARNED_MISSING_SEASONS: set[int] = set()
 def _load_pbp_or_empty(season: int) -> pd.DataFrame | None:
     """Load a season of play-by-play, or None if we know we do not have it.
 
-    Seasons outside PBP_SEASONS (e.g. 2026 before it kicks off) have no published
+    Seasons outside PBP_SEASONS (e.g. 2027 before it kicks off) have no published
     play-by-play, and nflverse answers with a 404. That is a legitimate "no data"
     state, not an error: a caller asking for as-of ratings in a season that has
     not started should get an empty result, not an unhandled HTTPError.
@@ -223,10 +223,10 @@ def team_ratings_asof(season: int, week: int, refresh: bool = False) -> pd.DataF
         # Preseason prior: the most recent STRICTLY-prior season.
         #
         # This used to be max([s for s in PBP_SEASONS if s < season] + [STATS_SEASON]).
-        # Because STATS_SEASON (2025) is the newest season in PBP_SEASONS, that
-        # max() returned 2025 for EVERY season <= 2025 -- so a 2022 week-1 game was
-        # rated on full-year 2025 efficiency. Concretely, the 2022_w1 and 2024_w1
-        # caches were byte-identical: the same 2025 data labelled two different
+        # Because STATS_SEASON (2026) is the newest season in PBP_SEASONS, that
+        # max() returned 2026 for EVERY season <= 2026 -- so a 2022 week-1 game was
+        # rated on full-year 2026 efficiency. Concretely, the 2022_w1 and 2024_w1
+        # caches were byte-identical: the same 2026 data labelled two different
         # seasons. That leaks up to four years of future results into BOTH the
         # train split (2022-23) and the test split (2024-25). See issue #17.
         prev = prior_season(season)
@@ -258,6 +258,11 @@ def build_model_frame(seasons, refresh: bool = False) -> pd.DataFrame:
     games = ingest.load("games")
     games = games[games["game_type"].isin(["REG", "POST"])]
     games = games[games["season"].isin(seasons)]
+    # Unplayed games (scores not published yet) carry NaN scores, and NaN > NaN
+    # is False -- left in, they would be labelled home losses below, and those
+    # with a published spread_line survive the dropna in model.build_frame.
+    # Drop them first, mirroring corpus.build_team_defense.
+    games = games.dropna(subset=["home_score", "away_score"])
     # Ties (home_score == away_score) are rare but well-formed, so dropna() won't
     # catch them -- left as-is they encode a tie as a home loss. Drop them instead
     # of mislabelling. See issue #28.

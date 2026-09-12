@@ -15,7 +15,7 @@ from . import corpus as corpus_mod
 
 
 def consistency(corpus: dict, preset: str = "ppr", min_games: int = 8) -> pd.DataFrame:
-    """Per-player weekly consistency metrics from 2022-2025 history.
+    """Per-player weekly consistency metrics from 2022-2026 history.
 
     Returns coefficient of variation (lower = steadier), boom rate (weeks at or
     above mean + 1 std) and bust rate (weeks at or below half the player's mean).

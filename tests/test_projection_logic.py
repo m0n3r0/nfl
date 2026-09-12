@@ -52,3 +52,45 @@ def test_first_round_starter_rookie_is_not_capped_below_mean(monkeypatch):
 
     assert rookie["is_rookie"]
     assert rookie["proj_ppg"] > rookie["pos_mean"]
+
+
+def test_season_weights_match_history_seasons():
+    assert projections._SEASON_WEIGHTS == {
+        2022: 1.0, 2023: 1.5, 2024: 2.0, 2025: 2.5, 2026: 3.0,
+    }
+    assert tuple(projections._SEASON_WEIGHTS) == tuple(projections.HISTORY_SEASONS)
+
+
+def test_current_season_availability_uses_elapsed_weeks(monkeypatch):
+    """One appearance in a part-played season must not dent expected games.
+
+    With 2026 only one week old, measuring a durable veteran's single 2026
+    game against a full 34-game slate (17 x 2 seasons) dropped expected_games
+    to 13.0, while a player with no 2026 rows at all kept 17.0 -- a ~30%
+    proj_total boost for being inactive. The current season's denominator is
+    the weeks elapsed (max week observed), not 17.
+    """
+    monkeypatch.setattr(projections, "STATS_SEASON", 2026)
+    weekly = pd.DataFrame(
+        [{"player_id": "a", "player_display_name": "Active", "position": "RB",
+          "recent_team": "NEW", "season": 2025, "week": w, "fantasy_points": 10.0}
+         for w in range(1, 18)]
+        + [{"player_id": "a", "player_display_name": "Active", "position": "RB",
+            "recent_team": "NEW", "season": 2026, "week": 1, "fantasy_points": 10.0}]
+        + [{"player_id": "b", "player_display_name": "Inactive", "position": "RB",
+            "recent_team": "NEW", "season": 2025, "week": w, "fantasy_points": 10.0}
+           for w in range(1, 18)]
+    )
+    corpus = {
+        "weekly_history": weekly,
+        "depth_roles": pd.DataFrame([
+            {"gsis_id": "a", "team": "NEW", "role_share": 0.60},
+            {"gsis_id": "b", "team": "NEW", "role_share": 0.60},
+        ]),
+        "schedule_2026": pd.DataFrame([{"team": "NEW", "opponent": "DEF"}]),
+        "team_defense": pd.DataFrame([{"team": "DEF", "def_sos_factor": 0.0}]),
+    }
+    result = projections.project_players(corpus).set_index("player_id")
+
+    assert result.loc["a", "expected_games"] == 17.0
+    assert result.loc["b", "expected_games"] == 17.0

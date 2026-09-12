@@ -6,7 +6,7 @@ re-downloading only when explicitly forced.
 
 Seasons (see src/config.py):
   * SCHEDULE_SEASON (2026) -- game schedule we pull.
-  * STATS_SEASON (2025)    -- most recent published player stats.
+  * STATS_SEASON (2026)    -- most recent published player stats.
   * HISTORY_SEASONS        -- weekly player stats used to build 2026 projections.
 """
 

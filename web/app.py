@@ -7,11 +7,11 @@ Server-rendered (Jinja) so it runs with no build step:
 
 Pages:
   /            dashboard (2026 projections + model card)
-  /players     searchable player list with 2022-2025 stats + 2026 projection
+  /players     searchable player list with 2022-2026 stats + 2026 projection
   /player/<id> single player detail (history + projection)
   /predictions 2026 win probabilities by week
   /sos        2026 strength-of-schedule ranking
-  /ratings     2025 team efficiency ratings (as-of season, per-play EPA etc.)
+  /ratings     2026 team efficiency ratings (as-of season, per-play EPA etc.)
   /strategy     game-strategy situation splits for a team (3rd down, red zone, pass/run)
 """
 
@@ -119,8 +119,8 @@ def sos():
 def ratings():
     season = request.args.get("season", default=STATS_SEASON, type=int)
     week = request.args.get("week", default=1, type=int)
-    # STATS_SEASON (2025) is already the last entry of PBP_SEASONS, so a plain
-    # concatenation put 2025 in the dropdown twice. Dedupe + sort.
+    # STATS_SEASON (2026) is already the last entry of PBP_SEASONS, so a plain
+    # concatenation put 2026 in the dropdown twice. Dedupe + sort.
     seasons = sorted(set(list(PBP_SEASONS) + [STATS_SEASON]))
     rt = features.team_ratings_asof(season, week, refresh=False)
     if rt is None or rt.empty:

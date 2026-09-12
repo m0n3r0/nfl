@@ -241,6 +241,7 @@ def predict_2026(week: int = None, auto_train: bool = True) -> pd.DataFrame:
 
     rows = []
     skipped_weeks = []
+    unrated_games = []
     # One ratings lookup per week, not per game (issue #24), and each week gets
     # its own as-of ratings rather than reusing week 1's for the whole season.
     for wk, group in sched.groupby("week"):
@@ -263,6 +264,7 @@ def predict_2026(week: int = None, auto_train: bool = True) -> pd.DataFrame:
                 g.get("away_rest", features.DEFAULT_REST),
             )
             if feats is None:
+                unrated_games.append(f"{at}@{ht}")
                 continue
 
             epa_diff = ((feats["home_off_epa_pp"] - feats["away_off_epa_pp"])
@@ -305,6 +307,15 @@ def predict_2026(week: int = None, auto_train: bool = True) -> pd.DataFrame:
             f"skipped {SCHEDULE_SEASON} week(s) {sorted(skipped_weeks)}: no in-season "
             f"play-by-play yet, so no as-of ratings. Showing the "
             f"{len({r['week'] for r in rows})} week(s) that are computable.",
+            stacklevel=2,
+        )
+    if unrated_games:
+        warnings.warn(
+            f"{len(unrated_games)} game(s) skipped ({', '.join(unrated_games[:6])}"
+            f"{'...' if len(unrated_games) > 6 else ''}): one or both teams have no "
+            f"in-season {SCHEDULE_SEASON} play-by-play yet. Only teams that have "
+            f"already played are rated; the week becomes computable once every "
+            f"team has played at least one game.",
             stacklevel=2,
         )
 
