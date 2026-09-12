@@ -319,3 +319,27 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
   draft-only tests, skills/fantasy-draft + skills/edge-cdp, src/draft_board.py
   and cli.py original-board/draft-class. All recoverable from git history
   (pre-cleanup commit cd16d8c).
+
+## In-season epic #80 COMPLETE (2026-09-12)
+- All issues closed: #81/#82 (PR #90), #83 (PR #91), #84 (PR #92), #85 (PR #93),
+  #86 (PR #94), #87 (PR #95), #88 (PR #97), #80 (PR #99). Main at 7c3a502.
+- Review path: CodeRabbit rate-limits (~1 review/hour, OSS manual trigger), so
+  independent k3 reviewer subagents gated PRs #91-#95 (user-approved flow);
+  CodeRabbit gated #97 and #99. Notable catches: stale injury statuses carried
+  forever (recency-bound now: latest 2 report weeks, blank = cleared); unplayed
+  2026 games mislabeled as home losses in the training frame; recommender's bye
+  handling was dead code pre-#92 (tool now derives on_bye from the schedule);
+  --apply refuses on Yahoo week mismatch.
+- tools/team_operator.py is THE entry point (read-only default; --apply submits
+  lineup moves only; waivers never auto-submitted). Audit logs/team-operator.jsonl;
+  flock logs/team-operator.lock (exit 3 = already_running); exit 2 = not ok.
+- CRON INSTALLED (JST): 08:24/20:24 daily monitor; Mon 01:23 (= Sun ~12:23 ET)
+  --apply lineup set; Wed 20:11 waiver scan + data refresh. Log:
+  logs/team-operator-cron.log. Manage via `crontab -l/-e`.
+- Open follow-ups: #89 (user-side: rotate Yahoo league invite), #96 (deferred
+  transaction scope: IR moves, claim cancel/edit, multi-claim ordering), #98
+  (pre-existing negative/zero proj_week values).
+- Session persistence SOLVED: --use-mock-keychain (CfT is ad-hoc signed; without
+  it cookies are memory-only). Profile backup: tools/profile_backup.py ->
+  ~/edge-profile-backups/; launchd com.fdnation.browser re-runs preflight at
+  login. Browser on 9222 must NEVER be killed (user rule).
