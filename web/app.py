@@ -7,16 +7,24 @@ Server-rendered (Jinja) so it runs with no build step:
 
 Pages:
   /            dashboard (2026 projections + model card)
+  /team        my FD nation team (latest operator report: matchup, lineup, flags)
+  /league      league standings + matchup (how the other teams are doing)
+  /cron        operator/cron status (run history + schedule)
   /players     searchable player list with 2022-2026 stats + 2026 projection
   /player/<id> single player detail (history + projection)
   /predictions 2026 win probabilities by week
   /sos        2026 strength-of-schedule ranking
   /ratings     2026 team efficiency ratings (as-of season, per-play EPA etc.)
   /strategy     game-strategy situation splits for a team (3rd down, red zone, pass/run)
+
+The fantasy pages read LOCAL artifacts only (logs/team-operator.jsonl and
+logs/league-report.json, written by the cron operators). The web process never
+touches Yahoo live — live reads belong to the gentle, WAF-aware cron jobs.
 """
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -30,6 +38,58 @@ from src import corpus, projections, analysis, model, ingest, features  # noqa: 
 from src.config import SCHEDULE_SEASON, STATS_SEASON, PBP_SEASONS, league_preset  # noqa: E402
 
 app = Flask(__name__, template_folder=str(Path(__file__).parent / "templates"))
+
+OPERATOR_AUDIT = ROOT / "logs" / "team-operator.jsonl"
+LEAGUE_REPORT = ROOT / "logs" / "league-report.json"
+
+# The host crontab (docs/TEAM_OPERATOR.md is the authoritative runbook).
+CRON_SCHEDULE = [
+    ("24 8,20 * * *", "twice daily 08:24 / 20:24", "team_operator.py — monitor + report"),
+    ("47 23 * * 0", "Sun 23:47", "team_operator.py --apply — lineup safety net"),
+    ("23 1 * * 1", "Mon 01:23", "team_operator.py --apply — final pre-kickoff set"),
+    ("11 20 * * 3", "Wed 20:11", "team_operator.py --waiver-scan --refresh-data"),
+    ("19 21 * * *", "nightly 21:19", "league_report.py --out — league snapshot"),
+    ("37 9 * * 0", "Sun 09:37", "profile_backup.py — browser-profile backup"),
+]
+
+
+def _read_operator_runs(limit: int = 30, path: Path | None = None) -> list[dict]:
+    """Parse the operator audit log, newest first; non-dict/broken lines skipped."""
+    path = path or OPERATOR_AUDIT
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return []
+    runs = []
+    for line in reversed(lines):
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(record, dict):
+            continue
+        proposal = record.get("proposal")
+        if isinstance(proposal, dict):
+            # Normalize at the artifact boundary so templates never see a
+            # non-list moves/plan (a corrupted record must not 500 the page).
+            if not isinstance(proposal.get("moves"), list):
+                proposal["moves"] = []
+            if not isinstance(proposal.get("plan"), (list, type(None))):
+                proposal["plan"] = None
+        runs.append(record)
+        if len(runs) >= limit:
+            break
+    return runs
+
+
+def _read_league_report(path: Path | None = None) -> dict | None:
+    """Return the latest persisted league snapshot, or None when absent/invalid."""
+    path = path or LEAGUE_REPORT
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return report if isinstance(report, dict) else None
 
 
 def _get_corpus(preset=None):
@@ -56,6 +116,35 @@ def dashboard():
             "cv_folds": cv["folds"],
         },
     )
+
+
+@app.route("/team")
+def my_team():
+    """My FD nation team, from the newest operator audit record."""
+    runs = _read_operator_runs(limit=200)  # deep window: the ok-fallback spans outages
+    latest = runs[0] if runs else None
+    latest_ok = next((r for r in runs if r.get("status") == "ok"), None)
+    return render_template("team.html", latest=latest, report=latest_ok)
+
+
+@app.route("/league")
+def league():
+    """League standings + current matchup (how the other teams are doing)."""
+    report = _read_league_report()
+    standings = report.get("standings") if report else None
+    if not isinstance(standings, list):
+        standings = None
+    matchup = report.get("matchup") if report else None
+    my_name = matchup.get("team") if isinstance(matchup, dict) else None
+    return render_template("league.html", report=report, standings=standings,
+                           my_name=my_name)
+
+
+@app.route("/cron")
+def cron_status():
+    """Operator run history + the cron schedule that produces it."""
+    return render_template("cron.html", runs=_read_operator_runs(limit=14),
+                           schedule=CRON_SCHEDULE)
 
 
 @app.route("/players")

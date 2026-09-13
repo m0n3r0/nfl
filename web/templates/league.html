@@ -1,0 +1,52 @@
+{% extends "layout.html" %}
+{% block title %}League — NFL Toolkit{% endblock %}
+{% block body %}
+<h1>League — FD nation</h1>
+
+{% if not report %}
+<div class="notice">No league snapshot yet. The nightly cron
+(<code>league_report.py --out logs/league-report.json</code>) writes it; live
+reads stay with the WAF-aware cron jobs, never with this web process.</div>
+{% else %}
+
+{% if report.status == "waf_blocked" %}
+<div class="notice">This snapshot file reports a WAF-throttled capture; its
+data may be incomplete. Live reads retry on the next cron run.</div>
+{% endif %}
+
+{% if report.captured_at %}
+<p class="muted">Snapshot from {{ report.captured_at }} (UTC)</p>
+{% endif %}
+
+{% if standings %}
+<div class="card">
+  <h2>Standings</h2>
+  <table>
+    <tr><th>#</th><th>Team</th><th>Record</th><th>PF</th><th>PA</th><th>Waiver</th></tr>
+    {% for row in standings %}
+    <tr{% if row.team == my_name %} style="background:#1d2b3a"{% endif %}>
+      <td>{{ row.rank }}</td>
+      <td>{% if row.team == my_name %}<b>{{ row.team }}</b>{% else %}{{ row.team }}{% endif %}</td>
+      <td>{{ row.record }}</td><td>{{ row.points_for }}</td>
+      <td>{{ row.points_against }}</td><td>{{ row.waiver }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+{% if report.matchup is mapping %}
+<div class="card">
+  <h2>My matchup — week {{ report.matchup.week }}</h2>
+  <table>
+    <tr><th></th><th>Score</th><th>Projected</th></tr>
+    <tr><td><b>{{ report.matchup.team }}</b></td>
+        <td>{{ report.matchup.score }}</td><td>{{ report.matchup.team_proj }}</td></tr>
+    <tr><td>{{ report.matchup.opponent }}</td>
+        <td>{{ report.matchup.opponent_score }}</td><td>{{ report.matchup.opponent_proj }}</td></tr>
+  </table>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

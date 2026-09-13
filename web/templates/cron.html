@@ -1,0 +1,42 @@
+{% extends "layout.html" %}
+{% block title %}Cron Status — NFL Toolkit{% endblock %}
+{% block body %}
+<h1>Cron / operator status</h1>
+
+<div class="card">
+  <h2>Schedule (JST, host crontab)</h2>
+  <table>
+    <tr><th>Entry</th><th>Fires</th><th>What it does</th></tr>
+    {% for entry, fires, what in schedule %}
+    <tr><td><code>{{ entry }}</code></td><td>{{ fires }}</td><td>{{ what }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="card">
+  <h2>Recent operator runs (newest first)</h2>
+  {% if not runs %}
+  <p class="muted">No runs recorded yet in <code>logs/team-operator.jsonl</code>.</p>
+  {% else %}
+  <table>
+    <tr><th>Time (UTC)</th><th>Status</th><th>Wk</th><th>Record</th><th>Moves</th><th>Applied</th><th>Error</th></tr>
+    {% for r in runs %}
+    <tr>
+      <td>{{ r.time }}</td>
+      <td><span class="pill">{{ r.status }}</span></td>
+      <td>{{ r.week }}</td>
+      <td>{{ r.record }}</td>
+      <td>{{ (r.proposal.moves | length) if r.proposal else "" }}</td>
+      <td>{{ "yes" if r.applied else "" }}</td>
+      <td class="muted">{{ r.error or "" }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+  <p class="muted">Statuses: ok = healthy · waf_blocked = Yahoo throttling (backs off
+  on its own) · preflight_failed = browser/session problem · already_running = skipped
+  (lock held) · lineup_halted = apply stopped fail-closed · week_mismatch = --apply
+  refused (week disagreement) · error = run crashed (see the Error column). Full detail:
+  <code>logs/team-operator.jsonl</code> and <code>logs/team-operator-cron.log</code>.</p>
+</div>
+{% endblock %}

@@ -195,16 +195,24 @@ rush EPA/play, success rate, and pass/shotgun tendency.
 
 ## Web UI
 
-A local Flask app (no build step) shows player stats, team ratings, and predictions:
+A local Flask app (no build step, loopback-only) shows your fantasy team, league
+standings, cron status, player stats, team ratings, and predictions:
 
 ```bash
 python cli.py web            # http://127.0.0.1:5000
 # or: python web/app.py
 ```
 
-Pages: dashboard (projections + model card), players (search + per-player
-history/projection), win predictions by week, team **ratings**, game **strategy**
-breakdowns, and SOS ranking. API: `/api/modelcard`, `/api/predictions`.
+Pages: **my team** (latest operator report: matchup, lineup plan, monitor
+flags), **league** (standings + matchup from the nightly league snapshot),
+**cron** (operator run history + schedule), dashboard (projections + model
+card), players (search + per-player history/projection), win predictions by
+week, team **ratings**, game **strategy** breakdowns, and SOS ranking. API:
+`/api/modelcard`, `/api/predictions`.
+
+The fantasy pages read only local artifacts (`logs/team-operator.jsonl`,
+`logs/league-report.json`) written by the cron operators — the web process
+never touches Yahoo live.
 
 ## Scoring
 

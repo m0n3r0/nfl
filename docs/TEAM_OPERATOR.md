@@ -243,6 +243,7 @@ Suggested crontab (times are JST, the host's local zone). Replace
 47 23 * * 0    cd /path/to/nfl && .venv/bin/python tools/team_operator.py --apply >> logs/team-operator-cron.log 2>&1
 23 1 * * 1     cd /path/to/nfl && .venv/bin/python tools/team_operator.py --apply >> logs/team-operator-cron.log 2>&1
 11 20 * * 3    cd /path/to/nfl && .venv/bin/python tools/team_operator.py --waiver-scan --refresh-data >> logs/team-operator-cron.log 2>&1
+19 21 * * *    cd /path/to/nfl && .venv/bin/python tools/league_report.py --out logs/league-report.json >> logs/league-report-cron.log 2>&1
 37 9 * * 0     cd /path/to/nfl && .venv/bin/python tools/profile_backup.py >> logs/profile-backup-cron.log 2>&1
 ```
 
@@ -257,6 +258,9 @@ Suggested crontab (times are JST, the host's local zone). Replace
   overnight waiver run, plus a data refresh for the new week's projections.
   If it still holds the flock at 20:24 the daily run simply skips — the
   waiver run already produces the full report.
+- nightly 21:19: league snapshot (standings + matchup) persisted to
+  `logs/league-report.json` — the local web UI's `/league` page reads this
+  file; the web process itself never touches Yahoo.
 - Sunday 09:37: weekly profile backup (local-only file copy — no Yahoo
   requests), keeping rung 2 of the recovery ladder fresh as cookies rotate.
 

@@ -1,0 +1,82 @@
+{% extends "layout.html" %}
+{% block title %}My Team — NFL Toolkit{% endblock %}
+{% block body %}
+<h1>My Team{% if report and report.matchup %} — {{ report.matchup.team }}{% endif %}</h1>
+
+{% if not report and not latest %}
+<div class="notice">No operator report yet. The cron operator writes
+<code>logs/team-operator.jsonl</code> twice daily; this page renders its
+latest record.</div>
+{% elif not report and latest %}
+<div class="notice">Operator runs exist but none is healthy yet — newest run:
+<b>{{ latest.status }}</b> ({{ latest.time }}). This page shows the most
+recent healthy report once one lands.</div>
+{% else %}
+
+{% if latest and latest.status != "ok" %}
+<div class="notice">Latest operator run: <b>{{ latest.status }}</b>
+({{ latest.time }}). Showing the most recent healthy report from
+{{ report.time }}.</div>
+{% else %}
+<p class="muted">Operator report from {{ report.time }} (UTC) — status
+<span class="pill">{{ report.status }}</span></p>
+{% endif %}
+
+<div class="card">
+  <b>Week {{ report.week }}</b> &nbsp;·&nbsp;
+  Record <b>{{ report.record }}</b> &nbsp;·&nbsp;
+  Waiver priority <b>#{{ report.waiver_priority }}</b>
+</div>
+
+{% if report.matchup %}
+<div class="card">
+  <h2>Matchup — week {{ report.matchup.week }}</h2>
+  <table>
+    <tr><th></th><th>Score</th><th>Projected</th></tr>
+    <tr><td><b>{{ report.matchup.team }}</b></td>
+        <td>{{ report.matchup.score }}</td><td>{{ report.matchup.team_proj }}</td></tr>
+    <tr><td>{{ report.matchup.opponent }}</td>
+        <td>{{ report.matchup.opponent_score }}</td><td>{{ report.matchup.opponent_proj }}</td></tr>
+  </table>
+</div>
+{% endif %}
+
+{% if report.proposal and report.proposal.plan %}
+<div class="card">
+  <h2>Lineup plan ({{ report.proposal.moves | length }} move(s) recommended)</h2>
+  <table>
+    <tr><th>Slot</th><th>Player</th><th>Pos</th><th>Proj (wk)</th><th>Note</th></tr>
+    {% for p in report.proposal.plan %}
+    <tr>
+      <td>{{ p.current_slot }}{% if p.proposed_slot != p.current_slot %} → {{ p.proposed_slot }}{% endif %}</td>
+      <td>{{ p.name }}</td><td>{{ p.position }}</td><td>{{ p.proj_week }}</td>
+      <td class="muted">{{ p.note }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+{% if report.applied %}
+<div class="card"><h2>Applied</h2>
+<p class="muted">Lineup moves submitted by the operator:</p>
+<pre>{{ report.applied | tojson(indent=1) }}</pre></div>
+{% endif %}
+
+{% if report.monitor %}
+<div class="card">
+  <h2>Monitor</h2>
+  <p>
+    Needs attention: <b>{{ "yes" if report.monitor.needs_attention else "no" }}</b>
+    {% if report.monitor.locked_starters %} · locked:
+      {{ report.monitor.locked_starters | join(", ") }}{% endif %}
+    {% if report.monitor.injury_tags %} · injuries:
+      {{ report.monitor.injury_tags | join(", ") }}{% endif %}
+    {% if report.monitor.bye_players %} · bye:
+      {{ report.monitor.bye_players | join(", ") }}{% endif %}
+  </p>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}
