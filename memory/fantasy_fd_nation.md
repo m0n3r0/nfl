@@ -456,3 +456,20 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
   then Prediction engines (Dashboard / Players / Win Predictions / Ratings /
   Strategy / SOS). Groups are unbreakable spans (narrow windows never split a
   label from its links). Test pins labels + order. Suite: 206 fast + 18 web.
+
+## League team detail pages #125 (2026-09-14, PR #126)
+- /league names are links to /league/team/<name>: standing + derived stats,
+  season trajectory (from the new nightly audit history), matchup card +
+  15-man roster for the current opponent, honest 404 for unknown teams.
+- Nightly cron now: league_report.py --opponent-roster --out logs/league-report.json
+  --audit logs/league-report.jsonl (21:19). The .jsonl accumulates the season.
+- Hard lessons pinned by tests: bonus roster read degrades on LeagueReadError
+  but RE-RAISES LeagueWafBlocked (subclass!) so a mid-roster block keeps the
+  full waf_blocked contract; standings parser strips comma thousands (PF >
+  1,000 would have killed the snapshot mid-season); detail page coerces
+  numerics at the boundary (junk types → 0.0, never 500).
+- Yahoo WAF is NOT Cloudflare: edge answers "server: ATS" (Yahoo's own Apache
+  Traffic Server); blocks are volume-based (Request denied / 999), clearing
+  after 15-30 min quiet. OAuth/API path rejected by user (app approval takes
+  weeks) — CDP+JS in the real browser stays the method.
+- Suite: 220 fast tests.
