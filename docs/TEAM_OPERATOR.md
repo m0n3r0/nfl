@@ -109,10 +109,12 @@ python tools/yahoo_waiver.py \
 The default stops on Yahoo's final confirmation and returns the browser to the
 team page. `--apply` creates the claim. Both paths verify the drop player against
 the authoritative roster, verify Yahoo's exact add/drop IDs at selection and
-confirmation, and never retry a POST. Applied claims succeed only when the same
-add/drop names appear together in Yahoo's waiver-transactions view. Repeating a
-pending claim returns `already_pending` without submission. Every run appends a
-redacted intent/result record to `logs/yahoo-waiver-audit.jsonl`.
+confirmation, and never retry a POST. Applied claims succeed two ways: waiver
+claims return `pending` when the add/drop names appear together in Yahoo's
+waiver-transactions view, while immediate free-agent adds never create one and
+return `completed` after an exact-ID roster read-back (add present, drop gone).
+Repeating a pending claim returns `already_pending` without submission. Every
+run appends a redacted intent/result record to `logs/yahoo-waiver-audit.jsonl`.
 
 The operator does not decide whether a claim is strategically worthwhile. Run
 the identity map first and reject candidates whose model mapping is not
@@ -120,12 +122,13 @@ actionable.
 
 ## Remaining transaction scope
 
-Immediate free-agent adds use the same Yahoo add/drop form and exact-ID
-preconditions, but have an immediate roster read-back rather than a pending
-claim. Trade execution is intentionally not generalized before a real offer
-exists: proposal shape, roster constraints, and the authoritative confirmation
-page must be captured from that offer instead of guessed in advance. Read-only
-recommendations and mutations remain separate.
+Immediate free-agent adds share the Yahoo add/drop form, exact-ID
+preconditions, and the `--apply` flow above; they are confirmed by roster
+read-back (`completed`) rather than a pending claim (#105). Trade execution is
+intentionally not generalized before a real offer exists: proposal shape,
+roster constraints, and the authoritative confirmation page must be captured
+from that offer instead of guessed in advance. Read-only recommendations and
+mutations remain separate.
 
 ## Yahoo/model identity map
 

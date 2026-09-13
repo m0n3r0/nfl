@@ -1,4 +1,9 @@
-"""Exact-ID Yahoo waiver claims with confirmation and pending-state read-back."""
+"""Exact-ID Yahoo waiver claims with confirmation and pending-state read-back.
+
+Applied claims verify two ways, because Yahoo reports them differently:
+waiver claims create a pending transaction; immediate free-agent adds never
+do, so they are confirmed by an exact-ID roster read-back instead (#105).
+"""
 
 from __future__ import annotations
 
@@ -83,6 +88,21 @@ class YahooWaiverOperator:
             add in str(row).casefold() and (not drop or drop in str(row).casefold())
             for row in rows
         )
+
+    def _on_roster(self, claim: WaiverClaim) -> bool:
+        """Immediate-add verification: exact-ID roster read-back.
+
+        Free-agent adds execute instantly and never create a pending waiver
+        transaction, so the only authoritative signal is the roster itself:
+        the add player present with the exact identity, the drop player gone.
+        """
+        roster = {player.yahoo_id: player for player in self._team().roster}
+        added = roster.get(claim.add_yahoo_id)
+        if added is None or added.name != claim.add_name:
+            return False
+        if claim.drop_yahoo_id and claim.drop_yahoo_id in roster:
+            return False
+        return True
 
     def _stage(self) -> Any:
         return self.client.evaluate(
@@ -188,8 +208,15 @@ class YahooWaiverOperator:
             time.sleep(0.1)
         else:
             raise WaiverError("waiver POST response did not finish")
-        if not self._pending(claim):
+        if self._pending(claim):
             self._restore_team()
-            raise WaiverError("submitted waiver claim is absent from authoritative pending transactions")
+            return WaiverReceipt("pending", claim)
+        # The roster read-back only works on the team page, and _pending leaves
+        # the tab on transactions — restore first or the snapshot read raises.
+        # One fresh read is enough: the POST completed at the marker check, and
+        # extra Yahoo page loads are expensive (WAF), so no poll loop.
         self._restore_team()
-        return WaiverReceipt("pending", claim)
+        if self._on_roster(claim):
+            return WaiverReceipt("completed", claim)
+        raise WaiverError("submitted claim is absent from authoritative pending "
+                          "transactions and the roster read-back does not confirm it")
