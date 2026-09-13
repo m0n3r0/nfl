@@ -233,8 +233,10 @@ def backup_profile(profile: str = DEFAULT_PROFILE, backup_root: str = BACKUP_ROO
     With stop_browser=True the operator browser is terminated first (consistent
     SQLite snapshot) and relaunched afterwards. With the default live copy the
     SQLite files may lag the running browser slightly; the session cookies
-    Chrome has flushed still restore fine. Backups decrypt only on the machine
-    and user account that created them (macOS Keychain holds the Chrome key).
+    Chrome has flushed still restore fine. Like the profile itself, the backup
+    is encrypted with Chrome's built-in mock key (--use-mock-keychain), so
+    anyone with read access to it can decrypt the cookies — keep the backup
+    directory as private as the profile.
     """
     src = Path(profile)
     if not src.is_dir():

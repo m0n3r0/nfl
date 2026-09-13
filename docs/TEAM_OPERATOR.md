@@ -21,9 +21,12 @@ persistent install under `~/Applications` — downloading Chrome for Testing
 there when nothing exists), opens the team page in a **new** tab when none is
 present (it never navigates a tab it didn't create), and checks the session
 with the same credentialed fetch `tools/check_login.py` uses. When only the
-auth check is red, a human (or `tools/login_yahoo.py`) must re-login; preflight
-reports it and exits 2. Re-login paths: `python tools/login_yahoo.py` (drives
-the login via CDP; stops with `CAPTCHA_BLOCKED` if a captcha appears), or one
+auth check is red, the session needs re-login (preflight reports it and exits
+2). Re-login paths, in order: open login.yahoo.com in the operator browser and
+click "Sign in with Google" — the persisted Google session normally
+auto-approves with no password (see the recovery ladder under "Profile backup
+and session persistence"); `python tools/login_yahoo.py` for a native Yahoo
+login via CDP (stops with `CAPTCHA_BLOCKED` if a captcha appears); or one
 manual headful login via Screen Sharing when captcha/2FA blocks automation.
 
 Exit codes at a glance:
@@ -74,10 +77,52 @@ python tools/profile_backup.py --stop-browser     # consistent snapshot + auto r
 python tools/profile_backup.py --restore          # restore the profile from backup
 ```
 
-Backups restore and decrypt only on the machine/user that created them. When
-the profile dir is missing, `ensure_browser` restores the backup automatically
-before launching, so a wiped profile (or a fresh machine image with the
-backup synced over) comes back logged in without human involvement.
+Like the profile, a backup is encrypted with Chrome's built-in mock key, so
+keep `~/edge-profile-backups` as private as the profile. When the profile dir
+is missing, `ensure_browser` restores the backup automatically before
+launching. The restore only brings back the cookies the backup held — it does
+not verify them — so a wiped profile (or a fresh machine image with the backup
+synced over) comes back logged in exactly when those cookies are still valid.
+`python tools/verify_relaunch.py --from-backup` proves that without touching
+anything live.
+
+### What actually keeps the session alive (verified 2026-09-13)
+
+The login is cookie-based, not password-based — no password is stored in the
+profile's main `Login Data` store. The cookies that matter, all persistent:
+
+- Yahoo auth `A1`/`A3` — expire 2027-09 (~1 year out);
+- fantasy app `SPT` (rolling, ~weekly refresh) and `SPTB` (~monthly);
+- Google account SID/`__Secure-1PSID` set — expire 2027-10 (~13 months out).
+  This is the identity behind "Sign in with Google".
+
+Session cookies die early only on a server-side revoke (password change,
+explicit logout, security challenge) — a plain browser relaunch never clears
+them. **Verified by drill**: a fresh headless Chrome launched against a *copy*
+of the profile fetched the protected team page as signed-in (HTTP 200 +
+manager name), no login prompt.
+
+Recovery ladder, best case to worst:
+
+1. Profile intact → relaunch with the same `--user-data-dir` +
+   `--use-mock-keychain` (preflight/`ensure_browser` do this) → logged in.
+2. Profile lost → backup auto-restores (above) → logged in.
+3. Yahoo cookies revoked but Google session alive → open login.yahoo.com and
+   click "Sign in with Google": the Google session auto-approves, no password.
+4. Both dead → one manual Google login, then re-run `tools/profile_backup.py`.
+
+Run the drill anytime to prove rungs 1-2 still hold (uses a throwaway copy on
+a spare port; the live browser is never touched):
+
+```bash
+python tools/verify_relaunch.py                  # drill the live profile copy
+python tools/verify_relaunch.py --from-backup    # drill the latest backup
+```
+
+Exit 0 = a relaunch comes back logged in; exit 1 = session dead (positive
+evidence — do rung 3 or 4, then re-backup); exit 2 = inconclusive — Yahoo WAF
+throttling (back off ~15-30 minutes and retry) or a drill infrastructure
+problem (the JSON `status` says which: `inconclusive` vs `error` + `detail`).
 
 ## Read-only snapshot
 
