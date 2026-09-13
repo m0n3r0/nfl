@@ -210,13 +210,15 @@ cd /Users/user/nfl
 .venv/bin/python tools/team_operator.py
 ```
 
-### The three cron entries (all times JST, all call `tools/team_operator.py`)
+### The cron entries (all times JST)
 
 | Schedule (JST) | What it does |
 | --- | --- |
 | `24 8,20 * * *` (twice daily) | Monitor: re-check team state, flag anything needing a human |
+| `47 23 * * 0` (Sun 23:47 = Sun ~10:47 ET) | Lineup safety net: `--apply` in case the 01:23 fire sleeps through |
 | `23 1 * * 1` (Mon 01:23 = Sun ~12:23 ET) | Set the week's lineup: `--apply` |
 | `11 20 * * 3` (Wed 20:11) | Waiver scan with fresh data: `--waiver-scan --refresh-data` |
+| `37 9 * * 0` (Sun 09:37) | Weekly browser-profile backup (`tools/profile_backup.py`, local-only) |
 
 ### The tools you'll touch by hand
 

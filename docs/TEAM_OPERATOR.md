@@ -239,17 +239,26 @@ Suggested crontab (times are JST, the host's local zone). Replace
 (`tools/install_launchd.py`) renders repo paths the same way:
 
 ```cron
-24 8,20 * * *   cd /path/to/nfl && .venv/bin/python tools/team_operator.py >> logs/team-operator-cron.log 2>&1
-23 1 * * 1      cd /path/to/nfl && .venv/bin/python tools/team_operator.py --apply >> logs/team-operator-cron.log 2>&1
-11 20 * * 3     cd /path/to/nfl && .venv/bin/python tools/team_operator.py --waiver-scan --refresh-data >> logs/team-operator-cron.log 2>&1
+24 8,20 * * *  cd /path/to/nfl && .venv/bin/python tools/team_operator.py >> logs/team-operator-cron.log 2>&1
+47 23 * * 0    cd /path/to/nfl && .venv/bin/python tools/team_operator.py --apply >> logs/team-operator-cron.log 2>&1
+23 1 * * 1     cd /path/to/nfl && .venv/bin/python tools/team_operator.py --apply >> logs/team-operator-cron.log 2>&1
+11 20 * * 3    cd /path/to/nfl && .venv/bin/python tools/team_operator.py --waiver-scan --refresh-data >> logs/team-operator-cron.log 2>&1
+37 9 * * 0     cd /path/to/nfl && .venv/bin/python tools/profile_backup.py >> logs/profile-backup-cron.log 2>&1
 ```
 
 - twice daily (08:24 / 20:24): monitor + report; catches injury/lineup news.
-- Monday 01:23 (= Sunday ~12:23 ET): final lineup set with `--apply`, before
-  the Sunday 1pm ET kickoff window. During EST the same fire lands an hour
-  earlier ET, still ahead of kickoff.
+- Sunday 23:47 (= Sunday ~10:47 ET): `--apply` safety net — cron has no
+  catch-up when the Mac sleeps, and the 01:23 fire below lands when the host
+  is likely asleep. The apply is idempotent, so running it twice is harmless.
+- Monday 01:23 (= Sunday ~12:23 ET): final lineup set with `--apply`, after
+  the inactives lists and before the Sunday 1pm ET kickoff window. During EST
+  the same fire lands an hour earlier ET, still ahead of kickoff.
 - Wednesday 20:11 (= Wednesday ~07:11 ET): waiver scan after Yahoo's
   overnight waiver run, plus a data refresh for the new week's projections.
+  If it still holds the flock at 20:24 the daily run simply skips — the
+  waiver run already produces the full report.
+- Sunday 09:37: weekly profile backup (local-only file copy — no Yahoo
+  requests), keeping rung 2 of the recovery ladder fresh as cookies rotate.
 
 ## Manual team analyzer
 
