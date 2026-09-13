@@ -47,6 +47,16 @@ def test_preflight_unhealthy_fails_closed(operator, monkeypatch):
     assert report["status"] == "preflight_failed"
 
 
+def test_preflight_waf_block_reports_distinctly(operator, monkeypatch):
+    monkeypatch.setattr(operator.preflight_mod, "preflight",
+                        lambda endpoint: {"cdp": True, "team_tab": True,
+                                          "auth": False, "waf_blocked": True})
+
+    report = operator.run(_args())
+
+    assert report["status"] == "waf_blocked"
+
+
 def test_lock_contention_audits_and_exits_3(operator):
     import fcntl
     with open(operator.LOCK_PATH, "w") as held:
@@ -96,3 +106,103 @@ def test_apply_with_wrong_week_is_refused(operator, monkeypatch):
     assert report["status"] == "week_mismatch"
     assert report["yahoo_week"] == 1
     assert report["requested_week"] == 2
+
+
+def _stub_run_pipeline(operator, monkeypatch, fake_client):
+    """Stub everything run() touches except the restore navigation under test."""
+    import contextlib
+    import types
+
+    monkeypatch.setattr(operator.preflight_mod, "preflight",
+                        lambda endpoint: {"cdp": True, "team_tab": True, "auth": True})
+    monkeypatch.setattr(operator, "find_team_target", lambda endpoint: object())
+
+    @contextlib.contextmanager
+    def ctx(target, endpoint, timeout):
+        yield fake_client
+    monkeypatch.setattr(operator, "CdpClient", ctx)
+    monkeypatch.setattr(operator, "YahooTeamReader", lambda client: types.SimpleNamespace(
+        snapshot=lambda: types.SimpleNamespace(week=1, record="0-0-0",
+                                               waiver_priority=4, roster=())))
+    monkeypatch.setattr(operator.corpus_mod, "build", lambda preset: {"schedule_2026": None})
+    monkeypatch.setattr(operator.sched, "locked_teams", lambda schedule, week: ())
+    monkeypatch.setattr(operator, "projections",
+                        types.SimpleNamespace(project_for_week=lambda corp, week: None))
+    monkeypatch.setattr(operator, "apply_schedule_locks", lambda snap, locked: (snap, ()))
+    monkeypatch.setattr(operator, "propose_lineup",
+                        lambda snap, proj, week: types.SimpleNamespace(
+                            moves=(), as_dict=lambda: {}))
+    monkeypatch.setattr(operator, "monitor_report", lambda snap, proj, week: {})
+
+
+def test_restore_failure_does_not_mask_matchup_error(operator, monkeypatch, capsys):
+    from yahoo.cdp import CdpError
+
+    class RestoreBoom:
+        def navigate(self, url, expected, timeout=25):
+            raise CdpError("restore boom")
+
+    _stub_run_pipeline(operator, monkeypatch, RestoreBoom())
+
+    def matchup_boom(client):
+        raise RuntimeError("matchup parse exploded")
+    monkeypatch.setattr(operator, "matchup", matchup_boom)
+
+    report = operator.run(_args())
+
+    assert report["status"] == "ok"
+    assert "matchup parse exploded" in report["matchup_error"]
+    assert "tab restore failed: restore boom" in capsys.readouterr().err
+
+
+def test_wire_waf_block_aborts_run_distinctly(operator, monkeypatch):
+    from yahoo.cdp import CdpError
+    from yahoo.wire import WireScanBlocked
+
+    class RestoreBoom:
+        def __init__(self):
+            self.calls = 0
+
+        def navigate(self, url, expected, timeout=25):
+            self.calls += 1
+            raise CdpError("restore boom")
+
+    client = RestoreBoom()
+    _stub_run_pipeline(operator, monkeypatch, client)
+    monkeypatch.setattr(operator, "matchup",
+                        lambda client: __import__("types").SimpleNamespace(as_dict=lambda: {}))
+
+    def scan_boom(client, week):
+        raise WireScanBlocked("denied mid-scan")
+    monkeypatch.setattr(operator, "scan_available", scan_boom)
+
+    report = operator.run(_args(waiver_scan=True))
+
+    assert report["status"] == "waf_blocked"  # distinct from a crash
+    assert "denied mid-scan" in report["wire_error"]
+    assert client.calls == 1  # only the matchup-block restore; scan restore skipped
+
+
+def test_matchup_waf_block_aborts_run_distinctly(operator, monkeypatch):
+    from yahoo.league import LeagueWafBlocked
+
+    class RecordingClient:
+        def __init__(self):
+            self.urls = []
+
+        def navigate(self, url, expected, timeout=25):
+            self.urls.append(url)
+            return url
+
+    client = RecordingClient()
+    _stub_run_pipeline(operator, monkeypatch, client)
+
+    def matchup_blocked(client):
+        raise LeagueWafBlocked("denied")
+    monkeypatch.setattr(operator, "matchup", matchup_blocked)
+
+    report = operator.run(_args())
+
+    assert report["status"] == "waf_blocked"
+    assert "matchup_error" not in report
+    assert client.urls == []  # restore skipped: no extra request into the block

@@ -6,6 +6,7 @@ import pytest
 
 from yahoo.league import (
     LeagueReadError,
+    LeagueWafBlocked,
     MatchupScore,
     StandingsRow,
     matchup,
@@ -16,8 +17,9 @@ from yahoo.league import (
 
 
 class Client:
-    def __init__(self, payloads):
+    def __init__(self, payloads, denied=False):
         self.payloads = payloads
+        self.denied = denied
         self.navigated = []
 
     def navigate(self, url, expected, timeout=20):
@@ -26,6 +28,8 @@ class Client:
         return url
 
     def evaluate(self, expression):
+        if "yahoo-waf-denied" in expression:
+            return self.denied
         for marker, payload in self.payloads.items():
             if marker in expression:
                 return payload
@@ -113,6 +117,18 @@ def test_opponent_team_id_excludes_authorized_team():
     ambiguous = Client({"yahoo-league-opponent-id": ["2", "7", "9"]})
     with pytest.raises(LeagueReadError, match="could not isolate"):
         opponent_team_id(ambiguous)
+
+
+def test_league_reads_fail_fast_on_waf_denial_page():
+    # Empty payload maps: the denial check must fire before any payload read.
+    with pytest.raises(LeagueWafBlocked, match="Request denied"):
+        standings(Client({}, denied=True))
+    with pytest.raises(LeagueWafBlocked, match="Request denied"):
+        matchup(Client({}, denied=True))
+    with pytest.raises(LeagueWafBlocked, match="Request denied"):
+        opponent_roster(Client({}, denied=True), "7")
+    with pytest.raises(LeagueWafBlocked, match="Request denied"):
+        opponent_team_id(Client({}, denied=True))
 
 
 def test_wire_rank_targets_orders_and_skips():

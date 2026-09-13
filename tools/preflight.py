@@ -3,7 +3,9 @@
 
 Heals what it can — launches the browser when CDP is down, navigates a tab to
 the authorized FD nation team page when none is there — then verifies the
-Yahoo session. Exits 0 only when the whole chain is green.
+Yahoo session. Exits 0 only when the whole chain is green, 3 when Yahoo's WAF
+is serving 'Request denied' (the session is fine; back off, do NOT re-login),
+and 2 for any other failure.
 """
 
 from __future__ import annotations
@@ -25,11 +27,22 @@ from yahoo.team import is_team_target, is_team_url  # noqa: E402
 AUTH_PROBE = r"""(function(){
   return fetch('/f1/1329011/team/002', {credentials: 'same-origin'})
     .then(function(r){ return r.text().then(function(html){
-      return {status: r.status, doge: /Doge/i.test(html)}; }); })
-    .catch(function(e){ return {status: 0, doge: false, error: String(e)}; });
+      return {status: r.status, doge: /Doge/i.test(html), denied: /Request denied/i.test(html)}; }); })
+    .catch(function(e){ return {status: 0, doge: false, denied: false, error: String(e)}; });
 })()"""
 
 READY_PROBE = "({url: location.href, ready: document.readyState})"
+
+
+def _probe_flags(probe: dict | None) -> dict:
+    """Interpret the auth probe. A WAF block (denial body or Yahoo's 999) is a
+    throttle, not a logout — report it apart so nobody re-logins pointlessly.
+    Denial wins over doge on purpose: a false block costs a skipped run, a
+    false pass hammers a throttled session — fail closed."""
+    probe = probe or {}
+    denied = bool(probe.get("denied")) or probe.get("status") == 999
+    return {"waf_blocked": denied,
+            "auth": bool(not denied and probe.get("status") == 200 and probe.get("doge"))}
 
 
 def _wait_ready(client: CdpClient, timeout: float = 15) -> bool:
@@ -89,7 +102,7 @@ def preflight(endpoint: str = DEFAULT_ENDPOINT, url: str = DEFAULT_URL) -> dict:
             return report
         probe = client.evaluate(AUTH_PROBE, timeout=20)
     report["team_tab"] = True
-    report["auth"] = bool(probe and probe.get("status") == 200 and probe.get("doge"))
+    report.update(_probe_flags(probe))
     report["auth_probe"] = probe
     return report
 
@@ -105,6 +118,8 @@ def main() -> int:
         print(json.dumps({"cdp": False, "error": str(exc)}, indent=2, sort_keys=True))
         return 2
     print(json.dumps(report, indent=2, sort_keys=True))
+    if report.get("waf_blocked"):
+        return 3
     return 0 if report.get("cdp") and report.get("team_tab") and report.get("auth") else 2
 
 

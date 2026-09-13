@@ -15,6 +15,7 @@ import pandas as pd
 from .identity import YahooPlayerIdentity, reconcile_identities
 from .players import AvailablePlayer, PlayerReadError, YahooPlayerReader
 from .team import LEAGUE_ID
+from .waf import denied as _waf_denied
 
 BASE = "https://football.fantasysports.yahoo.com"
 PLAYERS_PATH = f"/f1/{LEAGUE_ID}/players"
@@ -32,8 +33,7 @@ class WireScanBlocked(PlayerReadError):
 
 def _denied(client: WireClient) -> bool:
     try:
-        return bool(client.evaluate(
-            "!!document.body && /Request denied/i.test(document.body.innerText)"))
+        return _waf_denied(client)
     except Exception:
         return False
 

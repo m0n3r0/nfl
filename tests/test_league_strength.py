@@ -212,6 +212,19 @@ def test_render_report_notes_missing_teams():
     assert "1 team roster(s) unreadable" in text and "ids: 7" in text
 
 
+def test_render_report_light_mode_skips_league_sections():
+    report = {
+        "date": "2026-09-13", "week": 1, "mode": "light", "matchup": None,
+        "season_strength": None, "position_ranks": [], "alerts": [],
+        "recommendations": [{"kind": "lineup", "priority": 1, "text": "x"}],
+    }
+    text = ls.render_report(report)
+    assert "MODE: light" in text
+    assert "LEAGUE STRENGTH" not in text
+    assert "Position ranks" not in text
+    assert "RECOMMENDATIONS" in text
+
+
 def test_position_ranks_share_tied_values():
     league = {
         "1": [{"name": "Qb A", "position": "QB", "value": 300.0}],

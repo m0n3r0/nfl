@@ -235,6 +235,9 @@ def render_report(analysis: dict[str, Any]) -> str:
     """Plain-text rendering of the analyzer output for the terminal."""
     lines = [f"FD nation team analysis — {analysis['date']} (week {analysis['week']})",
              "=" * 60]
+    if analysis.get("mode") == "light":
+        lines.append("MODE: light — league-wide sections skipped (run without "
+                     "--light for strength ranks and waiver advice)")
     matchup = analysis.get("matchup")
     if matchup:
         lines.append(f"MATCHUP: vs {matchup['opponent']} — "
@@ -244,19 +247,22 @@ def render_report(analysis: dict[str, Any]) -> str:
     if missing:
         lines.append(f"NOTE: {len(missing)} team roster(s) unreadable this run "
                      f"(ids: {', '.join(missing)}); ranks cover the rest")
-    strength = analysis["season_strength"]
-    lines.append(f"LEAGUE STRENGTH (season, optimal lineup): "
-                 f"{strength['rank']}/{strength['of']} "
-                 f"({strength['score']} pts; leader {strength['leader']}, "
-                 f"playoff line ~{strength['playoff_line']})")
-    lines.append("Position ranks vs league (best rostered):")
-    for row in analysis["position_ranks"]:
-        if row["rank"] is None:
-            lines.append(f"  {row['position']:>3}  n/a")
-        else:
-            flag = "  <-- weakest" if row["rank"] >= 7 else ""
-            lines.append(f"  {row['position']:>3}  {row['rank']}/{row['of']}  "
-                         f"{row['my_player']} ({row['my_value']}){flag}")
+    strength = analysis.get("season_strength")
+    if strength:
+        lines.append(f"LEAGUE STRENGTH (season, optimal lineup): "
+                     f"{strength['rank']}/{strength['of']} "
+                     f"({strength['score']} pts; leader {strength['leader']}, "
+                     f"playoff line ~{strength['playoff_line']})")
+    rank_rows = analysis.get("position_ranks") or []
+    if rank_rows:
+        lines.append("Position ranks vs league (best rostered):")
+        for row in rank_rows:
+            if row["rank"] is None:
+                lines.append(f"  {row['position']:>3}  n/a")
+            else:
+                flag = "  <-- weakest" if row["rank"] >= 7 else ""
+                lines.append(f"  {row['position']:>3}  {row['rank']}/{row['of']}  "
+                             f"{row['my_player']} ({row['my_value']}){flag}")
     alerts = analysis.get("alerts") or []
     if alerts:
         lines.append("ALERTS:")

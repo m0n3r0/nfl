@@ -26,11 +26,11 @@ from src import corpus as corpus_mod, ingest, projections, schedule as sched  # 
 from src.config import league_preset  # noqa: E402
 from yahoo.browser import BrowserError  # noqa: E402
 from yahoo.cdp import CdpClient, CdpError  # noqa: E402
-from yahoo.league import matchup  # noqa: E402
+from yahoo.league import LeagueWafBlocked, matchup  # noqa: E402
 from yahoo.lineup import LineupError, YahooLineupOperator  # noqa: E402
 from yahoo.recommend import apply_schedule_locks, monitor_report, propose_lineup  # noqa: E402
 from yahoo.team import TEAM_PATH, YahooTeamReader, find_team_target  # noqa: E402
-from yahoo.wire import rank_targets, scan_available  # noqa: E402
+from yahoo.wire import WireScanBlocked, rank_targets, scan_available  # noqa: E402
 
 import preflight as preflight_mod  # noqa: E402  # tools/preflight.py
 
@@ -53,6 +53,9 @@ def run(args) -> dict:
         report.update({"status": "preflight_failed", "error": str(exc)})
         return report
     report["preflight"] = health
+    if health.get("waf_blocked"):
+        report["status"] = "waf_blocked"
+        return report
     if not (health.get("cdp") and health.get("team_tab") and health.get("auth")):
         report["status"] = "preflight_failed"
         return report
@@ -82,23 +85,46 @@ def run(args) -> dict:
             "monitor": monitor_report(snapshot, proj, week),
             "proposal": proposal.as_dict(),
         })
+        blocked = False
         try:
             report["matchup"] = matchup(client).as_dict()
+        except LeagueWafBlocked:
+            blocked = True
         except Exception as exc:  # decorative context; never abort the run
             report["matchup_error"] = str(exc)
         finally:
-            client.navigate(f"{BASE}{TEAM_PATH}",
-                            lambda url: url.rstrip("/").endswith(TEAM_PATH), 25)
+            # After a WAF block even one navigation can extend the throttle;
+            # the tab is restored by the next green run instead.
+            if not blocked:
+                try:  # best-effort restore; never mask an earlier failure
+                    client.navigate(f"{BASE}{TEAM_PATH}",
+                                    lambda url: url.rstrip("/").endswith(TEAM_PATH), 25)
+                except CdpError as exc:
+                    print(f"warning: tab restore failed: {exc}", file=sys.stderr)
+        if blocked:
+            report["status"] = "waf_blocked"  # abort: never continue into a block
+            return report
 
         if args.waiver_scan:
+            scan_blocked = False
             try:
                 available = scan_available(client, week)
                 targets, skipped = rank_targets(available, proj)
                 report["wire"] = {"scanned": len(available), "skipped": skipped,
                                   "targets": targets[: args.top]}
+            except WireScanBlocked as exc:
+                scan_blocked = True
+                report["wire_error"] = str(exc)
             finally:
-                client.navigate(f"{BASE}{TEAM_PATH}",
-                                lambda url: url.rstrip("/").endswith(TEAM_PATH), 25)
+                if not scan_blocked:  # see above: no requests into a WAF block
+                    try:  # best-effort restore; never mask an earlier failure
+                        client.navigate(f"{BASE}{TEAM_PATH}",
+                                        lambda url: url.rstrip("/").endswith(TEAM_PATH), 25)
+                    except CdpError as exc:
+                        print(f"warning: tab restore failed: {exc}", file=sys.stderr)
+            if scan_blocked:
+                report["status"] = "waf_blocked"  # distinct from a crash
+                return report
 
         if args.apply and proposal.moves:
             try:

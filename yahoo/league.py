@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 
 from .cdp import CdpError
 from .team import LEAGUE_ID, TEAM_ID
+from .waf import denied as _waf_denied
 
 BASE = "https://football.fantasysports.yahoo.com"
 LEAGUE_HOME = f"/f1/{LEAGUE_ID}"
@@ -23,6 +24,21 @@ MATCHUP_PATH = f"/f1/{LEAGUE_ID}/matchup"
 
 class LeagueReadError(CdpError):
     """A league page failed identity or parse validation."""
+
+
+class LeagueWafBlocked(LeagueReadError):
+    """Yahoo is serving its 'Request denied' WAF page; abort the run fast."""
+
+
+def _fail_if_denied(client: "LeagueClient") -> None:
+    """A WAF page parses as misleading empty payloads — name the true cause.
+    A probe hiccup is not a block: proceed and let the parse validate."""
+    try:
+        blocked = _waf_denied(client)
+    except Exception:
+        blocked = False
+    if blocked:
+        raise LeagueWafBlocked("Yahoo served 'Request denied'; aborting the read")
 
 
 class LeagueClient(Protocol):
@@ -93,6 +109,7 @@ def standings(client: LeagueClient, timeout: float = 30) -> tuple[StandingsRow, 
     """Read the league standings table from the league home page."""
     client.navigate(f"{BASE}{LEAGUE_HOME}", lambda url: url.rstrip("/").endswith(LEAGUE_HOME), timeout)
     time.sleep(2)
+    _fail_if_denied(client)
     payload = client.evaluate(
         r'''/* yahoo-league-standings */ (() => {
           const table = [...document.querySelectorAll('table')].find(t => {
@@ -120,6 +137,7 @@ def matchup(client: LeagueClient, timeout: float = 30) -> MatchupScore:
     """
     client.navigate(f"{BASE}{MATCHUP_PATH}", lambda url: urlparse(url).path == MATCHUP_PATH, timeout)
     time.sleep(2)
+    _fail_if_denied(client)
     payload = client.evaluate(
         r'''/* yahoo-league-matchup */ (() => {
           const body = document.body?.innerText || '';
@@ -159,6 +177,7 @@ def opponent_roster(client: LeagueClient, team_id: str, timeout: float = 30) -> 
     path = f"/f1/{LEAGUE_ID}/{team_id}"
     client.navigate(f"{BASE}{path}", lambda url: urlparse(url).path.rstrip("/") == path, timeout)
     time.sleep(2)
+    _fail_if_denied(client)
     payload = client.evaluate(
         r'''/* yahoo-league-opponent-roster */ (() => {
           const rows = [...document.querySelectorAll('tr')].filter(r => r.querySelector('.ysf-player-name')).map(row => {
@@ -190,6 +209,7 @@ def opponent_team_id(client: LeagueClient, timeout: float = 30) -> str:
     """Return the current matchup opponent's Yahoo team id (from matchup page links)."""
     client.navigate(f"{BASE}{MATCHUP_PATH}", lambda url: urlparse(url).path == MATCHUP_PATH, timeout)
     time.sleep(2)
+    _fail_if_denied(client)
     payload = client.evaluate(
         r'''/* yahoo-league-opponent-id */ (() => {
           const ids = [...document.querySelectorAll('a[href]')]

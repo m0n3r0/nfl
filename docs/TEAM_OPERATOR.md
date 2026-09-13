@@ -22,7 +22,18 @@ there when nothing exists), opens the team page in a **new** tab when none is
 present (it never navigates a tab it didn't create), and checks the session
 with the same credentialed fetch `tools/check_login.py` uses. When only the
 auth check is red, a human (or `tools/login_yahoo.py`) must re-login; preflight
-reports it and exits 2.
+reports it and exits 2. A Yahoo WAF 'Request denied' block (denial body or
+status 999) is reported as `waf_blocked` with exit 3 — that is throttling, not
+a logout: the session is fine, so back off for ~15-30 minutes and do NOT
+re-login. The team operator and analyzer surface the same condition as
+`"status": "waf_blocked"` and abort the run instead of multiplying requests
+into the block; all league reads fail fast on the denial signature for the
+same reason, and a blocked run even skips its tab-restore navigation (any
+request can extend the throttle; the next green run restores the tab). Note the exit-code asymmetry: preflight exits 3 for a WAF block,
+but the operator/analyzer exit 2 for any non-ok status (3 is the operator's
+lock-contention code) — read the JSON `status` field to tell `waf_blocked`
+apart from other failures. `tools/league_report.py` shares the same contract
+(exit 2 + `{"status": "waf_blocked"}` + skipped restore on a blocked run).
 
 A launchd agent re-runs this preflight at every login so the browser survives
 reboots (`/tmp` clears). The plist is a template; the installer renders the
@@ -187,7 +198,13 @@ doing" on demand (read-only, ~2 min with the wire scan):
 python tools/team_analyzer.py            # human-readable report
 python tools/team_analyzer.py --json     # machine-readable
 python tools/team_analyzer.py --no-wire  # skip the wire scan (fast)
+python tools/team_analyzer.py --light    # gentle: my roster + standings +
+                                         # matchup only; league-wide sections skipped
 ```
+
+Light mode is the WAF-friendly routine check (~5 reads instead of 120+): no
+opponent roster pulls and no wire scan, so strength ranks, position ranks,
+and waiver/standing recommendations are omitted for that run.
 
 It pulls every league roster live, maps them to the model's projections, and
 reports: matchup status, optimal-lineup strength rank across the league,
