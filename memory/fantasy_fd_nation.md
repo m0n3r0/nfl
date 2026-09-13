@@ -524,3 +524,20 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
   league tab to /f1/1329011/2 — find_team_target fails otherwise, and the
   404 /f1/1329011/scoreboard route does not exist (scoreboard lives on
   league home).
+
+## 2026-09-14 — #131 self-healing team-tab anchor (PR #132)
+
+- find_team_target() no longer hard-fails on a drifted league tab: exact
+  match returns as before (2+ exact matches stay fatal); no exact match but
+  ≥1 tab on the fantasy host → first tab navigated back to /f1/1329011/2
+  (one page load, stderr note), re-selected fresh, returned; no fantasy tab
+  → original "found 0" (sports.yahoo.com articles never hijacked; stays the
+  session-liveness signal). All 7 tools heal automatically.
+- Contract now: heal at start (find_team_target) + restore at end
+  (league_report finally). Cron runs are drift-proof.
+- Live drill: tab moved to league home → league_report --light logged the
+  recovery, exit 0, tab restored. Suite: 249 fast tests.
+- CodeRabbit rate-limited → k3 gated alone again (APPROVE; log-ordering nit
+  applied). k3 side notes (accepted, not bugs): navigate() doesn't tolerate
+  transient evaluate errors mid-commit (pre-existing, shared with restore);
+  first-candidate could sacrifice a half-filled human form (user-sanctioned).
