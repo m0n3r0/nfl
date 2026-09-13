@@ -353,3 +353,26 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
 - TX 1 (2026-09-13): ADDED Baker Mayfield (FA, no priority spent), DROPPED
   Brian Robinson (was team_mismatch dead spot). #101 closed. Waiver tool's
   false HALT on immediate FA adds filed as #105.
+
+## Analyzer blind-spot fixes + Tate ruling (2026-09-13, evening)
+- CARNELL TATE = HOLD. The analyzer flagged him "dead spot (matched)" but he is
+  a 2026 ROOKIE (NFL draft 1st round pick 4, TEN), a STARTING WR on every
+  depth-chart update since Aug 29, not injured. The flag was a model blind
+  spot, not worthlessness. Do NOT drop him on the tool's say-so; re-evaluate
+  after 2-3 weeks of real 2026 stats land in the corpus.
+- #108 (PR #109): matched-but-unprojected players now get map_status
+  no_projection; excluded from auto drop nominations; hygiene rec reads
+  "model blind spot … verify manually; not an auto-drop".
+- #110 (PR #111): ROOT CAUSE fixed — rookie injection omitted seasons_played,
+  so proj_total was NaN for ALL 76 rookies (Tate had ppg 5.42 but no season
+  total). Now every rookie gets a conservative half-season total (Tate 46.1,
+  rank ~182). Consequence: the 5/10 season-strength read was UNDERSTATED
+  (rookies counted as zero on every roster) — re-run team_analyzer.py after
+  the Wed data refresh for the truer rank.
+- #105 (PR #113): immediate FA adds now verify by exact-ID roster read-back
+  (receipt "completed") instead of demanding a pending claim. k3 review caught
+  a real blocker (read-back on wrong page → TeamReadError); fixed + pinned.
+- #112 (PR #114): groupby player_id-only (nflverse position relabels duped 4
+  DL); nightly test_projections_sane green again.
+- Review flow note: CodeRabbit OSS quota = 1 review/hour on this repo; k3
+  independent reviewer subagent is the approved fallback (user rule).
