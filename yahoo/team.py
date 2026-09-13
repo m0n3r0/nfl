@@ -8,17 +8,19 @@ before returning a snapshot.
 from __future__ import annotations
 
 import re
+import sys
 from collections import Counter
 from dataclasses import asdict, dataclass
 from typing import Any, Protocol
 from urllib.parse import urlparse
 
-from .cdp import CdpError, Target, select_target
+from .cdp import CdpClient, CdpError, Target, list_targets, select_target
 
 LEAGUE_ID = "1329011"
 TEAM_ID = "2"
 TEAM_PATH = f"/f1/{LEAGUE_ID}/{TEAM_ID}"
 YAHOO_FANTASY_HOST = "football.fantasysports.yahoo.com"
+TEAM_URL = f"https://{YAHOO_FANTASY_HOST}{TEAM_PATH}"
 EXPECTED_ACTIVE_SLOTS = Counter({"QB": 1, "RB": 2, "WR": 2, "TE": 1, "W/R/T": 1, "K": 1, "DEF": 1, "BN": 6})
 INJURED_RESERVE_SLOTS = {"IR", "IL"}
 
@@ -81,12 +83,40 @@ def is_team_target(target: Target) -> bool:
     return is_team_url(target.url)
 
 
+def _is_fantasy_host(target: Target) -> bool:
+    """Return whether a target sits anywhere on the Yahoo fantasy host."""
+    parsed = urlparse(target.url)
+    return parsed.scheme == "https" and parsed.hostname == YAHOO_FANTASY_HOST
+
+
 def find_team_target(endpoint: str = "http://127.0.0.1:9222") -> Target:
-    """Return exactly one browser tab on the authorized team route."""
-    return select_target(
-        is_team_target,
-        endpoint,
-    )
+    """Return the league tab on the authorized team route, healing drift.
+
+    Exactly one tab already on the team route returns unchanged — and two
+    exact matches still fail closed, the anchor itself is never ambiguous.
+    When no tab is on the route but at least one page target sits on the
+    fantasy host, the FIRST such tab is navigated back (one page load —
+    cheaper than a dead cron run) and returned. With no fantasy-host tab at
+    all the original error stands: a sports.yahoo.com article is never a
+    candidate, and the failure is the session-liveness signal.
+    """
+    try:
+        return select_target(is_team_target, endpoint)
+    except CdpError as exc:
+        if "found 0" not in str(exc):
+            raise  # 2+ exact matches: ambiguity on the anchor stays fatal
+        anchor_error = exc
+    candidates = [t for t in list_targets(endpoint)
+                  if t.type == "page" and _is_fantasy_host(t)]
+    if not candidates:
+        raise anchor_error
+    target = candidates[0]
+    with CdpClient(target, endpoint, timeout=25) as client:
+        client.navigate(TEAM_URL, is_team_url, 25)
+    recovered = select_target(is_team_target, endpoint)  # fresh target, exact route
+    print(f"note: league tab drifted to {target.url}; navigated the first "
+          f"fantasy tab back to {TEAM_PATH}", file=sys.stderr)
+    return recovered
 
 
 def _parse_payload(payload: Any) -> TeamSnapshot:

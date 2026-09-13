@@ -142,6 +142,17 @@ The reader fails closed unless all of these hold:
 - the lineup contains the configured nine starters and six bench slots;
 - record, current matchup, and waiver priority parse successfully.
 
+The tab does not have to *start* on that route. `find_team_target()` (the
+entry point of every Yahoo tool) heals drift: when no tab is on the team
+route but at least one tab sits anywhere on `football.fantasysports.yahoo.com`,
+it navigates the first such tab back to `/f1/1329011/2` (one page load) and
+carries on. It still fails closed when no fantasy-host tab exists (a
+`sports.yahoo.com` article is never hijacked — that failure is the
+session-liveness signal) and when two tabs sit on the exact team route
+(anchor ambiguity stays fatal). After any run, `league_report.py` still
+restores the tab in a `finally`, so start-heal + end-restore keep every cron
+run deterministic.
+
 ## Lineup changes
 
 Lineup requests name every player by Yahoo ID and include the expected current
