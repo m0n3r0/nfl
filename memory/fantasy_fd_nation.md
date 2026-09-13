@@ -434,3 +434,19 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
 - Wednesday 20:11 waiver-scan vs 20:24 daily: LOCK_NB skip is harmless
   (waiver run produces the full report). Cron logs grow ~KB/day; fine.
 - Docs synced: TEAM_OPERATOR crontab block + GAME_PLAN Part 9 table (5 entries).
+
+## Web UI team pages #121 (2026-09-13/14, PR #122)
+- Local web UI (127.0.0.1:5000) gained /team (latest operator report:
+  matchup, lineup plan, monitor flags, applied moves), /league (standings +
+  matchup from logs/league-report.json, my row highlighted), /cron (run
+  history + schedule). Nav gained My Team / League / Cron.
+- Architecture rule: the web process reads LOCAL artifacts only
+  (logs/team-operator.jsonl, logs/league-report.json); live Yahoo reads stay
+  with the WAF-aware cron jobs. New cron entry: 19 21 * * * league_report.py
+  --out logs/league-report.json (nightly 21:19).
+- league_report --out: atomic (mkstemp + replace), captured_at stamp on the
+  file copy only; waf_blocked never overwrites the last good snapshot;
+  persist OSError never loses the printed report.
+- Loaders normalize/tolerate: non-dict lines, bad UTF-8, null moves/plan,
+  non-dict matchup/standings — corrupted artifacts render honest pages,
+  never 500. Suite: 206 fast tests.
