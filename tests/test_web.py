@@ -132,6 +132,20 @@ def test_nav_contains_fantasy_links(client, tmp_path, monkeypatch):
         assert href in html
 
 
+def test_nav_groups_yahoo_pages_apart_from_prediction_pages(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(webapp, "OPERATOR_AUDIT", tmp_path / "missing.jsonl")
+    html = client.get("/team").get_data(as_text=True)
+    assert "FD nation" in html and "Prediction engines" in html
+    # Yahoo group comes first, led by its label; prediction links live after
+    # the second label.
+    assert html.index("FD nation") < html.index('href="/team"')
+    assert html.index('href="/team"') < html.index("Prediction engines")
+    assert html.index('href="/league"') < html.index("Prediction engines")
+    assert html.index('href="/cron"') < html.index("Prediction engines")
+    assert html.index('href="/players"') > html.index("Prediction engines")
+    assert html.index('href="/predictions"') > html.index("Prediction engines")
+
+
 def test_read_operator_runs_skips_bad_lines(tmp_path):
     audit = tmp_path / "audit.jsonl"
     audit.write_text('{"status": "ok", "time": "t1"}\nnot-json\n{"status": "ok", "time": "t2"}\n',

@@ -6,9 +6,12 @@
 <title>{% block title %}NFL Toolkit{% endblock %}</title>
 <style>
   body { font-family: -apple-system, system-ui, sans-serif; margin: 0; background: #0f1419; color: #e6e6e6; }
-  header { background: #16202c; padding: 14px 24px; border-bottom: 1px solid #243240; position: sticky; top: 0; z-index: 10; }
+  header { background: #16202c; padding: 14px 24px; border-bottom: 1px solid #243240; position: sticky; top: 0; z-index: 10; display: flex; align-items: center; flex-wrap: wrap; row-gap: 6px; }
   header a { color: #7fb3ff; text-decoration: none; margin-right: 18px; font-weight: 600; }
   header a:hover { color: #bcd6ff; }
+  .nav-label { color: #7a8a99; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; margin-right: 12px; }
+  .nav-group { display: inline-flex; align-items: center; flex-wrap: wrap; }
+  .nav-sep { border-left: 1px solid #243240; height: 18px; margin-right: 18px; }
   .wrap { max-width: 1120px; margin: 24px auto; padding: 0 16px; }
   h1 { font-size: 22px; } h2 { font-size: 16px; color: #9fd0ff; margin-top: 26px; }
   table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 10px; }
@@ -28,15 +31,22 @@
 </head>
 <body>
 <header>
-  <a href="/">Dashboard</a>
-  <a href="/team">My Team</a>
-  <a href="/league">League</a>
-  <a href="/players">Players</a>
-  <a href="/predictions">Win Predictions</a>
-  <a href="/ratings">Ratings</a>
-  <a href="/strategy?team=BUF">Strategy</a>
-  <a href="/sos">SOS</a>
-  <a href="/cron">Cron</a>
+  <span class="nav-group">
+    <span class="nav-label">FD nation</span>
+    <a href="/team">My Team</a>
+    <a href="/league">League</a>
+    <a href="/cron">Cron</a>
+  </span>
+  <span class="nav-sep"></span>
+  <span class="nav-group">
+    <span class="nav-label">Prediction engines</span>
+    <a href="/">Dashboard</a>
+    <a href="/players">Players</a>
+    <a href="/predictions">Win Predictions</a>
+    <a href="/ratings">Ratings</a>
+    <a href="/strategy?team=BUF">Strategy</a>
+    <a href="/sos">SOS</a>
+  </span>
 </header>
 <div class="wrap">
 {% block body %}{% endblock %}
