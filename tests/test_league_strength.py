@@ -23,6 +23,7 @@ def _frame():
         ("w3", "Wr Three", "WR", "MIA", 180.0, 10.0),
         ("t1", "Te One", "TE", "KC", 160.0, 8.0),
         ("k1", "K One", "K", "KC", 0.0, 0.0),
+        ("n1", "Rookie One", "WR", "TEN", None, None),  # identified, but model has no number
     ]
     return pd.DataFrame(rows, columns=["player_id", "player_display_name",
                                        "position", "last_team", "proj_total", "proj_week"])
@@ -36,12 +37,14 @@ def _roster(*specs):
 def test_evaluate_roster_marks_values_and_statuses():
     roster = _roster(("Qb One", "KC", "QB", "QB"),
                      ("Qb One", "MIA", "QB", "BN"),       # team mismatch
-                     ("Ghost Player", "KC", "QB", "BN"))  # unmapped
+                     ("Ghost Player", "KC", "QB", "BN"),  # unmapped
+                     ("Rookie One", "TEN", "WR", "BN"))   # matched, but no projection
     evaluated = ls.evaluate_roster(roster, _frame(), "proj_total", 1000)
 
     assert evaluated[0]["value"] == 250.0 and evaluated[0]["map_status"] == "matched"
     assert evaluated[1]["value"] is None and evaluated[1]["map_status"] == "team_mismatch"
     assert evaluated[2]["value"] is None and evaluated[2]["map_status"] == "unmapped"
+    assert evaluated[3]["value"] is None and evaluated[3]["map_status"] == "no_projection"
 
 
 def test_optimal_lineup_picks_best_surplus_for_flex():
@@ -220,3 +223,44 @@ def test_position_ranks_share_tied_values():
 
     assert ranks["1"]["rank"] == 1 and ranks["2"]["rank"] == 1
     assert ranks["3"]["rank"] == 3  # two players strictly above, not second
+
+
+def test_drop_candidates_exclude_model_blind_spots():
+    players = [
+        {"name": "rookie", "position": "WR", "value": None,
+         "map_status": "no_projection", "slot": "BN"},
+        {"name": "bench zero", "position": "RB", "value": 0.0,
+         "map_status": "matched", "slot": "BN"},
+        {"name": "ghost", "position": "RB", "value": None,
+         "map_status": "unmapped", "slot": "BN"},
+    ]
+    drops = ls.drop_candidates(players)
+    assert [d["name"] for d in drops] == ["bench zero", "ghost"]
+
+
+def test_blind_spot_hygiene_rec_is_not_drop_advice():
+    my_eval = [{"name": "C Tate", "position": "WR", "value": None,
+                "map_status": "no_projection", "slot": "BN"}]
+    recs = ls.recommendations(
+        my_eval=my_eval, week_eval=None, lineup_moves=(), wire_targets=[],
+        ranks=[], concentration={}, season_strength=(5, 10, 1430.0))
+
+    hygiene = [r for r in recs if r["kind"] == "hygiene"]
+    assert len(hygiene) == 1
+    assert "model blind spot" in hygiene[0]["text"]
+    assert "not an auto-drop" in hygiene[0]["text"]
+    assert "convert this slot" not in hygiene[0]["text"]
+
+
+def test_waiver_rec_falls_back_when_only_blind_spot_drops():
+    my_eval = [{"name": "C Tate", "position": "WR", "value": None,
+                "map_status": "no_projection", "slot": "BN"}]
+    week_eval = [{"name": "Purdy", "position": "QB", "value": 17.0, "slot": "QB"}]
+    wire = [{"name": "Mayfield", "position": "QB", "proj_week": 21.0}]
+    recs = ls.recommendations(
+        my_eval=my_eval, week_eval=week_eval, lineup_moves=(), wire_targets=wire,
+        ranks=[], concentration={}, season_strength=(5, 10, 1430.0))
+
+    waiver = next(r for r in recs if r["kind"] == "waiver")
+    assert "no obvious drop candidate" in waiver["text"]
+    assert "drop C Tate" not in waiver["text"]

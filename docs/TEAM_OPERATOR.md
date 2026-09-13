@@ -190,7 +190,9 @@ It pulls every league roster live, maps them to the model's projections, and
 reports: matchup status, optimal-lineup strength rank across the league,
 per-position ranks vs league (best rostered), alerts (locks, injuries, unevaluated
 players, bye-week concentration), and a ranked recommendation list (lineup,
-weak slots, waiver upgrades with drop candidates, dead spots, bye planning).
+weak slots, waiver upgrades with drop candidates, dead spots, model blind
+spots — players the model cannot price, flagged "verify manually", never
+auto-drop — bye planning).
 The pure analysis lives in `yahoo/league_strength.py` and is hermetically
 tested; the tool is the browser glue.
 

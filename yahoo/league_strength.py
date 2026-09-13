@@ -29,7 +29,9 @@ def evaluate_roster(roster: list[dict], frame: pd.DataFrame, value_col: str,
     """Attach model values to one roster.
 
     Every player gets `value` (float or None when the model cannot evaluate
-    him) and `map_status` (actionable, team_mismatch, unmapped, ambiguous).
+    him) and `map_status` (matched, no_projection, team_mismatch, unmapped,
+    ambiguous). `no_projection` means he was identified in the dataset but
+    the model produced no number — typical for rookies and new call-ups.
     `id_base` namespaces the synthetic Yahoo IDs so several rosters can be
     evaluated without ID collisions.
     """
@@ -43,11 +45,14 @@ def evaluate_roster(roster: list[dict], frame: pd.DataFrame, value_col: str,
     for i, player in enumerate(roster):
         mapping = mappings[str(id_base + i)]
         value = None
+        status = mapping.status
         if mapping.actionable:
             hit = frame[frame["player_id"] == mapping.internal_id]
             if len(hit) and pd.notna(hit.iloc[0][value_col]):
                 value = float(hit.iloc[0][value_col])
-        evaluated.append({**player, "value": value, "map_status": mapping.status})
+            else:
+                status = "no_projection"
+        evaluated.append({**player, "value": value, "map_status": status})
     return evaluated
 
 
@@ -144,10 +149,13 @@ def dead_spots(players: list[dict]) -> list[dict]:
 def drop_candidates(players: list[dict]) -> list[dict]:
     """Bench players with no model value — the only safe drop nominations.
 
-    Starters are never nominated, and team_mismatch stays flagged as a
-    possible nflverse trade lag rather than proof of worthlessness.
+    Starters are never nominated, team_mismatch stays flagged as a possible
+    nflverse trade lag, and no_projection players are excluded: the model
+    cannot price them (rookies, new call-ups), which is a blind spot, not
+    proof of worthlessness.
     """
-    return [p for p in dead_spots(players) if p["slot"] in BENCH_SLOTS]
+    return [p for p in dead_spots(players)
+            if p["slot"] in BENCH_SLOTS and p["reason"] != "no_projection"]
 
 
 def recommendations(*, my_eval: list[dict], week_eval: list[dict] | None,
@@ -197,6 +205,12 @@ def recommendations(*, my_eval: list[dict], week_eval: list[dict] | None,
                                  f"({current['value']}){drop_text}"})
 
     for drop in dead_spots(my_eval):
+        if drop["reason"] == "no_projection":
+            recs.append({"kind": "hygiene", "priority": 3,
+                         "text": f"model blind spot: {drop['name']} has no projection "
+                                 f"(rookie or new to the dataset) — verify manually; "
+                                 f"not an auto-drop"})
+            continue
         reason = "possible trade lag — verify" if drop["reason"] == "team_mismatch" else drop["reason"]
         recs.append({"kind": "hygiene", "priority": 3,
                      "text": f"dead spot: {drop['name']} ({reason}) — "
