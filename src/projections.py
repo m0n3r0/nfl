@@ -83,7 +83,9 @@ def project_players(corpus: dict) -> pd.DataFrame:
     # are absent from `base`. Inject them with games = 0 (confidence 0, so the
     # regression step yields exactly the position mean). The role (step 3) and
     # SOS (step 4) adjustments then apply unchanged; the draft-capital discount
-    # in 3b keeps them conservative.
+    # in 3b keeps them conservative. seasons_played = 1 keeps the availability
+    # math defined: with no durability history the 0.5 floor applies, so a
+    # rookie gets a conservative half-season expected_games instead of NaN.
     players_tbl = corpus.get("players")
     _need = {"gsis_id", "display_name", "position", "draft_year"}
     if players_tbl is not None and _need.issubset(players_tbl.columns):
@@ -104,6 +106,7 @@ def project_players(corpus: dict) -> pd.DataFrame:
                 "last_season": SCHEDULE_SEASON,
                 "last_team": _team.values if hasattr(_team, "values") else _team,
                 "baseline_ppg": 0.0,
+                "seasons_played": 1.0,
                 "draft_round": _round.values if hasattr(_round, "values") else _round,
                 "is_rookie": True,
             })], ignore_index=True)

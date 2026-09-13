@@ -54,6 +54,22 @@ def test_first_round_starter_rookie_is_not_capped_below_mean(monkeypatch):
     assert rookie["proj_ppg"] > rookie["pos_mean"]
 
 
+def test_injected_rookie_gets_real_season_total(monkeypatch):
+    """No durability history is not a reason for a missing season total.
+
+    The rookie-injection concat used to omit seasons_played, so the
+    availability math yielded NaN expected_games and proj_total stayed NaN:
+    rookies were invisible on the season board and dragged league-strength
+    ranks down for every team holding one (#110).
+    """
+    monkeypatch.setattr(projections, "HISTORY_SEASONS", (2024, 2025))
+    result = projections.project_players(_corpus())
+    rookie = result[result["player_id"] == "r"].iloc[0]
+
+    assert rookie["proj_total"] > 0
+    assert rookie["expected_games"] == 8.5  # no data -> 0.5 availability floor
+
+
 def test_season_weights_match_history_seasons():
     assert projections._SEASON_WEIGHTS == {
         2022: 1.0, 2023: 1.5, 2024: 2.0, 2025: 2.5, 2026: 3.0,
