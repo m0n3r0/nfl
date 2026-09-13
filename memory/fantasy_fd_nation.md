@@ -3,6 +3,14 @@
 Persistent context for the user's Yahoo Fantasy Football league. Load this whenever
 the user mentions fantasy football, their league, the draft, lineup, waivers, or Edge/CDP.
 
+> **How to read this file:** dated journal entries, newest at the bottom. Entries
+> before "Post-draft + in-season pivot (2026-09-12)" are the DRAFT-ERA record —
+> the Windows box, WSL, the draft driver, mock harness, ADP pipeline and most
+> commands/paths in them are RETIRED (removed in #82; the draft completed Sep 1-2,
+> 15/15). They are kept as history explaining why current rules exist, not as
+> guidance. For current operations start at "Post-draft + in-season pivot" and
+> read downward.
+
 ## League facts (verified 2026-08-20 via live Edge CDP)
 - Platform: Yahoo Fantasy Football, league ID **1329011**, name **"FD nation"**.
 - Manager: user is **"Doge"**, team **#2** (URL team id = 2). **10 teams** (verified 2026-08-28 via live Edge CDP — the FD nation Teams page listed exactly 10 teams; Yahoo Settings confirms "Max Teams: 10"; the earlier "12 teams" claim was incorrect).
@@ -17,7 +25,7 @@ the user mentions fantasy football, their league, the draft, lineup, waivers, or
 - Not a cash league. Playoffs top 4, Weeks 16-17.
 - Waiver: 2-day rolling list; trade review by league vote; max acquisitions unlimited.
 
-## Draft strategy (user-approved)
+## Draft strategy (user-approved; draft COMPLETED Sep 1-2)
 - Format: **10-team** .5 PPR snake. Draft from the **original nflverse-derived
   board** (default; zero third-party feed) — `python cli.py original-board` builds
   `data/board/original_board.json` from our own projections (skill), kicking columns
@@ -44,7 +52,7 @@ the user mentions fantasy football, their league, the draft, lineup, waivers, or
 - Safety net: Yahoo DEFAULT pre-rank (ADP-based) is the auto-draft fallback. User accepted this (custom Edit-My-Rankings UI was too fragile to automate safely — Yahoo uses a JS drag widget with no stable controls).
 - Do-not-draft list: **none** (user confirmed).
 
-## Engineering setup (verified working)
+## Engineering setup (draft-era, RETIRED — Windows/WSL)
 - Edge launched by user on **port 9222** with `--remote-allow-origins=*` (and the original `--user-data-dir=C:\edge-debug-profile`). This is REQUIRED for CDP WebSocket control. Without the flag, Edge rejects WS with 403.
 - **Security:** the CDP debug port (9222) is a full browser-control interface. Bind Edge to loopback only (`--remote-debugging-address=127.0.0.1`) and ensure no firewall/port-forward exposes 9222 to the network — anyone who reaches it can drive the browser and read the logged-in Yahoo session. Close Edge when not drafting.
 - Control from WSL is NOT possible directly (WSL2 separate netns). Driver runs on the **Windows side via `py.exe`** where `websocket-client` 1.9.0 is installed (pip into Windows Python 3.13).
@@ -52,7 +60,7 @@ the user mentions fantasy football, their league, the draft, lineup, waivers, or
 - Output/artifacts dir on Windows: `C:\edge-debug-profile\`.
 - Human-like input layer: quadratic Bézier mouse paths + per-step jitter + variable think delays, dispatched as real CDP Input.dispatchMouseEvent. navigator.webdriver=false on the page (no automation banner).
 
-## Live draft driver (deployed)
+## Live draft driver (draft-era, RETIRED — Windows task)
 - Script: `C:\edge-debug-profile\draft_driver.py` (also at /home/eml/draft_driver.py).
 - Scheduled Windows task **"FDnationDraftDriver"**: fires **2026-09-01 17:00 EDT (= 2026-09-02 06:00 JST)**, runs `py.exe C:\edge-debug-profile\draft_driver.py`. Rescheduled 2026-08-28 after the live tab showed Sep 1 (was Aug 28).
 - Decision log: `C:\edge-debug-profile\draft_log.txt` (created at first run).
@@ -123,7 +131,7 @@ exact markup (draft-button label/position, live ADP parsing) can only be confirm
 on Sep 1 — but the logic that finds, clicks, and confirms a pick is now proven, and
 the parser handles every board name format we know of.
 
-## Proven skills (see /home/eml/.hermes/skills/)
+## Proven skills (draft-era; skills removed in #82)
 - `edge-cdp`: connect to Edge 9222, human-like input helpers.
 - `fantasy-read`: read roster/standings/matchups/waivers from the live tab.
 - `fantasy-draft`: the live draft driver + scheduler + board.
