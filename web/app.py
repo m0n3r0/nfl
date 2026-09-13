@@ -9,6 +9,7 @@ Pages:
   /            dashboard (2026 projections + model card)
   /team        my FD nation team (latest operator report: matchup, lineup, flags)
   /league      league standings + matchup (how the other teams are doing)
+  /league/team/<name>  one team's standing, trajectory, and roster when captured
   /cron        operator/cron status (run history + schedule)
   /players     searchable player list with 2022-2026 stats + 2026 projection
   /player/<id> single player detail (history + projection)
@@ -17,14 +18,16 @@ Pages:
   /ratings     2026 team efficiency ratings (as-of season, per-play EPA etc.)
   /strategy     game-strategy situation splits for a team (3rd down, red zone, pass/run)
 
-The fantasy pages read LOCAL artifacts only (logs/team-operator.jsonl and
-logs/league-report.json, written by the cron operators). The web process never
-touches Yahoo live — live reads belong to the gentle, WAF-aware cron jobs.
+The fantasy pages read LOCAL artifacts only (logs/team-operator.jsonl,
+logs/league-report.json, logs/league-report.jsonl — written by the cron
+operators). The web process never touches Yahoo live — live reads belong to
+the gentle, WAF-aware cron jobs.
 """
 
 from __future__ import annotations
 
 import json
+import math
 import os
 from pathlib import Path
 
@@ -41,6 +44,7 @@ app = Flask(__name__, template_folder=str(Path(__file__).parent / "templates"))
 
 OPERATOR_AUDIT = ROOT / "logs" / "team-operator.jsonl"
 LEAGUE_REPORT = ROOT / "logs" / "league-report.json"
+LEAGUE_AUDIT = ROOT / "logs" / "league-report.jsonl"
 
 # The host crontab (docs/TEAM_OPERATOR.md is the authoritative runbook).
 CRON_SCHEDULE = [
@@ -48,7 +52,7 @@ CRON_SCHEDULE = [
     ("47 23 * * 0", "Sun 23:47", "team_operator.py --apply — lineup safety net"),
     ("23 1 * * 1", "Mon 01:23", "team_operator.py --apply — final pre-kickoff set"),
     ("11 20 * * 3", "Wed 20:11", "team_operator.py --waiver-scan --refresh-data"),
-    ("19 21 * * *", "nightly 21:19", "league_report.py --out — league snapshot"),
+    ("19 21 * * *", "nightly 21:19", "league_report.py --opponent-roster --out --audit — league snapshot"),
     ("37 9 * * 0", "Sun 09:37", "profile_backup.py — browser-profile backup"),
 ]
 
@@ -90,6 +94,56 @@ def _read_league_report(path: Path | None = None) -> dict | None:
     except (OSError, ValueError):
         return None
     return report if isinstance(report, dict) else None
+
+
+def _read_league_history(path: Path | None = None) -> list[dict]:
+    """Return the season's nightly league snapshots, oldest first."""
+    path = path or LEAGUE_AUDIT
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return []
+    snaps = []
+    for line in lines:
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(record, dict):
+            snaps.append(record)
+    return snaps
+
+
+def _team_row(standings, team_name: str) -> dict | None:
+    """Find one team's row in a standings list (exact name match).
+
+    Numeric fields are coerced to floats at this boundary so templates can
+    do arithmetic without trusting the artifact's types.
+    """
+    if not isinstance(standings, list):
+        return None
+    row = next((r for r in standings
+                if isinstance(r, dict) and r.get("team") == team_name), None)
+    if row is None:
+        return None
+
+    def num(key: str) -> float:
+        try:
+            value = float(row.get(key) or 0)
+        except (TypeError, ValueError):
+            return 0.0
+        return value if math.isfinite(value) else 0.0
+
+    return {**row, "points_for": num("points_for"),
+            "points_against": num("points_against")}
+
+
+def _record_games(record: str) -> int:
+    """Games played from a 'W-L-T' record string (0 when unparseable)."""
+    try:
+        return sum(int(part) for part in str(record).split("-")[:3])
+    except ValueError:
+        return 0
 
 
 def _get_corpus(preset=None):
@@ -138,6 +192,31 @@ def league():
     my_name = matchup.get("team") if isinstance(matchup, dict) else None
     return render_template("league.html", report=report, standings=standings,
                            my_name=my_name)
+
+
+@app.route("/league/team/<path:team_name>")
+def league_team(team_name):
+    """Detail page for one league team: standing, trend, roster when captured."""
+    latest = _read_league_report()
+    row = _team_row(latest.get("standings") if latest else None, team_name)
+    trend = []
+    for snap in _read_league_history():
+        mine = _team_row(snap.get("standings"), team_name)
+        if mine:
+            trend.append({**mine, "captured_at": str(snap.get("captured_at", ""))})
+    matchup = latest.get("matchup") if latest else None
+    is_opponent = isinstance(matchup, dict) and matchup.get("opponent") == team_name
+    roster = latest.get("opponent_roster") if (latest and is_opponent) else None
+    if row is None and not trend:
+        return render_template("league_team.html", name=team_name, row=None,
+                               trend=[], games=0, matchup=None, roster=None,
+                               captured_at=None), 404
+    games = _record_games(row.get("record", "")) if row else 0
+    return render_template("league_team.html", name=team_name, row=row,
+                           trend=trend, games=games,
+                           matchup=matchup if is_opponent else None,
+                           roster=roster if isinstance(roster, list) else None,
+                           captured_at=latest.get("captured_at") if latest else None)
 
 
 @app.route("/cron")

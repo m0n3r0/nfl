@@ -5,8 +5,9 @@
 
 {% if not report %}
 <div class="notice">No league snapshot yet. The nightly cron
-(<code>league_report.py --out logs/league-report.json</code>) writes it; live
-reads stay with the WAF-aware cron jobs, never with this web process.</div>
+(<code>league_report.py --out logs/league-report.json --audit logs/league-report.jsonl</code>)
+writes it; live reads stay with the WAF-aware cron jobs, never with this web
+process.</div>
 {% else %}
 
 {% if report.status == "waf_blocked" %}
@@ -26,7 +27,7 @@ data may be incomplete. Live reads retry on the next cron run.</div>
     {% for row in standings %}
     <tr{% if row.team == my_name %} style="background:#1d2b3a"{% endif %}>
       <td>{{ row.rank }}</td>
-      <td>{% if row.team == my_name %}<b>{{ row.team }}</b>{% else %}{{ row.team }}{% endif %}</td>
+      <td>{% if row.team == my_name %}<b><a href="/league/team/{{ row.team | urlencode }}">{{ row.team }}</a></b>{% else %}<a href="/league/team/{{ row.team | urlencode }}">{{ row.team }}</a>{% endif %}</td>
       <td>{{ row.record }}</td><td>{{ row.points_for }}</td>
       <td>{{ row.points_against }}</td><td>{{ row.waiver }}</td>
     </tr>

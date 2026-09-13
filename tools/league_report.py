@@ -20,7 +20,14 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from yahoo.cdp import CdpClient, CdpError  # noqa: E402
-from yahoo.league import LeagueWafBlocked, matchup, opponent_roster, opponent_team_id, standings  # noqa: E402
+from yahoo.league import (  # noqa: E402
+    LeagueReadError,
+    LeagueWafBlocked,
+    matchup,
+    opponent_roster,
+    opponent_team_id,
+    standings,
+)
 from yahoo.team import TEAM_PATH, find_team_target  # noqa: E402
 
 BASE = "https://football.fantasysports.yahoo.com"
@@ -50,6 +57,22 @@ def write_report(path: str, report: dict) -> None:
         tmp.unlink(missing_ok=True)
 
 
+def append_audit(path: str, report: dict) -> None:
+    """Append the report as one JSON line (season history of snapshots).
+
+    Same captured_at stamping and gitignored-path rule as write_report. One
+    line is ~3 KB — well under the text buffer — so a single write() call
+    keeps concurrent writers from interleaving a line in practice. A crash
+    mid-append can leave a partial line that merges with the next one; the
+    web reader skips unparseable lines, so the history self-heals.
+    """
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    stamped = {"captured_at": datetime.now(timezone.utc).isoformat(), **report}
+    with open(target, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(stamped, sort_keys=True) + "\n")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--opponent-roster", action="store_true",
@@ -57,6 +80,8 @@ def main() -> int:
     parser.add_argument("--endpoint", default="http://127.0.0.1:9222")
     parser.add_argument("--out", metavar="PATH",
                         help="also persist the report JSON to PATH (e.g. logs/league-report.json)")
+    parser.add_argument("--audit", metavar="PATH",
+                        help="also append the report as one JSON line to PATH (season history)")
     args = parser.parse_args()
 
     target = find_team_target(args.endpoint)
@@ -68,9 +93,16 @@ def main() -> int:
                 "matchup": matchup(client).as_dict(),
             }
             if args.opponent_roster:
-                opp_id = opponent_team_id(client)
-                report["opponent_team_id"] = opp_id
-                report["opponent_roster"] = list(opponent_roster(client, opp_id))
+                try:
+                    opp_id = opponent_team_id(client)
+                    report["opponent_team_id"] = opp_id
+                    report["opponent_roster"] = list(opponent_roster(client, opp_id))
+                except LeagueWafBlocked:
+                    raise  # never downgrade a block to a warning: exit 2 + skip restore
+                except LeagueReadError as exc:
+                    # The roster is a bonus read on a fragile page; its failure
+                    # must never kill the standings+matchup snapshot.
+                    print(f"warning: opponent roster skipped: {exc}", file=sys.stderr)
         except LeagueWafBlocked:
             blocked = True
             report = {"status": "waf_blocked"}
@@ -84,17 +116,20 @@ def main() -> int:
                 except CdpError as exc:
                     print(f"warning: tab restore failed: {exc}", file=sys.stderr)
     print(json.dumps(report, indent=2, sort_keys=True))
-    if args.out:
-        if report.get("status") == "waf_blocked":
-            # Never overwrite the last good snapshot with a throttle stub;
-            # exit 2 already signals the condition to cron.
-            print("not persisting a waf_blocked stub over the last good snapshot",
-                  file=sys.stderr)
-        else:
+    if report.get("status") == "waf_blocked":
+        if args.out or args.audit:
+            # Never overwrite the last good snapshot with a throttle stub,
+            # and never pollute the season history with one either; exit 2
+            # already signals the condition to cron.
+            print("not persisting a waf_blocked stub", file=sys.stderr)
+    else:
+        for persist, path in ((write_report, args.out), (append_audit, args.audit)):
+            if not path:
+                continue
             try:
-                write_report(args.out, report)
+                persist(path, report)
             except OSError as exc:  # the live-fetched report must still stand
-                print(f"warning: could not persist report to {args.out}: {exc}",
+                print(f"warning: could not persist report to {path}: {exc}",
                       file=sys.stderr)
     return 2 if report.get("status") == "waf_blocked" else 0
 

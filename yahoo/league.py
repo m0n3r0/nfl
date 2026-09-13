@@ -94,8 +94,9 @@ def _parse_standings_rows(header: Any, rows: Any) -> tuple[StandingsRow, ...]:
                 rank=len(out) + 1,
                 team=team,
                 record=record,
-                points_for=float(cells[columns["PF"]] or 0),
-                points_against=float(cells[columns["PA"]] or 0),
+                # Yahoo renders thousands with commas once PF/PA cross 1,000
+                points_for=float(re.sub(r"[,\s]", "", cells[columns["PF"]]) or 0),
+                points_against=float(re.sub(r"[,\s]", "", cells[columns["PA"]]) or 0),
                 waiver=int(re.sub(r"\D", "", cells[columns["Waiver"]]) or "0"),
             ))
         except (IndexError, ValueError):

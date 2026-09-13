@@ -218,7 +218,7 @@ cd /Users/user/nfl
 | `47 23 * * 0` (Sun 23:47 = Sun ~10:47 ET) | Lineup safety net: `--apply` in case the 01:23 fire sleeps through |
 | `23 1 * * 1` (Mon 01:23 = Sun ~12:23 ET) | Set the week's lineup: `--apply` |
 | `11 20 * * 3` (Wed 20:11) | Waiver scan with fresh data: `--waiver-scan --refresh-data` |
-| `19 21 * * *` (nightly 21:19) | League snapshot for the web UI (`league_report.py --out`) |
+| `19 21 * * *` (nightly 21:19) | League snapshot + opponent roster for the web UI (`league_report.py --out` + `--audit`) |
 | `37 9 * * 0` (Sun 09:37) | Weekly browser-profile backup (`tools/profile_backup.py`, local-only) |
 
 ### The tools you'll touch by hand

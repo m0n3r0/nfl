@@ -1,0 +1,74 @@
+{% extends "layout.html" %}
+{% block title %}{{ name }} — FD nation{% endblock %}
+{% block body %}
+<h1>{{ name }}</h1>
+
+{% if not row and not trend %}
+<div class="notice">No team named "{{ name }}" in the league snapshots.
+<a href="/league">Back to standings</a>.</div>
+{% else %}
+
+{% if captured_at %}<p class="muted">Snapshot from {{ captured_at }} (UTC)</p>{% endif %}
+
+{% if row %}
+<div class="card">
+  <h2>Standing</h2>
+  <table>
+    <tr><th>Rank</th><th>Record</th><th>PF</th><th>PA</th><th>Diff</th>
+        <th>PF/game</th><th>Waiver</th></tr>
+    <tr>
+      <td>#{{ row.rank }}</td><td>{{ row.record }}</td>
+      <td>{{ row.points_for }}</td><td>{{ row.points_against }}</td>
+      <td>{{ (row.points_for - row.points_against) | round(1) }}</td>
+      <td>{% if games %}{{ (row.points_for / games) | round(1) }}{% else %}—{% endif %}</td>
+      <td>{{ row.waiver }}</td>
+    </tr>
+  </table>
+</div>
+{% endif %}
+
+{% if matchup %}
+<div class="card">
+  <h2>Playing us this week (week {{ matchup.week }})</h2>
+  <table>
+    <tr><th></th><th>Score</th><th>Projected</th></tr>
+    <tr><td><b>{{ matchup.team }}</b></td>
+        <td>{{ matchup.score }}</td><td>{{ matchup.team_proj }}</td></tr>
+    <tr><td>{{ matchup.opponent }}</td>
+        <td>{{ matchup.opponent_score }}</td><td>{{ matchup.opponent_proj }}</td></tr>
+  </table>
+</div>
+{% endif %}
+
+{% if roster %}
+<div class="card">
+  <h2>Roster (captured for our current opponent)</h2>
+  <table>
+    <tr><th>Slot</th><th>Player</th><th>Team</th><th>Pos</th><th>Status</th></tr>
+    {% for p in roster %}
+    <tr><td>{{ p.slot }}</td><td>{{ p.name }}</td><td>{{ p.team }}</td>
+        <td>{{ p.position }}</td><td class="muted">{{ p.injury_status }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% else %}
+<p class="muted">Rosters are captured nightly only for our current matchup
+opponent; no roster on file for this team.</p>
+{% endif %}
+
+{% if trend %}
+<div class="card">
+  <h2>Season trajectory (nightly snapshots)</h2>
+  <table>
+    <tr><th>Captured (UTC)</th><th>Rank</th><th>Record</th><th>PF</th><th>PA</th></tr>
+    {% for t in trend %}
+    <tr><td>{{ t.captured_at[:10] }}</td><td>#{{ t.rank }}</td>
+        <td>{{ t.record }}</td><td>{{ t.points_for }}</td>
+        <td>{{ t.points_against }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

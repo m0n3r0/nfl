@@ -50,6 +50,8 @@ def league_report():
              "points_for": 140.5, "points_against": 90.1, "waiver": 3},
             {"rank": 2, "team": "Shiba Innu", "record": "1-0-0",
              "points_for": 130.2, "points_against": 95.4, "waiver": 4},
+            {"rank": 3, "team": "Team Beta", "record": "0-1-0",
+             "points_for": 95.4, "points_against": 130.2, "waiver": 7},
         ],
         "matchup": {"week": 1, "team": "Shiba Innu", "score": 35.6,
                     "opponent": "Team Beta", "opponent_score": 0.0,
@@ -95,7 +97,8 @@ def test_league_page_renders_standings_and_marks_my_team(client, tmp_path, monke
     monkeypatch.setattr(webapp, "LEAGUE_REPORT", snap)
     html = client.get("/league").get_data(as_text=True)
     assert "Team Alpha" in html
-    assert "<b>Shiba Innu</b>" in html  # my row is highlighted
+    assert '<b><a href="/league/team/Shiba%20Innu">Shiba Innu</a></b>' in html
+    assert '<a href="/league/team/Team%20Alpha">Team Alpha</a>' in html
     assert "140.5" in html
 
 
@@ -122,7 +125,7 @@ def test_cron_page_lists_runs_and_schedule(client, tmp_path, monkeypatch):
     html = client.get("/cron").get_data(as_text=True)
     assert "already_running" in html
     assert "47 23 * * 0" in html  # schedule table rendered
-    assert "league_report.py --out" in html
+    assert "league_report.py --opponent-roster" in html
 
 
 def test_nav_contains_fantasy_links(client, tmp_path, monkeypatch):
@@ -223,3 +226,109 @@ def test_league_report_write_report_atomic(tmp_path):
     assert persisted["standings"] == []
     assert "captured_at" in persisted  # persisted copy is timestamped
     assert not (tmp_path / "sub" / "league-report.json.tmp").exists()
+
+
+def league_snapshot_with_roster():
+    report = league_report()
+    report["opponent_team_id"] = "7"
+    report["opponent_roster"] = [
+        {"name": "Enemy Qb", "team": "KC", "position": "QB", "slot": "QB",
+         "injury_status": ""},
+        {"name": "Enemy Wr", "team": "MIN", "position": "WR", "slot": "WR",
+         "injury_status": "Q"},
+    ]
+    return report
+
+
+def test_league_team_detail_shows_standing_and_roster(client, tmp_path, monkeypatch):
+    snap = tmp_path / "league.json"
+    snap.write_text(json.dumps(league_snapshot_with_roster()), encoding="utf-8")
+    monkeypatch.setattr(webapp, "LEAGUE_REPORT", snap)
+    monkeypatch.setattr(webapp, "LEAGUE_AUDIT", tmp_path / "missing.jsonl")
+    html = client.get("/league/team/Team Beta").get_data(as_text=True)
+    assert "Enemy Qb" in html          # opponent roster rendered
+    assert "Playing us this week" in html
+    assert "no roster on file" not in html
+
+
+def test_league_team_detail_without_roster_says_so(client, tmp_path, monkeypatch):
+    snap = tmp_path / "league.json"
+    snap.write_text(json.dumps(league_report()), encoding="utf-8")
+    monkeypatch.setattr(webapp, "LEAGUE_REPORT", snap)
+    monkeypatch.setattr(webapp, "LEAGUE_AUDIT", tmp_path / "missing.jsonl")
+    html = client.get("/league/team/Team Alpha").get_data(as_text=True)
+    assert "Team Alpha" in html
+    assert "no roster on file for this team" in html
+
+
+def test_league_team_detail_unknown_team_404(client, tmp_path, monkeypatch):
+    snap = tmp_path / "league.json"
+    snap.write_text(json.dumps(league_report()), encoding="utf-8")
+    monkeypatch.setattr(webapp, "LEAGUE_REPORT", snap)
+    monkeypatch.setattr(webapp, "LEAGUE_AUDIT", tmp_path / "missing.jsonl")
+    resp = client.get("/league/team/Nobody FC")
+    assert resp.status_code == 404
+    assert "No team named" in resp.get_data(as_text=True)
+
+
+def test_league_team_detail_trend_from_history(client, tmp_path, monkeypatch):
+    older = league_report()
+    older["captured_at"] = "2026-09-12T12:19:00+00:00"
+    older["standings"][0]["points_for"] = 122.0
+    monkeypatch.setattr(webapp, "LEAGUE_REPORT", tmp_path / "missing.json")
+    audit = tmp_path / "league.jsonl"
+    audit.write_text(json.dumps(older) + "\n" + json.dumps(league_report()) + "\n",
+                     encoding="utf-8")
+    monkeypatch.setattr(webapp, "LEAGUE_AUDIT", audit)
+    html = client.get("/league/team/Team Alpha").get_data(as_text=True)
+    assert "Season trajectory" in html
+    assert "2026-09-12" in html and "122.0" in html and "140.5" in html
+
+
+def test_helpers_team_row_and_record_games():
+    rows = [{"team": "A"}, {"team": "B"}]
+    row = webapp._team_row(rows, "B")
+    assert row["team"] == "B"
+    assert row["points_for"] == 0.0 and row["points_against"] == 0.0  # coerced
+    assert webapp._team_row(rows, "C") is None
+    assert webapp._team_row("junk", "A") is None
+    assert webapp._record_games("2-1-0") == 3
+    assert webapp._record_games("bad") == 0
+
+
+def test_append_audit_appends_stamped_lines(tmp_path):
+    from tools.league_report import append_audit
+    out = tmp_path / "sub" / "league.jsonl"
+    append_audit(str(out), {"standings": []})
+    append_audit(str(out), {"standings": [{"team": "X"}]})
+    lines = out.read_text().splitlines()
+    assert len(lines) == 2
+    first, second = (json.loads(l) for l in lines)
+    assert first["standings"] == [] and "captured_at" in first
+    assert second["standings"] == [{"team": "X"}]
+
+
+def test_league_team_detail_tolerates_junk_types(client, tmp_path, monkeypatch):
+    junk = league_report()
+    junk["standings"][0]["points_for"] = "140.5"     # string instead of float
+    junk["standings"][0]["points_against"] = None    # null instead of float
+    snap = tmp_path / "league.json"
+    snap.write_text(json.dumps(junk), encoding="utf-8")
+    monkeypatch.setattr(webapp, "LEAGUE_REPORT", snap)
+    audit = tmp_path / "league.jsonl"
+    bad = league_report()
+    bad["captured_at"] = 12345  # non-string stamp must not 500 the trend slice
+    audit.write_text(json.dumps(bad) + "\n", encoding="utf-8")
+    monkeypatch.setattr(webapp, "LEAGUE_AUDIT", audit)
+    assert client.get("/league/team/Team Alpha").status_code == 200
+
+
+def test_league_team_detail_slash_and_unicode_names(client, tmp_path, monkeypatch):
+    report = league_report()
+    report["standings"].append({"rank": 9, "team": "A/B Sébastien", "record": "0-0-0",
+                                "points_for": 0.0, "points_against": 0.0, "waiver": 9})
+    snap = tmp_path / "league.json"
+    snap.write_text(json.dumps(report), encoding="utf-8")
+    monkeypatch.setattr(webapp, "LEAGUE_REPORT", snap)
+    monkeypatch.setattr(webapp, "LEAGUE_AUDIT", tmp_path / "missing.jsonl")
+    assert client.get("/league/team/A/B%20S%C3%A9bastien").status_code == 200
