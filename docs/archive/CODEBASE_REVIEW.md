@@ -1,5 +1,10 @@
 # Codebase Review — m0n3r0/nfl (Yahoo Fantasy Football 2026 Draft Engine)
 
+> **STATUS: HISTORICAL (archived).** Point-in-time draft-era review
+> (2026-08-31); superseded by CODEBASE_REVIEW_INSEASON.md (2026-09-12), and
+> most of the draft layer it reviews was removed in #82. Keep for provenance;
+> do not treat its architecture or gap tables as current.
+
 **Date:** 2026-08-31 · **HEAD:** `fb34de6` · **Language:** Python · **Lines:** ~3,659 (src) + 1,138 (driver) + tests + tools
 
 ---

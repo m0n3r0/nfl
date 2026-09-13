@@ -1,5 +1,12 @@
 # Data sources & winning strategy
 
+> **STATUS: HISTORICAL (archived).** Written for the draft-time driver and
+> FantasyPros pipeline, both removed post-draft in #82 (`driver/`,
+> `src/draft_board.py`, `cli.py original-board`/`draft-class`). The "what
+> actually wins" prose survives in docs/GAME_PLAN.md; the projections
+> description survives in README.md. Keep for provenance; do not follow any
+> setup instruction in here.
+
 This document captures *what actually moves the needle* for a winning fantasy
 team, *which sources to tap*, and *how this repo uses them*. It backs up the
 "better source to tap" discussion and the live value-board in

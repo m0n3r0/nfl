@@ -1,6 +1,13 @@
 # In-Season Codebase Review — m0n3r0/nfl
 
-**Date:** 2026-09-12 · **HEAD:** `3cc467c` · **Scope:** every tracked file (src, yahoo, tools incl. debug, driver, tests, web, docs, skills, CI) · Supersedes the draft-centric CODEBASE_REVIEW.md (2026-08-31) as the current-state reference.
+> **STATUS: DELIVERED (2026-09-13).** Every issue mapped here (#79-#89) is
+> closed and the #80 epic shipped: the operator/crons it proposes exist as
+> `tools/team_operator.py` + `tools/team_analyzer.py` (runbook:
+> `docs/TEAM_OPERATOR.md`). Keep this as the design rationale and issue map;
+> for the current state of the code, see README.md and the runbook. Historical
+> references below point into `docs/archive/`.
+
+**Date:** 2026-09-12 · **HEAD:** `3cc467c` · **Scope:** every tracked file (src, yahoo, tools incl. debug, driver, tests, web, docs, skills, CI) · Supersedes the draft-centric docs/archive/CODEBASE_REVIEW.md (2026-08-31) as the current-state reference.
 
 **Context:** the draft completed Sep 1–2 (15/15, see `docs/drafts/2026-09-02-fd-nation.md`). The repo now pivots to **in-season team maintenance**: one operator, runnable manually or via cron, that checks → monitors → adjusts → reports every day through the Week 16–17 playoffs. Tracked as epic **#80**.
 
@@ -42,7 +49,7 @@ Dependency order: **#79 → #81 → (#83, #84, #85, #86) → #87 → #88**, with
 - **Reads:** `YahooTeamReader.snapshot` (after #79); `yahoo/players.py` available-players reader (FA / `W (date)` availability, injury, game text) + pagination loop in `tools/yahoo_identity_map.py:41-54`; pending-transactions read in `waivers.py:69-79`.
 - **Writes (verified, dry-run default, fail-closed):** `YahooLineupOperator.apply` (form-identity, exact-ID preconditions, disabled-option lock check `lineup.py:79-80`, legal-slot invariant, read-back confirm, idempotent `already_applied`) and `YahooWaiverOperator` (add+drop one transaction, stage-3 ID re-verification, in-flight no-replay marker, pending read-back, audit JSONL in `tools/yahoo_waiver.py:42-45`). Lineup CLI lacks the audit writer — add it.
 - **Projection bridge:** `yahoo/identity.py` `reconcile_identities` (unique full-name+position+team match; ambiguous/unmapped fail closed).
-- **Cron scaffolding to copy:** date gate + `fcntl` lock + reconnect loop from `tools/yahoo_real_draft.py:43-83`; launchd plist pattern in `docs/MAC_SETUP.md:140-183`.
+- **Cron scaffolding to copy:** date gate + `fcntl` lock + reconnect loop from `tools/yahoo_real_draft.py:43-83` (removed in #82; recoverable from git history); launchd plist pattern in `docs/archive/MAC_SETUP.md:140-183`.
 - **Official API option:** `scripts/yahoo_oauth.py` (OAuth2, token refresh) — unused today; an API read path would remove most DOM fragility. Worth evaluating under #88.
 
 ### Dead in-season (archive candidates, not blocking)
@@ -79,7 +86,7 @@ Verified data state (Sep 12): `data/raw/games.csv` is an Aug 31 cache (2026 week
 
 - **#89 privacy:** `images/human_demo.png` shows a live league-invite URL with `key=`/`ikey=` tokens in a PUBLIC repo — delete, purge history, rotate invite. Rest checked clean (manager names already initial-only in `memory/`; drafts doc clean; no credentials tracked).
 - **#82 cleanup:** `3}` = zero-byte redirect junk (delete); `logs/real-draft.lock` stale (delete); `.gitignore` misses `logs/real-draft-cron.log` and `logs/yahoo-player-map.json` → ignore `logs/` wholesale; add `joblib` to requirements; remove the draft cron block from crontab.
-- **Docs:** `docs/TEAM_OPERATOR.md` is the current in-season runbook (read/lineup/waiver stages, fail-closed) — needs the cron/cadence spec added (#80). `docs/WINNING_STRATEGY.md` §4 is the human playbook (start/sit, waiver, trade rules); :111 says "FAAB" but FD nation is a 2-day rolling-waiver league — fix. README:380 contradicts the shipped waiver operator (claims mutations disabled under #62) — fix. Draft-era docs (REAL_DRAFT, MANUAL_FAILOVER, DRAFT_CHEAT_SHEET, MAC_SETUP draft sections, GAME_PLAN Part 3) → label completed/historical; harvest MAC_SETUP's launchd pattern. `memory/fantasy_fd_nation.md` needs a post-draft entry.
+- **Docs:** `docs/TEAM_OPERATOR.md` is the current in-season runbook (read/lineup/waiver stages, fail-closed) — needs the cron/cadence spec added (#80). `docs/archive/WINNING_STRATEGY.md` §4 is the human playbook (start/sit, waiver, trade rules); :111 says "FAAB" but FD nation is a 2-day rolling-waiver league — fix. README:380 contradicts the shipped waiver operator (claims mutations disabled under #62) — fix. Draft-era docs (REAL_DRAFT, MANUAL_FAILOVER, DRAFT_CHEAT_SHEET, MAC_SETUP draft sections, GAME_PLAN Part 3) → label completed/historical; harvest MAC_SETUP's launchd pattern. `memory/fantasy_fd_nation.md` needs a post-draft entry.
 - CI: green-friendly as configured; nightly job doesn't cover 2026 datasets (#86).
 
 ---
@@ -95,4 +102,4 @@ adjust     dry-run default; --apply via verified lineup/waiver operators; audit 
 report     one durable JSONL line per run + human summary; fail closed, never replay
 ```
 
-Cadence: daily JST morning (read+monitor+report); Sun ~01:25 JST lineup-finalize before 1pm ET lock; Tue–Wed waiver-window watch (priority 4th, 2-day rolling). Cron scaffolding from `tools/yahoo_real_draft.py:43-83`; launchd pattern from `docs/MAC_SETUP.md`.
+Cadence: daily JST morning (read+monitor+report); Sun ~01:25 JST lineup-finalize before 1pm ET lock; Tue–Wed waiver-window watch (priority 4th, 2-day rolling). Cron scaffolding from `tools/yahoo_real_draft.py:43-83` (removed in #82); launchd pattern from `docs/archive/MAC_SETUP.md`.

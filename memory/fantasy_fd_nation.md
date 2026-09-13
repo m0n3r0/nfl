@@ -192,9 +192,9 @@ the parser handles every board name format we know of.
   the logged-in Edge: `ALREADY_LOGGED_IN` detected correctly, zero page
   interaction. Credential prompt is skipped when already logged in.
 - Caveat: Yahoo occasionally serves an interactive captcha to headless mode →
-  then fall back to MAC_SETUP option A (cookie-copy the Windows profile) or C
-  (one-time headful login via Screen Sharing). Option A is preferred because
-  Yahoo auth is cookie-based and the profile transfers directly.
+  use the re-login paths in docs/TEAM_OPERATOR.md (one manual headful login
+  via Screen Sharing when captcha/2FA blocks automation). (Pre-Mac era this
+  was cookie-copy the Windows profile; that box is retired.)
 - `signed_in()` reuses the proven marker (team page fetch 200 + /Doge/i) from
   tools/check_login.py — plain "sign out" body-text is NOT reliable on Yahoo.
 

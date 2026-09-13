@@ -1,5 +1,12 @@
 # Deep dive: data to predict a WINNING team (game-outcome modeling)
 
+> **STATUS: HISTORICAL (archived).** The research plan behind `src/model.py`
+> — and the plan is fully executed: the "still to add" list below shipped as
+> `src/features.py` (leakage-safe PBP efficiency) + `src/model.py` (calibrated
+> logistic model, Vegas baseline). The living description with measured
+> results is README.md's win-probability section; keep this as design
+> rationale. The win-probability model itself is still live.
+
 Goal: move beyond fantasy points (who scores) to team-win prediction (who wins).
 This is a different modeling problem. The signals that predict fantasy points are
 NOT the same as the signals that predict wins. Below is what is actually collectable

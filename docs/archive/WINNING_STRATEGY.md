@@ -1,4 +1,10 @@
 FANTASY FOOTBALL 2026 — WINNING STRATEGY
+
+> **STATUS: HISTORICAL (archived).** The draft-era plan; the season it
+> describes is underway. Its still-live content (honest engine assessment,
+> waiver/trade tactics) was absorbed into docs/GAME_PLAN.md — read that
+> instead. Keep for provenance.
+
 FD nation (league 1329011) — team #2 "Doge" — Half-PPR, 10-team snake
 Draft: Sep 1 5:00 PM EDT / Sep 2 6:00 AM JST
 

@@ -1,7 +1,7 @@
 # FD nation — Manual Draft Cheat Sheet (team #2 "Doge")
 
 > **STATUS: COMPLETED (historical).** Used for the 2026-09-01 draft (results in
-> [drafts/2026-09-02-fd-nation.md](drafts/2026-09-02-fd-nation.md)). The generator
+> [drafts/2026-09-02-fd-nation.md](../drafts/2026-09-02-fd-nation.md)). The generator
 > script `tools/gen_cheat_sheet.py` was removed post-draft.
 
 _Generated 2026-09-01 23:07 from `data/board/original_board.json` (250 players, SHA-256 `1222c2c3db1a`). Re-run `tools/gen_cheat_sheet.py --write` after the morning-of ADP re-scrape to refresh._

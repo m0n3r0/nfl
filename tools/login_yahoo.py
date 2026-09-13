@@ -12,8 +12,8 @@ Credentials (never written to disk):
 
 CAVEAT (honest): if Yahoo serves an interactive captcha ("enter the letters",
 "verify you're human") in headless mode, no pure-automation path is safe;
-fall back to options A/C in docs/MAC_SETUP.md (copy the Windows session, or a
-one-time headful login via Screen Sharing).
+fall back to the re-login paths in docs/TEAM_OPERATOR.md (one manual headful
+login via Screen Sharing when captcha/2FA blocks automation).
 
 Safe: this script only fills the login form on login.yahoo.com; it never clicks
 inside the live league/draft page.
@@ -259,8 +259,8 @@ def main():
         tail = body_tail(ws, 40).lower()
         if any(k in tail for k in ("captcha", "are you human", "enter the letters")):
             print("CAPTCHA_BLOCKED: Yahoo served an interactive challenge to headless mode.")
-            print("Use docs/MAC_SETUP.md option A (copy the Windows session) or C (one-time\n"
-                  "headful login via Screen Sharing), then relaunch headless with that profile.")
+            print("Do one manual headful login via Screen Sharing (see docs/TEAM_OPERATOR.md),\n"
+                  "then relaunch with that profile.")
             ws.close()
             sys.exit(3)
 

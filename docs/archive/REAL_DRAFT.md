@@ -1,7 +1,7 @@
 # FD nation real-draft runbook
 
 > **STATUS: COMPLETED (historical).** The draft described here ran to 15/15 on
-> 2026-09-01/02 — results in [drafts/2026-09-02-fd-nation.md](drafts/2026-09-02-fd-nation.md).
+> 2026-09-01/02 — results in [drafts/2026-09-02-fd-nation.md](../drafts/2026-09-02-fd-nation.md).
 > The operator (`tools/yahoo_real_draft.py`) and its cron entry were removed
 > post-draft; this document remains as the record of what ran.
 

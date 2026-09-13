@@ -22,7 +22,19 @@ there when nothing exists), opens the team page in a **new** tab when none is
 present (it never navigates a tab it didn't create), and checks the session
 with the same credentialed fetch `tools/check_login.py` uses. When only the
 auth check is red, a human (or `tools/login_yahoo.py`) must re-login; preflight
-reports it and exits 2. A Yahoo WAF 'Request denied' block (denial body or
+reports it and exits 2. Re-login paths: `python tools/login_yahoo.py` (drives
+the login via CDP; stops with `CAPTCHA_BLOCKED` if a captcha appears), or one
+manual headful login via Screen Sharing when captcha/2FA blocks automation.
+
+Exit codes at a glance:
+
+| Code | Meaning | Action |
+|---|---|---|
+| 0 | cdp + team tab + auth green | proceed |
+| 2 | auth red or other failure | re-login (above) or read the error |
+| 3 | `waf_blocked` — Yahoo WAF throttling | back off 15-30 min; do NOT re-login |
+
+A Yahoo WAF 'Request denied' block (denial body or
 status 999) is reported as `waf_blocked` with exit 3 — that is throttling, not
 a logout: the session is fine, so back off for ~15-30 minutes and do NOT
 re-login. The team operator and analyzer surface the same condition as
@@ -171,6 +183,11 @@ line in `logs/team-operator.jsonl`. An flock (`logs/team-operator.lock`)
 prevents overlapping cron/manual runs. Read-only by default; `--apply` submits
 only the recommended lineup moves through the verified operator. Waiver claims
 are never auto-submitted — `--waiver-scan` only ranks targets for a human.
+`--week N` overrides the week used for projections/proposal (default: Yahoo's
+current week from the snapshot); `--apply` refuses to run when it disagrees
+with Yahoo's week. `--top N` caps the waiver-target list (default 10);
+`--refresh-data` re-downloads nflverse data first; `--endpoint` overrides the
+CDP endpoint.
 
 Suggested crontab (times are JST, the host's local zone). Replace
 `/path/to/nfl` with the local clone path — the launchd installer

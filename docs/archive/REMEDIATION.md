@@ -1,5 +1,11 @@
 # Remediation log
 
+> **STATUS: HISTORICAL (archived).** The 2026-08-31 review is fully remediated
+> (all issues #9-#32 closed), and the draft-era artifacts some phases describe
+> (driver/, draft_board.py, deploy.ps1, simulation/mock tooling, the Windows
+> box, the `github` remote) were removed post-draft in #82 or renamed. Keep
+> for provenance; do not follow any command or path in here.
+
 Tracking the 2026-08-31 code review. Every finding is a GitHub issue on
 `m0n3r0/nfl`; this file records which phase fixed what, and where.
 
