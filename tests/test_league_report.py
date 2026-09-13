@@ -133,3 +133,83 @@ def test_roster_phase_waf_still_exits_2_and_skips_restore(harness, monkeypatch, 
     assert harness.urls == []  # no restore navigation into the active block
     assert "Good Data" in out_path.read_text()
     assert not audit_path.exists()
+
+
+def _green_stubs(monkeypatch):
+    monkeypatch.setattr(league_report, "standings", lambda client: ())
+    monkeypatch.setattr(league_report, "matchup",
+                        lambda client: types.SimpleNamespace(as_dict=lambda: {"week": 1}))
+
+
+def test_all_rosters_excludes_own_team(harness, monkeypatch, capsys):
+    monkeypatch.setattr(sys, "argv",
+                        ["league_report.py", "--all-rosters", "--roster-delay", "0"])
+    _green_stubs(monkeypatch)
+    from yahoo.team import TEAM_ID
+    monkeypatch.setattr(league_report, "team_ids",
+                        lambda client: {"Team Alpha": "3", "Shiba Innu": TEAM_ID,
+                                        "Team Beta": "4"})
+    called_with = []
+    monkeypatch.setattr(league_report, "opponent_roster",
+                        lambda client, tid: called_with.append(tid) or [{"name": f"Player {tid}"}])
+
+    assert league_report.main() == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["rosters"] == {"Team Alpha": [{"name": "Player 3"}],
+                              "Team Beta": [{"name": "Player 4"}]}
+    assert TEAM_ID not in called_with  # ours is never read
+
+
+def test_all_rosters_reads_ids_before_leaving_standings_page(harness, monkeypatch, capsys):
+    """team_ids only works on the standings page; the order is load-bearing."""
+    monkeypatch.setattr(sys, "argv",
+                        ["league_report.py", "--all-rosters", "--roster-delay", "0"])
+    calls = []
+    monkeypatch.setattr(league_report, "standings",
+                        lambda client: calls.append("standings") or ())
+    monkeypatch.setattr(league_report, "team_ids",
+                        lambda client: calls.append("team_ids") or {"Team Alpha": "3"})
+    monkeypatch.setattr(league_report, "matchup",
+                        lambda client: calls.append("matchup") or
+                        types.SimpleNamespace(as_dict=lambda: {"week": 1}))
+    monkeypatch.setattr(league_report, "opponent_roster",
+                        lambda client, tid: [{"name": "Player 3"}])
+
+    assert league_report.main() == 0
+    assert calls == ["standings", "team_ids", "matchup"]
+
+
+def test_all_rosters_per_team_failure_degrades(harness, monkeypatch, capsys):
+    monkeypatch.setattr(sys, "argv",
+                        ["league_report.py", "--all-rosters", "--roster-delay", "0"])
+    _green_stubs(monkeypatch)
+    monkeypatch.setattr(league_report, "team_ids",
+                        lambda client: {"Team Alpha": "3", "Team Beta": "4"})
+
+    def flaky(client, tid):
+        if tid == "3":
+            raise LeagueReadError("markup changed")
+        return [{"name": "Player 4"}]
+    monkeypatch.setattr(league_report, "opponent_roster", flaky)
+
+    assert league_report.main() == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["rosters"] == {"Team Beta": [{"name": "Player 4"}]}
+
+
+def test_all_rosters_waf_keeps_full_contract(harness, monkeypatch, capsys, tmp_path):
+    out_path = tmp_path / "league.json"
+    monkeypatch.setattr(sys, "argv", ["league_report.py", "--all-rosters",
+                                      "--roster-delay", "0", "--out", str(out_path)])
+    _green_stubs(monkeypatch)
+    monkeypatch.setattr(league_report, "team_ids",
+                        lambda client: {"Team Alpha": "3"})
+
+    def blocked(client, tid):
+        raise LeagueWafBlocked("denied")
+    monkeypatch.setattr(league_report, "opponent_roster", blocked)
+
+    assert league_report.main() == 2
+    assert json.loads(capsys.readouterr().out) == {"status": "waf_blocked"}
+    assert harness.urls == []  # no restore navigation into the block
+    assert not out_path.exists()

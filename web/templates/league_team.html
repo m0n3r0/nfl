@@ -42,7 +42,7 @@
 
 {% if roster %}
 <div class="card">
-  <h2>Roster (captured for our current opponent)</h2>
+  <h2>Roster{% if roster_date %} <span class="muted">(from the {{ roster_date }} snapshot)</span>{% endif %}</h2>
   <table>
     <tr><th>Slot</th><th>Player</th><th>Team</th><th>Pos</th><th>Status</th></tr>
     {% for p in roster %}
@@ -52,8 +52,8 @@
   </table>
 </div>
 {% else %}
-<p class="muted">Rosters are captured nightly only for our current matchup
-opponent; no roster on file for this team.</p>
+<p class="muted">No roster captured for this team yet — the nightly snapshot
+fills it in (all teams, paced for Yahoo's rate limit).</p>
 {% endif %}
 
 {% if trend %}

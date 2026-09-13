@@ -130,11 +130,69 @@ def standings(client: LeagueClient, timeout: float = 30) -> tuple[StandingsRow, 
     return _parse_standings_rows(payload.get("header"), payload.get("rows"))
 
 
+def team_ids(client: LeagueClient) -> dict[str, str]:
+    """Map league team names to Yahoo roster numbers.
+
+    Evaluates on the league home page — call it right after standings()
+    (which navigates there), so this costs no extra request. Fails closed
+    when the browser is anywhere else, like the sibling readers.
+    """
+    payload = client.evaluate(
+        r'''/* yahoo-league-team-ids */ (() => {
+          const out = {};
+          document.querySelectorAll('table a[href*="%s"]').forEach(a => {
+            const m = (a.getAttribute('href') || '').match(/\/f1\/\d+\/(\d+)([/?#]|$)/);
+            const name = (a.innerText || '').trim();
+            if (m && name && !(name in out)) out[name] = m[1];
+          });
+          return {path: location.pathname.replace(/\/$/, ''), ids: out};
+        })()''' % LEAGUE_HOME
+    )
+    if not isinstance(payload, dict) or payload.get("path") != LEAGUE_HOME:
+        raise LeagueReadError("not on the league home page")
+    ids = payload.get("ids")
+    if not isinstance(ids, dict) or not ids:
+        raise LeagueReadError("no team links found on the league home page")
+    return ids
+
+
+def _build_matchup_score(payload: Any) -> MatchupScore:
+    """Turn the matchup-page JS payload into a MatchupScore (pure; testable).
+
+    The pre-game page shows "NN.N Live Proj NN.N" (team, opponent); the
+    live-game page relabels to "Orig Proj" and orders the pair
+    (opponent, team). Scores are mandatory — a missing pair means the page
+    did not render (raise), projections degrade to 0.0.
+    """
+    if not isinstance(payload, dict) or not payload.get("week"):
+        raise LeagueReadError("matchup page did not parse")
+    if not payload.get("score"):
+        raise LeagueReadError("matchup scores are missing")
+    names = payload.get("names") or ["", ""]
+    live, orig = payload.get("live"), payload.get("orig")
+    if live:
+        team_proj, opponent_proj = float(live[0]), float(live[1])
+    elif orig:
+        team_proj, opponent_proj = float(orig[1]), float(orig[0])
+    else:
+        team_proj = opponent_proj = 0.0
+    return MatchupScore(
+        week=int(payload["week"]),
+        team=names[0],
+        score=float(payload["score"][0]),
+        opponent=names[1] if len(names) > 1 else "",
+        opponent_score=float(payload["score"][1]),
+        team_proj=team_proj,
+        opponent_proj=opponent_proj,
+    )
+
+
 def matchup(client: LeagueClient, timeout: float = 30) -> MatchupScore:
     """Read the current matchup scoreboard (live during the week).
 
     Attribution follows Yahoo's header order: our team block precedes the
-    score line, the opponent block follows it.
+    score line, the opponent block follows it. The score line renders as
+    "vs" pre-game and "vs." during live games.
     """
     client.navigate(f"{BASE}{MATCHUP_PATH}", lambda url: urlparse(url).path == MATCHUP_PATH, timeout)
     time.sleep(2)
@@ -147,28 +205,16 @@ def matchup(client: LeagueClient, timeout: float = 30) -> MatchupScore:
             .filter(a => /^(?:https?:\/\/[^/]+)?\/f1\/\d+\/\d+\/?$/.test(a.getAttribute('href') || ''))
             .map(a => (a.innerText || '').trim())
             .filter(t => t && t !== 'My Team' && t.length < 40))];
-          const score = body.match(/(\d+\.\d+)\s*\n\s*vs\s*\n\s*(\d+\.\d+)/);
+          const score = body.match(/(\d+\.\d+)\s*\n\s*vs\.?\s*\n\s*(\d+\.\d+)/);
           const live = body.match(/(\d+\.\d+)\s*\t?\s*Live\s+Proj\s*\t?\s*(\d+\.\d+)/);
+          const orig = body.match(/Orig\s+Proj\s*\n\s*(\d+\.\d+)\s*\n\s*(\d+\.\d+)/);
           return {week, names: names.slice(0, 2),
                   score: score && [parseFloat(score[1]), parseFloat(score[2])],
-                  live: live && [parseFloat(live[1]), parseFloat(live[2])]};
+                  live: live && [parseFloat(live[1]), parseFloat(live[2])],
+                  orig: orig && [parseFloat(orig[1]), parseFloat(orig[2])]};
         })()'''
     )
-    if not isinstance(payload, dict) or not payload.get("week"):
-        raise LeagueReadError("matchup page did not parse")
-    if not payload.get("score"):
-        raise LeagueReadError("matchup scores are missing")
-    names = payload.get("names") or ["", ""]
-    live = payload.get("live") or [0.0, 0.0]
-    return MatchupScore(
-        week=int(payload["week"]),
-        team=names[0],
-        score=float(payload["score"][0]),
-        opponent=names[1] if len(names) > 1 else "",
-        opponent_score=float(payload["score"][1]),
-        team_proj=float(live[0]),
-        opponent_proj=float(live[1]),
-    )
+    return _build_matchup_score(payload)
 
 
 def opponent_roster(client: LeagueClient, team_id: str, timeout: float = 30) -> tuple[dict[str, str], ...]:

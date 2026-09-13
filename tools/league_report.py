@@ -12,6 +12,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -27,8 +28,9 @@ from yahoo.league import (  # noqa: E402
     opponent_roster,
     opponent_team_id,
     standings,
+    team_ids,
 )
-from yahoo.team import TEAM_PATH, find_team_target  # noqa: E402
+from yahoo.team import TEAM_ID, TEAM_PATH, find_team_target  # noqa: E402
 
 BASE = "https://football.fantasysports.yahoo.com"
 
@@ -77,12 +79,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--opponent-roster", action="store_true",
                         help="also read the matchup opponent's roster")
+    parser.add_argument("--all-rosters", action="store_true",
+                        help="also read every other team's roster (paced, nightly use)")
+    parser.add_argument("--roster-delay", type=float, default=3.0, metavar="SECONDS",
+                        help="pause between per-team roster reads (default 3.0)")
     parser.add_argument("--endpoint", default="http://127.0.0.1:9222")
     parser.add_argument("--out", metavar="PATH",
                         help="also persist the report JSON to PATH (e.g. logs/league-report.json)")
     parser.add_argument("--audit", metavar="PATH",
                         help="also append the report as one JSON line to PATH (season history)")
     args = parser.parse_args()
+    if args.roster_delay < 0:
+        parser.error("--roster-delay must be >= 0")
 
     target = find_team_target(args.endpoint)
     with CdpClient(target, args.endpoint, timeout=25) as client:
@@ -90,8 +98,14 @@ def main() -> int:
         try:
             report = {
                 "standings": [row.as_dict() for row in standings(client)],
-                "matchup": matchup(client).as_dict(),
             }
+            ids = {}
+            if args.all_rosters:
+                try:
+                    ids = team_ids(client)  # free: still on the standings page
+                except LeagueReadError as exc:
+                    print(f"warning: team id map skipped: {exc}", file=sys.stderr)
+            report["matchup"] = matchup(client).as_dict()
             if args.opponent_roster:
                 try:
                     opp_id = opponent_team_id(client)
@@ -103,6 +117,22 @@ def main() -> int:
                     # The roster is a bonus read on a fragile page; its failure
                     # must never kill the standings+matchup snapshot.
                     print(f"warning: opponent roster skipped: {exc}", file=sys.stderr)
+            if args.all_rosters:
+                rosters = {}
+                others = [(name, tid) for name, tid in ids.items() if tid != TEAM_ID]
+                # opponent_roster refuses our own team by design, so it is
+                # filtered before the paced loop (and never costs a delay).
+                for i, (name, tid) in enumerate(others):
+                    if i:
+                        time.sleep(args.roster_delay)  # pace the batch for the WAF
+                    try:
+                        rosters[name] = list(opponent_roster(client, tid))
+                    except LeagueWafBlocked:
+                        raise  # full waf_blocked contract, see above
+                    except LeagueReadError as exc:
+                        print(f"warning: roster for {name!r} skipped: {exc}",
+                              file=sys.stderr)
+                report["rosters"] = rosters
         except LeagueWafBlocked:
             blocked = True
             report = {"status": "waf_blocked"}

@@ -52,7 +52,7 @@ CRON_SCHEDULE = [
     ("47 23 * * 0", "Sun 23:47", "team_operator.py --apply — lineup safety net"),
     ("23 1 * * 1", "Mon 01:23", "team_operator.py --apply — final pre-kickoff set"),
     ("11 20 * * 3", "Wed 20:11", "team_operator.py --waiver-scan --refresh-data"),
-    ("19 21 * * *", "nightly 21:19", "league_report.py --opponent-roster --out --audit — league snapshot"),
+    ("19 21 * * *", "nightly 21:19", "league_report.py --all-rosters --out --audit — league snapshot"),
     ("37 9 * * 0", "Sun 09:37", "profile_backup.py — browser-profile backup"),
 ]
 
@@ -199,23 +199,40 @@ def league_team(team_name):
     """Detail page for one league team: standing, trend, roster when captured."""
     latest = _read_league_report()
     row = _team_row(latest.get("standings") if latest else None, team_name)
+    matchup = latest.get("matchup") if latest else None
+    is_opponent = isinstance(matchup, dict) and matchup.get("opponent") == team_name
+    roster = None
+    roster_date = None
+    rosters = latest.get("rosters") if latest else None
+    if isinstance(rosters, dict) and isinstance(rosters.get(team_name), list):
+        roster = rosters[team_name]
+    elif latest and is_opponent:  # older snapshots only carried the opponent's
+        fallback = latest.get("opponent_roster")
+        roster = fallback if isinstance(fallback, list) else None
+    history = _read_league_history()
+    if roster is None:
+        # A per-team read can fail on a given night; fall back to the newest
+        # history snapshot that still holds this team's roster.
+        for snap in reversed(history):
+            past = snap.get("rosters")
+            if isinstance(past, dict) and isinstance(past.get(team_name), list):
+                roster = past[team_name]
+                roster_date = str(snap.get("captured_at", ""))[:10]
+                break
     trend = []
-    for snap in _read_league_history():
+    for snap in history:
         mine = _team_row(snap.get("standings"), team_name)
         if mine:
             trend.append({**mine, "captured_at": str(snap.get("captured_at", ""))})
-    matchup = latest.get("matchup") if latest else None
-    is_opponent = isinstance(matchup, dict) and matchup.get("opponent") == team_name
-    roster = latest.get("opponent_roster") if (latest and is_opponent) else None
     if row is None and not trend:
         return render_template("league_team.html", name=team_name, row=None,
                                trend=[], games=0, matchup=None, roster=None,
-                               captured_at=None), 404
+                               roster_date=None, captured_at=None), 404
     games = _record_games(row.get("record", "")) if row else 0
     return render_template("league_team.html", name=team_name, row=row,
                            trend=trend, games=games,
                            matchup=matchup if is_opponent else None,
-                           roster=roster if isinstance(roster, list) else None,
+                           roster=roster, roster_date=roster_date,
                            captured_at=latest.get("captured_at") if latest else None)
 
 

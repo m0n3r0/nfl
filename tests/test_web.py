@@ -125,7 +125,7 @@ def test_cron_page_lists_runs_and_schedule(client, tmp_path, monkeypatch):
     html = client.get("/cron").get_data(as_text=True)
     assert "already_running" in html
     assert "47 23 * * 0" in html  # schedule table rendered
-    assert "league_report.py --opponent-roster" in html
+    assert "league_report.py --all-rosters" in html
 
 
 def test_nav_contains_fantasy_links(client, tmp_path, monkeypatch):
@@ -258,7 +258,20 @@ def test_league_team_detail_without_roster_says_so(client, tmp_path, monkeypatch
     monkeypatch.setattr(webapp, "LEAGUE_AUDIT", tmp_path / "missing.jsonl")
     html = client.get("/league/team/Team Alpha").get_data(as_text=True)
     assert "Team Alpha" in html
-    assert "no roster on file for this team" in html
+    assert "No roster captured for this team yet" in html
+
+
+def test_league_team_detail_roster_from_all_teams_map(client, tmp_path, monkeypatch):
+    report = league_report()
+    report["rosters"] = {"Team Alpha": [
+        {"name": "Alpha Rb", "team": "DAL", "position": "RB", "slot": "RB",
+         "injury_status": ""}]}
+    snap = tmp_path / "league.json"
+    snap.write_text(json.dumps(report), encoding="utf-8")
+    monkeypatch.setattr(webapp, "LEAGUE_REPORT", snap)
+    monkeypatch.setattr(webapp, "LEAGUE_AUDIT", tmp_path / "missing.jsonl")
+    html = client.get("/league/team/Team Alpha").get_data(as_text=True)
+    assert "Alpha Rb" in html  # non-opponent roster renders from the rosters map
 
 
 def test_league_team_detail_unknown_team_404(client, tmp_path, monkeypatch):
@@ -332,3 +345,28 @@ def test_league_team_detail_slash_and_unicode_names(client, tmp_path, monkeypatc
     monkeypatch.setattr(webapp, "LEAGUE_REPORT", snap)
     monkeypatch.setattr(webapp, "LEAGUE_AUDIT", tmp_path / "missing.jsonl")
     assert client.get("/league/team/A/B%20S%C3%A9bastien").status_code == 200
+
+
+def test_league_team_roster_falls_back_to_history(client, tmp_path, monkeypatch):
+    # Tonight's snapshot lacks the roster (per-team read failed) ...
+    latest = league_report()
+    monkeypatch.setattr(webapp, "LEAGUE_REPORT",
+                        _write := tmp_path / "league.json")
+    _write.write_text(json.dumps(latest), encoding="utf-8")
+    # ... but history lines still hold it; the NEWEST holder must win.
+    older = league_report()
+    older["captured_at"] = "2026-09-12T12:19:00+00:00"
+    older["rosters"] = {"Team Alpha": [
+        {"name": "Old Rb", "team": "DAL", "position": "RB", "slot": "RB",
+         "injury_status": ""}]}
+    newer = league_report()
+    newer["captured_at"] = "2026-09-13T12:19:00+00:00"
+    newer["rosters"] = {"Team Alpha": [
+        {"name": "Alpha Rb", "team": "DAL", "position": "RB", "slot": "RB",
+         "injury_status": ""}]}
+    audit = tmp_path / "league.jsonl"
+    audit.write_text(json.dumps(older) + "\n" + json.dumps(newer) + "\n", encoding="utf-8")
+    monkeypatch.setattr(webapp, "LEAGUE_AUDIT", audit)
+    html = client.get("/league/team/Team Alpha").get_data(as_text=True)
+    assert "Alpha Rb" in html and "Old Rb" not in html
+    assert "2026-09-13" in html  # dated-snapshot note rendered
