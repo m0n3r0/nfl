@@ -376,3 +376,14 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
   DL); nightly test_projections_sane green again.
 - Review flow note: CodeRabbit OSS quota = 1 review/hour on this repo; k3
   independent reviewer subagent is the approved fallback (user rule).
+
+## WAF hardening #106 (2026-09-13, PR #115)
+- waf_blocked is now a first-class outcome: preflight exit 3 (throttling, NOT
+  logout — do NOT re-login; back off 15-30 min of zero automation), operator/
+  analyzer/league_report report status waf_blocked and abort. league reads
+  fail fast on the 'Request denied' signature (yahoo/waf.py, LeagueWafBlocked).
+- Analyzer has --light (my roster + standings + matchup only, ~5 reads) for
+  gentle checks; full runs stay for weekly deep-dives.
+- WAF-blocked runs SKIP the tab-restore navigation (any request can extend
+  the throttle); next green run restores tab hygiene.
+- Suite: 164 fast tests.
