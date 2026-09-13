@@ -492,3 +492,35 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
   newest wins) → legacy opponent-only field. Verified live: all 9 teams,
   15-17 players each (Namaste → Lamar Jackson).
 - Suite: 232 fast tests.
+
+## 2026-09-14 — #129 live league scoreboard + game-day refresh (PR #130)
+
+- Problem: web UI showed only our matchup from the nightly snapshot; the other
+  8 teams' live scores were invisible during games, and everything sat stale
+  for a day. (Standings 0-0-0 in week 1 is correct Yahoo behavior — records/PF
+  count completed weeks only.)
+- `yahoo/league.py scoreboard()`: reads ALL matchups of the week off the
+  league-home scoreboard section (UL with `/f1/<league>/matchup?week=N&mid1=&mid2=`
+  links). Evaluates on the page standings() already loaded → zero extra Yahoo
+  requests. (id,name) pairs per anchor, deduped by id, in DOM order — the same
+  order the nums regex reads — so name↔score attribution is structural (k3
+  caught the mid-order variant crossing attribution). Duplicate team names
+  survive via ids; matchup link needed only for the week.
+- `league_report.py --light`: game-day refresh — standings + scoreboard +
+  matchup only (~3 page loads, no rosters); `--out` merges via merge_report()
+  so the nightly 9-team roster map survives; leftover waf_blocked status /
+  stale captured_at popped. Conflicts with roster flags.
+- Host crontab gained light runs at :05/:35 in NFL windows (JST): Fri 08-13
+  (TNF), Mon 02-13 (Sun slate), Tue 08-13 (MNF). Web UI stays ~30 min from
+  live during games. Nightly 21:19 full --all-rosters unchanged.
+- Web: /league "Week N scoreboard" card (all matchups, live scores, proj,
+  links to team detail pages, ours highlighted); /cron lists new entries.
+- Process: CodeRabbit reviewed round 1 (CdpError degrade + id-dedup findings,
+  both applied), rate-limited on re-review → k3 gated the rest alone
+  (user-approved fallback). k3 round 3 caught the attribution-crossing issue.
+- Suite: 243 fast tests. Verified live: light run captured all 5 week-1
+  matchups with scores moving between captures; merged snapshot kept rosters.
+- Reminder burned in twice this session: manual CDP pokes MUST restore the
+  league tab to /f1/1329011/2 — find_team_target fails otherwise, and the
+  404 /f1/1329011/scoreboard route does not exist (scoreboard lives on
+  league home).
