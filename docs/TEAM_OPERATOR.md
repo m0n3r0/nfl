@@ -244,6 +244,9 @@ Suggested crontab (times are JST, the host's local zone). Replace
 23 1 * * 1     cd /path/to/nfl && .venv/bin/python tools/team_operator.py --apply >> logs/team-operator-cron.log 2>&1
 11 20 * * 3    cd /path/to/nfl && .venv/bin/python tools/team_operator.py --waiver-scan --refresh-data >> logs/team-operator-cron.log 2>&1
 19 21 * * *    cd /path/to/nfl && .venv/bin/python tools/league_report.py --all-rosters --out logs/league-report.json --audit logs/league-report.jsonl >> logs/league-report-cron.log 2>&1
+5,35 8-13 * * 5  cd /path/to/nfl && .venv/bin/python tools/league_report.py --light --out logs/league-report.json --audit logs/league-report.jsonl >> logs/league-report-cron.log 2>&1
+5,35 2-13 * * 1  cd /path/to/nfl && .venv/bin/python tools/league_report.py --light --out logs/league-report.json --audit logs/league-report.jsonl >> logs/league-report-cron.log 2>&1
+5,35 8-13 * * 2  cd /path/to/nfl && .venv/bin/python tools/league_report.py --light --out logs/league-report.json --audit logs/league-report.jsonl >> logs/league-report-cron.log 2>&1
 37 9 * * 0     cd /path/to/nfl && .venv/bin/python tools/profile_backup.py >> logs/profile-backup-cron.log 2>&1
 ```
 
@@ -264,6 +267,13 @@ Suggested crontab (times are JST, the host's local zone). Replace
   and appended to the season history `logs/league-report.jsonl` — the local
   web UI's `/league` pages read these files; the web process itself never
   touches Yahoo.
+- game days at :05/:35 past the hour, Fri 08-13 / Mon 02-13 / Tue 08-13 JST
+  (= Thu/Sun/Mon NFL windows ET): light score refresh — standings, the full
+  week scoreboard (every matchup's live score, read off the league home page
+  at no extra request cost), and our matchup. No roster reads, so each run is
+  ~3 page loads; `--out` merges into the snapshot so the nightly rosters
+  survive, and the `/league` scoreboard stays within ~30 min of live during
+  games.
 - Sunday 09:37: weekly profile backup (local-only file copy — no Yahoo
   requests), keeping rung 2 of the recovery ladder fresh as cookies rotate.
 

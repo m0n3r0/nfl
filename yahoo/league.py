@@ -73,6 +73,23 @@ class MatchupScore:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class ScoreboardEntry:
+    """One league matchup from the league-home scoreboard section."""
+    week: int
+    team1: str
+    team1_id: str
+    score1: float
+    proj1: float
+    team2: str
+    team2_id: str
+    score2: float
+    proj2: float
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
 def _parse_standings_rows(header: Any, rows: Any) -> tuple[StandingsRow, ...]:
     if not isinstance(rows, list) or not isinstance(header, list):
         raise LeagueReadError("standings rows are missing")
@@ -154,6 +171,89 @@ def team_ids(client: LeagueClient) -> dict[str, str]:
     if not isinstance(ids, dict) or not ids:
         raise LeagueReadError("no team links found on the league home page")
     return ids
+
+
+def _parse_scoreboard_entries(entries: Any) -> tuple[ScoreboardEntry, ...]:
+    """Turn the league-home JS payload into ScoreboardEntries (pure; testable).
+
+    An entry qualifies on identity alone (matchup link + two named teams);
+    the four floats around "vs" (score/proj per side) degrade to 0.0 — the
+    pre-game page can render without them, and a scoreless entry still tells
+    the web UI who plays whom.
+    """
+    if not isinstance(entries, list):
+        raise LeagueReadError("scoreboard payload is missing")
+    out = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        ids = entry.get("ids")
+        names = entry.get("names")
+        if (not isinstance(ids, list) or len(ids) != 2
+                or not isinstance(names, list) or len(names) != 2
+                or not entry.get("week")):
+            continue
+        nums = entry.get("nums")
+        try:
+            vals = ([float(n) for n in nums]
+                    if isinstance(nums, list) and len(nums) == 4 else None)
+            score1, proj1, score2, proj2 = vals if vals else (0.0, 0.0, 0.0, 0.0)
+            out.append(ScoreboardEntry(
+                week=int(entry["week"]),
+                team1=str(names[0]), team1_id=str(ids[0]),
+                score1=score1, proj1=proj1,
+                team2=str(names[1]), team2_id=str(ids[1]),
+                score2=score2, proj2=proj2,
+            ))
+        except (TypeError, ValueError):
+            continue  # one mangled entry must not kill the rest (standings idiom)
+    if not out:
+        raise LeagueReadError("no parseable scoreboard entries")
+    return tuple(out)
+
+
+def scoreboard(client: LeagueClient) -> tuple[ScoreboardEntry, ...]:
+    """Read every matchup of the current week from the league-home scoreboard.
+
+    Evaluates on the league home page — call it right after standings()
+    (which navigates there), so a full league overview costs no extra
+    request. Fails closed when the browser is anywhere else, like the
+    sibling readers.
+    """
+    payload = client.evaluate(
+        r'''/* yahoo-league-scoreboard */ (() => {
+          const ul = [...document.querySelectorAll('ul')].find(el =>
+            (el.innerText || '').length < 2000 &&
+            el.querySelector('a[href*="%s/matchup?"]'));
+          const entries = ul ? [...ul.children].map(li => {
+            const links = [...li.querySelectorAll('a[href]')];
+            const mu = links.map(a => a.getAttribute('href') || '')
+              .map(h => h.match(/\/f1\/\d+\/matchup\?week=(\d+)&mid1=(\d+)&mid2=(\d+)/))
+              .find(Boolean);
+            // (id, name) pairs per anchor, deduped by id, in DOM order — the
+            // same order the nums regex reads scores in, so name↔score
+            // alignment is structural; the matchup link is needed only for
+            // the week (duplicate team names survive via distinct ids).
+            const seen = {};
+            const teams = [];
+            links.forEach(a => {
+              const m = (a.getAttribute('href') || '').match(/\/f1\/\d+\/(\d+)\/?$/);
+              const t = (a.innerText || '').trim();
+              if (m && t && !seen[m[1]]) { seen[m[1]] = 1; teams.push({id: m[1], name: t}); }
+            });
+            const two = teams.slice(0, 2);
+            const m = (li.innerText || '').match(
+              /(\d+\.\d+)\s*\n\s*(\d+\.\d+)\s*\n\s*\t?\s*vs\.?\s*\t?\s*\n\s*(\d+\.\d+)\s*\n\s*(\d+\.\d+)/);
+            return {week: mu && mu[1], ids: two.map(t => t.id),
+                    names: two.map(t => t.name),
+                    nums: m && [m[1], m[2], m[3], m[4]].map(parseFloat)};
+          }) : [];
+          return {path: location.pathname.replace(/\/$/, ''), entries};
+        })()''' % LEAGUE_HOME
+    )
+    if not isinstance(payload, dict) or payload.get("path") != LEAGUE_HOME:
+        raise LeagueReadError("not on the league home page")
+    return _parse_scoreboard_entries(payload.get("entries"))
 
 
 def _build_matchup_score(payload: Any) -> MatchupScore:

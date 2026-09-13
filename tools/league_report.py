@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Print league standings and the current matchup score (read-only).
+"""Print league standings, the week scoreboard, and our matchup (read-only).
 
 Other managers' team names appear in this output: keep it in the console or
 local logs, never in committed files (this repo is public).
@@ -27,6 +27,7 @@ from yahoo.league import (  # noqa: E402
     matchup,
     opponent_roster,
     opponent_team_id,
+    scoreboard,
     standings,
     team_ids,
 )
@@ -59,6 +60,30 @@ def write_report(path: str, report: dict) -> None:
         tmp.unlink(missing_ok=True)
 
 
+def merge_report(path: str, report: dict) -> None:
+    """Light-mode persist: refresh the snapshot without dropping roster data.
+
+    A light run captures no rosters, so writing it plainly would erase the
+    roster map the web detail pages rely on. Merging old-then-new keeps the
+    last good `rosters`/`opponent_roster` keys; refreshed keys (standings,
+    matchup, and the scoreboard when its read succeeds) come from the new
+    report, otherwise the old values carry forward as last-good. Missing or
+    corrupt existing files degrade to a plain write (a light report still
+    stands on its own).
+    """
+    try:
+        old = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        old = None
+    if isinstance(old, dict):
+        # write_report re-stamps; a stale capture time or a leftover
+        # waf_blocked status must not survive a healthy merged write.
+        old.pop("captured_at", None)
+        old.pop("status", None)
+        report = {**old, **report}
+    write_report(path, report)
+
+
 def append_audit(path: str, report: dict) -> None:
     """Append the report as one JSON line (season history of snapshots).
 
@@ -81,6 +106,9 @@ def main() -> int:
                         help="also read the matchup opponent's roster")
     parser.add_argument("--all-rosters", action="store_true",
                         help="also read every other team's roster (paced, nightly use)")
+    parser.add_argument("--light", action="store_true",
+                        help="game-day refresh: standings + scoreboard + matchup only "
+                             "(no roster reads); --out merges so prior rosters survive")
     parser.add_argument("--roster-delay", type=float, default=3.0, metavar="SECONDS",
                         help="pause between per-team roster reads (default 3.0)")
     parser.add_argument("--endpoint", default="http://127.0.0.1:9222")
@@ -91,6 +119,8 @@ def main() -> int:
     args = parser.parse_args()
     if args.roster_delay < 0:
         parser.error("--roster-delay must be >= 0")
+    if args.light and (args.all_rosters or args.opponent_roster):
+        parser.error("--light reads no rosters; it conflicts with --all-rosters/--opponent-roster")
 
     target = find_team_target(args.endpoint)
     with CdpClient(target, args.endpoint, timeout=25) as client:
@@ -99,6 +129,15 @@ def main() -> int:
             report = {
                 "standings": [row.as_dict() for row in standings(client)],
             }
+            try:
+                # Free like team_ids: evaluates on the page standings() loaded.
+                report["scoreboard"] = [e.as_dict() for e in scoreboard(client)]
+            except LeagueWafBlocked:
+                raise  # never downgrade a block to a warning, same as rosters
+            except CdpError as exc:
+                # A scoreboard miss — parse failure OR a CDP hiccup on this
+                # free read — must never kill the standings+matchup core.
+                print(f"warning: scoreboard skipped: {exc}", file=sys.stderr)
             ids = {}
             if args.all_rosters:
                 try:
@@ -156,6 +195,8 @@ def main() -> int:
         for persist, path in ((write_report, args.out), (append_audit, args.audit)):
             if not path:
                 continue
+            if args.light and persist is write_report:
+                persist = merge_report  # keep the last good roster map
             try:
                 persist(path, report)
             except OSError as exc:  # the live-fetched report must still stand

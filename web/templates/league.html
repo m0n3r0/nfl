@@ -36,6 +36,26 @@ data may be incomplete. Live reads retry on the next cron run.</div>
 </div>
 {% endif %}
 
+{% if scoreboard %}
+<div class="card">
+  <h2>Week {{ scoreboard[0].week }} scoreboard</h2>
+  <table>
+    <tr><th style="text-align:right">Team</th><th>Score</th><th></th><th>Score</th><th style="text-align:left">Team</th><th>Projected</th></tr>
+    {% for e in scoreboard %}
+    {% set mine = e.team1 == my_name or e.team2 == my_name %}
+    <tr{% if mine %} style="background:#1d2b3a"{% endif %}>
+      <td style="text-align:right">{% if e.team1 == my_name %}<b><a href="/league/team/{{ e.team1 | urlencode }}">{{ e.team1 }}</a></b>{% else %}<a href="/league/team/{{ e.team1 | urlencode }}">{{ e.team1 }}</a>{% endif %}</td>
+      <td><b>{{ e.score1 }}</b></td>
+      <td class="muted">vs</td>
+      <td><b>{{ e.score2 }}</b></td>
+      <td style="text-align:left">{% if e.team2 == my_name %}<b><a href="/league/team/{{ e.team2 | urlencode }}">{{ e.team2 }}</a></b>{% else %}<a href="/league/team/{{ e.team2 | urlencode }}">{{ e.team2 }}</a>{% endif %}</td>
+      <td class="muted">{{ e.proj1 }} – {{ e.proj2 }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
 {% if report.matchup is mapping %}
 <div class="card">
   <h2>My matchup — week {{ report.matchup.week }}</h2>

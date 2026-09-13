@@ -102,6 +102,36 @@ def test_league_page_renders_standings_and_marks_my_team(client, tmp_path, monke
     assert "140.5" in html
 
 
+def test_league_page_renders_scoreboard_card(client, tmp_path, monkeypatch):
+    report = league_report()
+    report["scoreboard"] = [
+        {"week": 1, "team1": "Shiba Innu", "team1_id": "2", "score1": 134.7,
+         "proj1": 150.89, "team2": "Team Beta", "team2_id": "10",
+         "score2": 86.2, "proj2": 134.63},
+        {"week": 1, "team1": "Team Alpha", "team1_id": "1", "score1": 89.46,
+         "proj1": 113.82, "team2": "Team Gamma", "team2_id": "6",
+         "score2": 75.86, "proj2": 97.49},
+    ]
+    snap = tmp_path / "league.json"
+    snap.write_text(json.dumps(report), encoding="utf-8")
+    monkeypatch.setattr(webapp, "LEAGUE_REPORT", snap)
+    html = client.get("/league").get_data(as_text=True)
+    assert "Week 1 scoreboard" in html
+    assert '<a href="/league/team/Team%20Gamma">Team Gamma</a>' in html
+    assert "134.63" in html  # projections column
+
+
+def test_league_page_skips_junk_scoreboard(client, tmp_path, monkeypatch):
+    report = league_report()
+    report["scoreboard"] = [{"week": 1}, "not-a-dict"]  # one bad apple
+    snap = tmp_path / "league.json"
+    snap.write_text(json.dumps(report), encoding="utf-8")
+    monkeypatch.setattr(webapp, "LEAGUE_REPORT", snap)
+    response = client.get("/league")
+    assert response.status_code == 200
+    assert "scoreboard" not in response.get_data(as_text=True).lower()
+
+
 def test_league_page_missing_file_shows_notice(client, tmp_path, monkeypatch):
     monkeypatch.setattr(webapp, "LEAGUE_REPORT", tmp_path / "missing.json")
     html = client.get("/league").get_data(as_text=True)

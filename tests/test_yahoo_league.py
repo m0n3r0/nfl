@@ -8,10 +8,12 @@ from yahoo.league import (
     LeagueReadError,
     LeagueWafBlocked,
     MatchupScore,
+    ScoreboardEntry,
     StandingsRow,
     matchup,
     opponent_roster,
     opponent_team_id,
+    scoreboard,
     standings,
 )
 
@@ -129,6 +131,72 @@ def test_league_reads_fail_fast_on_waf_denial_page():
         opponent_roster(Client({}, denied=True), "7")
     with pytest.raises(LeagueWafBlocked, match="Request denied"):
         opponent_team_id(Client({}, denied=True))
+
+
+def test_scoreboard_parses_all_matchups():
+    client = Client({"yahoo-league-scoreboard": {
+        "path": "/f1/1329011",
+        "entries": [
+            {"week": "1", "ids": ["2", "10"], "names": ["Shiba Innu", "Team Alpha"],
+             "nums": [134.7, 150.89, 86.2, 134.63]},
+            {"week": "1", "ids": ["1", "6"], "names": ["Team Beta", "Team Gamma"],
+             "nums": [89.46, 113.82, 75.86, 97.49]},
+        ],
+    }})
+
+    entries = scoreboard(client)
+
+    assert entries == (
+        ScoreboardEntry(week=1, team1="Shiba Innu", team1_id="2", score1=134.7,
+                        proj1=150.89, team2="Team Alpha", team2_id="10",
+                        score2=86.2, proj2=134.63),
+        ScoreboardEntry(week=1, team1="Team Beta", team1_id="1", score1=89.46,
+                        proj1=113.82, team2="Team Gamma", team2_id="6",
+                        score2=75.86, proj2=97.49),
+    )
+    assert client.navigated == []  # rides on the standings page: no navigation
+
+
+def test_scoreboard_degrades_to_zeros_without_numbers():
+    # Pre-game pages can render matchup cards without the score/proj floats.
+    client = Client({"yahoo-league-scoreboard": {
+        "path": "/f1/1329011",
+        "entries": [{"week": "1", "ids": ["2", "10"],
+                     "names": ["Shiba Innu", "Team Alpha"], "nums": None}],
+    }})
+
+    (entry,) = scoreboard(client)
+
+    assert (entry.score1, entry.proj1, entry.score2, entry.proj2) == (0.0, 0.0, 0.0, 0.0)
+    assert entry.team1 == "Shiba Innu" and entry.team2_id == "10"
+
+
+def test_scoreboard_fails_closed_on_wrong_page_and_empty_payload():
+    wrong_page = Client({"yahoo-league-scoreboard": {"path": "/f1/1329011/2", "entries": []}})
+    with pytest.raises(LeagueReadError, match="not on the league home page"):
+        scoreboard(wrong_page)
+
+    no_entries = Client({"yahoo-league-scoreboard": {"path": "/f1/1329011", "entries": [
+        {"week": "1", "ids": ["2"], "names": ["Shiba Innu"], "nums": None},  # malformed
+    ]}})
+    with pytest.raises(LeagueReadError, match="no parseable scoreboard entries"):
+        scoreboard(no_entries)
+
+
+def test_scoreboard_skips_mangled_entries_keeps_good_ones():
+    entries = (
+        {"week": "abc", "ids": ["2", "10"], "names": ["Shiba Innu", "Team Alpha"],
+         "nums": [1.0, 2.0, 3.0, 4.0]},          # bad week
+        {"week": "1", "ids": ["1", "6"], "names": ["Team Beta", "Team Gamma"],
+         "nums": ["x", 113.82, 75.86, 97.49]},   # bad float
+        {"week": "1", "ids": ["3", "4"], "names": ["Team Delta", "Team Epsilon"],
+         "nums": [10.5, 100.1, 20.5, 90.2]},     # clean
+    )
+
+    (survivor,) = scoreboard(Client({"yahoo-league-scoreboard": {
+        "path": "/f1/1329011", "entries": list(entries)}}))
+
+    assert survivor.team1 == "Team Delta" and survivor.score1 == 10.5
 
 
 def test_wire_rank_targets_orders_and_skips():

@@ -8,7 +8,7 @@ Server-rendered (Jinja) so it runs with no build step:
 Pages:
   /            dashboard (2026 projections + model card)
   /team        my FD nation team (latest operator report: matchup, lineup, flags)
-  /league      league standings + matchup (how the other teams are doing)
+  /league      league standings + week scoreboard (how the other teams are doing)
   /league/team/<name>  one team's standing, trajectory, and roster when captured
   /cron        operator/cron status (run history + schedule)
   /players     searchable player list with 2022-2026 stats + 2026 projection
@@ -53,6 +53,9 @@ CRON_SCHEDULE = [
     ("23 1 * * 1", "Mon 01:23", "team_operator.py --apply — final pre-kickoff set"),
     ("11 20 * * 3", "Wed 20:11", "team_operator.py --waiver-scan --refresh-data"),
     ("19 21 * * *", "nightly 21:19", "league_report.py --all-rosters --out --audit — league snapshot"),
+    ("5,35 8-13 * * 5", "Fri 08:05–13:35 (TNF)", "league_report.py --light — score refresh"),
+    ("5,35 2-13 * * 1", "Mon 02:05–13:35 (Sun slate)", "league_report.py --light — score refresh"),
+    ("5,35 8-13 * * 2", "Tue 08:05–13:35 (MNF)", "league_report.py --light — score refresh"),
     ("37 9 * * 0", "Sun 09:37", "profile_backup.py — browser-profile backup"),
 ]
 
@@ -183,15 +186,18 @@ def my_team():
 
 @app.route("/league")
 def league():
-    """League standings + current matchup (how the other teams are doing)."""
+    """League standings + week scoreboard (how the other teams are doing)."""
     report = _read_league_report()
     standings = report.get("standings") if report else None
     if not isinstance(standings, list):
         standings = None
     matchup = report.get("matchup") if report else None
     my_name = matchup.get("team") if isinstance(matchup, dict) else None
+    scoreboard = report.get("scoreboard") if report else None
+    if not isinstance(scoreboard, list) or not all(isinstance(e, dict) for e in scoreboard):
+        scoreboard = None  # older snapshots predate the scoreboard capture
     return render_template("league.html", report=report, standings=standings,
-                           my_name=my_name)
+                           scoreboard=scoreboard, my_name=my_name)
 
 
 @app.route("/league/team/<path:team_name>")

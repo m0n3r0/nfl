@@ -27,6 +27,12 @@ class FakeClient:
 def harness(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["league_report.py"])
     monkeypatch.setattr(league_report, "find_team_target", lambda endpoint: object())
+    # Default: the scoreboard section is absent. The real reader raises
+    # LeagueReadError when nothing parses (it never returns empty), so the
+    # stub mirrors that; tests that care override with their own stub.
+    def no_scoreboard(client):
+        raise LeagueReadError("no scoreboard in fixture")
+    monkeypatch.setattr(league_report, "scoreboard", no_scoreboard)
     client = FakeClient()
 
     @contextlib.contextmanager
@@ -213,3 +219,101 @@ def test_all_rosters_waf_keeps_full_contract(harness, monkeypatch, capsys, tmp_p
     assert json.loads(capsys.readouterr().out) == {"status": "waf_blocked"}
     assert harness.urls == []  # no restore navigation into the block
     assert not out_path.exists()
+
+
+def test_scoreboard_rides_standings_page_and_lands_in_report(harness, monkeypatch, capsys):
+    calls = []
+    monkeypatch.setattr(league_report, "standings",
+                        lambda client: calls.append("standings") or ())
+    monkeypatch.setattr(league_report, "scoreboard",
+                        lambda client: calls.append("scoreboard") or
+                        [types.SimpleNamespace(as_dict=lambda: {"week": 1, "team1": "A"})])
+    monkeypatch.setattr(league_report, "matchup",
+                        lambda client: calls.append("matchup") or
+                        types.SimpleNamespace(as_dict=lambda: {"week": 1}))
+
+    assert league_report.main() == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["scoreboard"] == [{"week": 1, "team1": "A"}]
+    # Load-bearing order: scoreboard evaluates on the page standings() loaded,
+    # before matchup() navigates away.
+    assert calls == ["standings", "scoreboard", "matchup"]
+
+
+def test_scoreboard_failure_degrades_but_waf_still_aborts(harness, monkeypatch, capsys):
+    _green_stubs(monkeypatch)
+
+    def explode(client):
+        raise LeagueReadError("markup changed")
+    monkeypatch.setattr(league_report, "scoreboard", explode)
+
+    assert league_report.main() == 0
+    out = json.loads(capsys.readouterr().out)
+    assert "scoreboard" not in out  # bonus read fails soft, core stands
+
+    from yahoo.cdp import CdpError
+
+    def hiccup(client):
+        raise CdpError("websocket dropped")
+    monkeypatch.setattr(league_report, "scoreboard", hiccup)
+
+    assert league_report.main() == 0  # a CDP hiccup on the free read degrades too
+    assert "scoreboard" not in json.loads(capsys.readouterr().out)
+
+    def blocked(client):
+        raise LeagueWafBlocked("denied")
+    monkeypatch.setattr(league_report, "scoreboard", blocked)
+
+    assert league_report.main() == 2  # a block is never downgraded to a warning
+    assert json.loads(capsys.readouterr().out) == {"status": "waf_blocked"}
+
+
+def test_light_run_merges_out_and_keeps_prior_rosters(harness, monkeypatch, capsys, tmp_path):
+    out_path = tmp_path / "league.json"
+    out_path.write_text(json.dumps({
+        "captured_at": "2026-09-13T12:19:00+00:00",
+        "standings": [{"team": "Team Alpha", "points_for": 10.5}],
+        "rosters": {"Team Alpha": [{"name": "Player 3"}]},
+        "opponent_team_id": "3",
+        "opponent_roster": [{"name": "Player 3"}],
+    }), encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", ["league_report.py", "--light", "--out", str(out_path)])
+    _green_stubs(monkeypatch)
+    monkeypatch.setattr(league_report, "team_ids",
+                        lambda client: (_ for _ in ()).throw(AssertionError("light reads no ids")))
+    monkeypatch.setattr(league_report, "opponent_roster",
+                        lambda client, tid: (_ for _ in ()).throw(AssertionError("light reads no rosters")))
+
+    assert league_report.main() == 0
+    persisted = json.loads(out_path.read_text())
+    assert persisted["rosters"] == {"Team Alpha": [{"name": "Player 3"}]}  # survives
+    assert persisted["opponent_roster"] == [{"name": "Player 3"}]
+    assert persisted["matchup"] == {"week": 1}  # refreshed
+    assert persisted["captured_at"] != "2026-09-13T12:19:00+00:00"  # re-stamped
+
+
+def test_light_conflicts_with_roster_flags(harness, monkeypatch, capsys):
+    for flag in ("--all-rosters", "--opponent-roster"):
+        monkeypatch.setattr(sys, "argv", ["league_report.py", "--light", flag])
+        with pytest.raises(SystemExit):
+            league_report.main()
+        assert "--light" in capsys.readouterr().err
+
+
+def test_light_merge_tolerates_corrupt_and_stub_snapshots(harness, monkeypatch, capsys, tmp_path):
+    out_path = tmp_path / "league.json"
+    monkeypatch.setattr(sys, "argv", ["league_report.py", "--light", "--out", str(out_path)])
+    _green_stubs(monkeypatch)
+
+    out_path.write_text("{not json", encoding="utf-8")  # corrupt
+    assert league_report.main() == 0
+    persisted = json.loads(out_path.read_text())  # plain write, still valid JSON
+    assert persisted["matchup"] == {"week": 1}
+
+    out_path.write_text(json.dumps({"status": "waf_blocked",
+                                    "captured_at": "2026-09-13T00:00:00+00:00"}),
+                        encoding="utf-8")  # leftover stub (written by hand, say)
+    assert league_report.main() == 0
+    persisted = json.loads(out_path.read_text())
+    assert "status" not in persisted  # a healthy merge never carries the stub flag
+    assert persisted["captured_at"] != "2026-09-13T00:00:00+00:00"

@@ -219,6 +219,7 @@ cd /Users/user/nfl
 | `23 1 * * 1` (Mon 01:23 = Sun ~12:23 ET) | Set the week's lineup: `--apply` |
 | `11 20 * * 3` (Wed 20:11) | Waiver scan with fresh data: `--waiver-scan --refresh-data` |
 | `19 21 * * *` (nightly 21:19) | League snapshot + all teams' rosters for the web UI (`league_report.py --all-rosters --out` + `--audit`) |
+| `5,35 8-13 * * 5` / `5,35 2-13 * * 1` / `5,35 8-13 * * 2` (game windows) | Light score refresh during Thu/Sun/Mon games: standings + full week scoreboard + our matchup, no roster reads; merges into the snapshot so the web UI stays ~30 min from live (`league_report.py --light --out` + `--audit`) |
 | `37 9 * * 0` (Sun 09:37) | Weekly browser-profile backup (`tools/profile_backup.py`, local-only) |
 
 ### The tools you'll touch by hand
