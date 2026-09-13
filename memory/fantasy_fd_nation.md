@@ -450,3 +450,9 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
 - Loaders normalize/tolerate: non-dict lines, bad UTF-8, null moves/plan,
   non-dict matchup/standings — corrupted artifacts render honest pages,
   never 500. Suite: 206 fast tests.
+
+## Web nav grouping #123 (2026-09-14, PR #124)
+- Header now two labeled groups: FD nation (My Team / League / Cron) first,
+  then Prediction engines (Dashboard / Players / Win Predictions / Ratings /
+  Strategy / SOS). Groups are unbreakable spans (narrow windows never split a
+  label from its links). Test pins labels + order. Suite: 206 fast + 18 web.
