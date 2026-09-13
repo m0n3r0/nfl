@@ -68,8 +68,13 @@ def project_players(corpus: dict) -> pd.DataFrame:
     weekly["wp"] = weekly["fantasy_points"] * weekly["w"]
     # Group by player, not team.  A mid-career team change must not discard the
     # player's earlier production when selecting the latest 2026 team role.
-    grp = weekly.groupby(["player_id", "player_display_name", "position"])
+    # Name/position come from the latest season too: nflverse sometimes
+    # relabels a player's position across seasons, and grouping on it would
+    # emit one row per position -- a duplicate player_id on the board (#112).
+    grp = weekly.groupby("player_id")
     base = grp.agg(
+        player_display_name=("player_display_name", "last"),
+        position=("position", "last"),
         weighted_ppg=("wp", "sum"),
         weight_sum=("w", "sum"),
         games=("week", "size"),

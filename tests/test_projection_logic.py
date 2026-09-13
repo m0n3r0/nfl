@@ -45,6 +45,37 @@ def test_team_change_keeps_history_and_counts_rows(monkeypatch):
     assert veteran["expected_games"] < 17
 
 
+def test_position_relabel_keeps_single_row_and_history(monkeypatch):
+    """nflverse sometimes relabels a player's position across seasons.
+
+    Grouping on (player_id, name, position) emitted one row per position,
+    duplicating the player_id on the board and breaking its uniqueness
+    contract (#112). The latest season's name/position wins; history is kept.
+    """
+    monkeypatch.setattr(projections, "HISTORY_SEASONS", (2024, 2025))
+    weekly = pd.DataFrame([
+        {"player_id": "x", "player_display_name": "Flex Old", "position": "TE",
+         "recent_team": "NEW", "season": 2024, "week": 1, "fantasy_points": 8.0},
+        {"player_id": "x", "player_display_name": "Flex", "position": "WR",
+         "recent_team": "NEW", "season": 2025, "week": 1, "fantasy_points": 12.0},
+        {"player_id": "x", "player_display_name": "Flex", "position": "WR",
+         "recent_team": "NEW", "season": 2025, "week": 2, "fantasy_points": 12.0},
+    ])
+    corpus = {
+        "weekly_history": weekly,
+        "depth_roles": pd.DataFrame([{"gsis_id": "x", "team": "NEW", "role_share": 0.60}]),
+        "schedule_2026": pd.DataFrame([{"team": "NEW", "opponent": "DEF"}]),
+        "team_defense": pd.DataFrame([{"team": "DEF", "def_sos_factor": 0.0}]),
+    }
+    result = projections.project_players(corpus)
+
+    assert result["player_id"].is_unique
+    flex = result[result["player_id"] == "x"].iloc[0]
+    assert flex["position"] == "WR"            # latest season wins
+    assert flex["player_display_name"] == "Flex"
+    assert flex["games"] == 3                  # history across the relabel retained
+
+
 def test_first_round_starter_rookie_is_not_capped_below_mean(monkeypatch):
     monkeypatch.setattr(projections, "HISTORY_SEASONS", (2024, 2025))
     result = projections.project_players(_corpus())
