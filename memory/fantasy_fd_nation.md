@@ -395,3 +395,25 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
 - WAF-blocked runs SKIP the tab-restore navigation (any request can extend
   the throttle); next green run restores tab hygiene.
 - Suite: 164 fast tests.
+
+## Session persistence #117 (2026-09-13, PR #118)
+- Login is cookie-based, not password-based (main Login Data store is empty).
+  Yahoo A1/A3 → 2027-09; SPT/SPTB rolling; Google SID/__Secure-1PSID → 2027-10.
+  Cookies die early only on server-side revoke (password change, logout,
+  security challenge) — a plain relaunch never clears them.
+- Recovery ladder: (1) relaunch same profile+flags → logged in; (2) profile
+  lost → ensure_browser auto-restores ~/edge-profile-backups → logged in;
+  (3) Yahoo revoked but Google alive → login.yahoo.com "Sign in with Google"
+  is a button click, no password; (4) both dead → one manual Google login,
+  then re-run tools/profile_backup.py. Backup refreshed 2026-09-13.
+- tools/verify_relaunch.py = the drill: copies profile (or --from-backup),
+  headless throwaway on OS-assigned port (DevToolsActivePort read-back),
+  same-origin probe with redirect:'manual', verdict signed_in(0) /
+  login_required(1, positive evidence only) / inconclusive(2, WAF/infra).
+  NEVER touches the live browser. Verified live: exit 0 vs copy AND backup.
+- Live demo for the user: killed + relaunched the operator browser via
+  tools/launch_browser.py → check_login 200 + Doge. No password needed.
+- Drill gotchas burned into tests: denied-wins ordering, status None and
+  429/5xx are inconclusive (never logout), 302 retries (anonymous early
+  probe races the cookie store), 401/403/3xx = real logout, 404 = stale path.
+- Suite: 187 fast tests.
