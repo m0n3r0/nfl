@@ -417,3 +417,20 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
   429/5xx are inconclusive (never logout), 302 retries (anonymous early
   probe races the cookie store), 401/403/3xx = real logout, 404 = stale path.
 - Suite: 187 fast tests.
+
+## Cron/browser adaptation review #119 (2026-09-13, PR #120)
+- Chain verified: every cron run of team_operator.py starts with preflight →
+  ensure_browser (relaunch with profile if CDP down, backup auto-restore if
+  profile missing, CfT download if binary missing). launchd com.fdnation.browser
+  runs preflight at login. Evidence: 08:24 cron run = ok right after the
+  kill/relaunch demo.
+- Crontab changes on the host (backup /tmp/crontab.bak):
+  - ADDED 47 23 * * 0 --apply = Sunday 23:47 JST (10:47 ET) safety net; the
+    01:23 JST Monday final set fires when the Mac is likely asleep and cron
+    has no catch-up. --apply is a no-op when the lineup is already optimal
+    (submission gated on proposal.moves), so double-apply is harmless.
+  - ADDED 37 9 * * 0 profile_backup.py = weekly backup, local-only (no Yahoo
+    requests, no browser stop), keeps recovery-ladder rung 2 fresh.
+- Wednesday 20:11 waiver-scan vs 20:24 daily: LOCK_NB skip is harmless
+  (waiver run produces the full report). Cron logs grow ~KB/day; fine.
+- Docs synced: TEAM_OPERATOR crontab block + GAME_PLAN Part 9 table (5 entries).
