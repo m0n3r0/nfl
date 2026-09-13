@@ -473,3 +473,22 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
   after 15-30 min quiet. OAuth/API path rejected by user (app approval takes
   weeks) — CDP+JS in the real browser stays the method.
 - Suite: 220 fast tests.
+
+## All-teams rosters #127 (2026-09-14, PR #128)
+- Nightly job is now: league_report.py --all-rosters --out … --audit …
+  (21:19). team_ids() maps name → roster number from standings-page anchors
+  for FREE (same page as standings; path-validated fail-closed — the
+  ordering invariant standings → team_ids → matchup is pinned by a test
+  because matchup() navigates away and the regression bit once already).
+- --all-rosters: 9 paced reads (~5s each incl. 3s --roster-delay + 2s
+  settle, ~60-90s total); per-team LeagueReadError degrades with a warning;
+  LeagueWafBlocked re-raised (exit 2, no persistence, no restore-nav).
+  TEAM_ID filtered before the paced loop. Rosters persist under
+  report["rosters"] = {name: [players]}.
+- matchup() live-game fix: score regex accepts "vs." (live layout) and
+  projections fall back to "Orig Proj" (ordered opponent, team — verified
+  against the live body). Attribution is pure _build_matchup_score + tests.
+- Detail pages: roster from the all-teams map → history fallback (dated,
+  newest wins) → legacy opponent-only field. Verified live: all 9 teams,
+  15-17 players each (Namaste → Lamar Jackson).
+- Suite: 232 fast tests.
