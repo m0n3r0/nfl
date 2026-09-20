@@ -558,3 +558,20 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
 - Operational rule: our tables and Yahoo's can drift midweek until corrections
   land — run `cli.py ingest --refresh` (or team_operator `--refresh-data`)
   after Thursday US corrections, before weekend lineup decisions.
+
+## 2026-09-20 — Cloudflare tunnel + persistent web UI (jra-van-re method)
+
+- Three user LaunchAgents (`tools/install_launchd.py --agent {browser,cloudflared,web}`):
+  `com.fdnation.browser` (keepalive, pre-existing), `com.fdnation.web` (Flask UI on
+  127.0.0.1:5000, KeepAlive, logs/web.log — added after a session-bound process died
+  and took the public URL down), `com.fdnation.cloudflared` (quick tunnel).
+- Tunnel: `cloudflared tunnel --no-autoupdate --url http://127.0.0.1:5000`;
+  `tools/launchd/cloudflared-url-watch` greps logs/cloudflared.log, health-gates the
+  edge, publishes the live URL atomically (0600) to **logs/cloudflared-url.txt**.
+- Caveats: URL is **ephemeral** (changes on cloudflared restart, watcher republishes)
+  and **unauthenticated** — anyone with the URL reads every page; treat the file like
+  a password. Stable URL would need a named tunnel on a domain (unresolved, same as jra).
+- Same day cleanup: jra-van-re's cloudflared (port 4173) had a duplicate orphan +
+  double-loaded job (gui + system domains); gui copy booted out + disabled, system
+  LaunchDaemon booted out + disabled via sudo. jra stack not running; only the nfl
+  tunnel (5000) remains. jra plists left on disk (reversible).
