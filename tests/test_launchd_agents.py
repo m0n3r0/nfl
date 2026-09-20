@@ -28,6 +28,17 @@ def test_cloudflared_template_renders_keepalive_tunnel():
     assert plist["StandardOutPath"].endswith("logs/cloudflared.log")
 
 
+def test_web_template_renders_loopback_app():
+    plist = install_launchd.render("web")
+    assert plist["Label"] == "com.fdnation.web"
+    assert plist["KeepAlive"] is True
+    python, script = plist["ProgramArguments"]
+    assert python.endswith(".venv/bin/python")
+    assert script.endswith("web/app.py")
+    assert "@REPO_ROOT@" not in script
+    assert plist["StandardOutPath"].endswith("logs/web.log")
+
+
 def test_unknown_agent_rejected():
     with pytest.raises(ValueError, match="unknown agent"):
         install_launchd.render("nope")

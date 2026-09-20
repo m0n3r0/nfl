@@ -10,6 +10,7 @@ Agents:
   cloudflared  quick tunnel exposing the local web UI (127.0.0.1:5000) on an
                ephemeral *.trycloudflare.com URL — unauthenticated; the live
                URL lands in logs/cloudflared-url.txt (mode 0600)
+  web          the Flask web UI itself on 127.0.0.1:5000 (loopback only)
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-AGENTS = ("browser", "cloudflared")
+AGENTS = ("browser", "cloudflared", "web")
 
 
 def template_path(agent: str, repo_root: Path = ROOT) -> Path:

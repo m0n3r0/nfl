@@ -232,8 +232,10 @@ under launchd (`com.fdnation.cloudflared`, KeepAlive). A watcher
 only once the edge actually serves the app. Caveats, same as jra-van-re's:
 the URL is **ephemeral** (new one every cloudflared restart — nothing
 bookmarkable), **unauthenticated** (anyone with the URL can read every page —
-treat the URL file like a password), and the web app must be running
-separately (`python cli.py web`); the tunnel alone serves nothing.
+treat the URL file like a password), and the tunnel only forwards to
+127.0.0.1:5000 — the web app must be running too: either `python cli.py web`
+by hand, or persistently via `python tools/install_launchd.py --agent web`
+(`com.fdnation.web`, KeepAlive, logs in `logs/web.log`).
 
 Pages: **my team** (latest operator report: matchup, lineup plan, monitor
 flags), **league** (standings + matchup from the nightly league snapshot),
