@@ -6,3 +6,4 @@ scikit-learn>=1.3
 joblib>=1.3
 flask>=3.0
 websocket-client>=1.6
+typesafe-sdk>=0.7

@@ -63,12 +63,13 @@ def jev_questions() -> dict:
     }
 
 
-def review_targets(targets: list[dict], week: int) -> int:
+def review_targets(targets: list[dict], week: int, client=None) -> int:
     """Attach a 'jev' block to each target in place; returns failures."""
     failures = 0
     for target in targets:
         try:
-            resp = jev.ask(jev_state(target, week), jev_questions())
+            resp = jev.ask(jev_state(target, week), jev_questions(),
+                           client=client)
             answers = resp.answers
             target["jev"] = {
                 "profile": answers["profile"].choice,
@@ -112,7 +113,11 @@ def main() -> int:
 
     top = ranked[: args.top]
     if args.jev:
-        review_targets(top[: args.jev], week)
+        try:
+            with jev.connect() as client:
+                review_targets(top[: args.jev], week, client=client)
+        except jev.JevError as exc:
+            print(f"warning: Jev review unavailable: {exc}", file=sys.stderr)
 
     print(json.dumps({
         "week": week,
