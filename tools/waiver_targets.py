@@ -34,56 +34,6 @@ from yahoo.wire import rank_targets, scan_available  # noqa: E402
 BASE = "https://football.fantasysports.yahoo.com"
 
 
-def jev_state(target: dict, week: int) -> dict:
-    """Compact per-player state; Jev can only judge facts we hand it."""
-    return {
-        "task": "Assess an available free agent for a fantasy football waiver claim.",
-        "league": "12-team half-PPR Yahoo league; weekly lineup QB/2RB/2WR/TE/W-R-T/K/DEF.",
-        "week": week,
-        "player": {k: target[k] for k in
-                   ("name", "position", "team", "availability", "injury_status")},
-        "proj_points_this_week": target["proj_week"],
-    }
-
-
-def jev_questions() -> dict:
-    return {
-        "profile": jev.choice(
-            "Which profile best fits `player` as a waiver target right now?",
-            {"steady_starter": "Reliable weekly starter talent.",
-             "breakout": "Emerging role with sustainable upside.",
-             "injury_fillin": "Value depends on a teammate's injury.",
-             "one_week_spike": "Recent hype driven by a fluke game.",
-             "depth_piece": "Bench depth or handcuff only."}),
-        "claim": jev.score(
-            "Recommended waiver action for `player` this week.",
-            ["ignore", "watchlist", "stream if needed", "claim now"]),
-        "risk": jev.noul(
-            "Does `player` carry injury or role risk the projection may not capture?"),
-    }
-
-
-def review_targets(targets: list[dict], week: int, client=None) -> int:
-    """Attach a 'jev' block to each target in place; returns failures."""
-    failures = 0
-    for target in targets:
-        try:
-            resp = jev.ask(jev_state(target, week), jev_questions(),
-                           client=client)
-            answers = resp.answers
-            target["jev"] = {
-                "profile": answers["profile"].choice,
-                "claim_score": answers["claim"].score,
-                "claim_legend": answers["claim"].legend,
-                "risk_noul": answers["risk"].noul,
-            }
-        except jev.JevError as exc:
-            failures += 1
-            print(f"warning: Jev skipped {target['name']}: {exc}",
-                  file=sys.stderr)
-    return failures
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--week", type=int, default=None,
@@ -115,9 +65,13 @@ def main() -> int:
     if args.jev:
         try:
             with jev.connect() as client:
-                review_targets(top[: args.jev], week, client=client)
+                failures = jev.review_waiver_targets(top[: args.jev], week,
+                                                     client=client)
         except jev.JevError as exc:
             print(f"warning: Jev review unavailable: {exc}", file=sys.stderr)
+        else:
+            for name, err in failures:
+                print(f"warning: Jev skipped {name}: {err}", file=sys.stderr)
 
     print(json.dumps({
         "week": week,

@@ -22,7 +22,7 @@ def operator(tmp_path, monkeypatch):
 def _args(**kw):
     import argparse
     defaults = dict(endpoint="http://127.0.0.1:9222", refresh_data=False,
-                    week=None, waiver_scan=False, apply=False, top=10)
+                    week=None, waiver_scan=False, apply=False, top=10, jev=0)
     defaults.update(kw)
     return argparse.Namespace(**defaults)
 
@@ -206,3 +206,87 @@ def test_matchup_waf_block_aborts_run_distinctly(operator, monkeypatch):
     assert report["status"] == "waf_blocked"
     assert "matchup_error" not in report
     assert client.urls == []  # restore skipped: no extra request into the block
+
+
+def _stub_jev_pipeline(operator, monkeypatch):
+    """Full pipeline stub with an injured roster player and one wire target."""
+    import contextlib
+    import types
+
+    _stub_run_pipeline(operator, monkeypatch, types.SimpleNamespace(
+        navigate=lambda url, expected, timeout=25: None))
+    injured = types.SimpleNamespace(
+        yahoo_id="1", name="Chris Olave", position="WR", team="NO",
+        slot="WR", injury_status="Q", game="", locked=False)
+    healthy = types.SimpleNamespace(
+        yahoo_id="2", name="Brock Purdy", position="QB", team="SF",
+        slot="QB", injury_status="", game="", locked=False)
+    monkeypatch.setattr(operator, "YahooTeamReader", lambda client: types.SimpleNamespace(
+        snapshot=lambda: types.SimpleNamespace(
+            week=2, record="1-0-0", waiver_priority=4, roster=(injured, healthy))))
+    monkeypatch.setattr(operator, "propose_lineup",
+                        lambda snap, proj, week: types.SimpleNamespace(
+                            moves=(), as_dict=lambda: {
+                                "week": 2, "moves": [], "warnings": [],
+                                "plan": [{"yahoo_id": "1", "proj_week": 11.0}]}))
+    monkeypatch.setattr(operator, "matchup",
+                        lambda client: types.SimpleNamespace(as_dict=lambda: {}))
+    monkeypatch.setattr(operator, "scan_available", lambda client, week: {"1": object()})
+    monkeypatch.setattr(operator, "rank_targets",
+                        lambda available, proj: ([{"name": "T", "proj_week": 9.0}], {}))
+
+
+def _fake_jev(operator, monkeypatch, connect_exc=None):
+    """Install a fake src.jev: review fns attach marker blocks in place."""
+    import contextlib
+    import types
+
+    from src.jev import JevError
+
+    @contextlib.contextmanager
+    def connect():
+        if connect_exc:
+            raise connect_exc
+        yield object()
+
+    def review_injured(players, week, client=None):
+        for p in players:
+            p["jev"] = {"likely_out": 0.35}
+        return []
+
+    def review_wire(targets, week, client=None):
+        for t in targets:
+            t["jev"] = {"profile": "breakout"}
+        return []
+
+    monkeypatch.setattr(operator, "jev", types.SimpleNamespace(
+        JevError=JevError, connect=connect,
+        review_injured_players=review_injured,
+        review_waiver_targets=review_wire))
+
+
+def test_jev_advisory_blocks_attach(operator, monkeypatch):
+    _stub_jev_pipeline(operator, monkeypatch)
+    _fake_jev(operator, monkeypatch)
+
+    report = operator.run(_args(waiver_scan=True, jev=3))
+
+    assert report["status"] == "ok"
+    (injured,) = report["jev_injuries"]
+    assert injured["name"] == "Chris Olave"
+    assert injured["proj_week"] == 11.0  # joined from the proposal plan
+    assert injured["jev"] == {"likely_out": 0.35}
+    assert report["wire"]["targets"][0]["jev"] == {"profile": "breakout"}
+
+
+def test_jev_down_never_breaks_the_run(operator, monkeypatch):
+    from src.jev import JevError
+
+    _stub_jev_pipeline(operator, monkeypatch)
+    _fake_jev(operator, monkeypatch, connect_exc=JevError("no key"))
+
+    report = operator.run(_args(waiver_scan=True, jev=3))
+
+    assert report["status"] == "ok"  # advisory layer must not affect the run
+    assert report["jev_error"] == "no key"
+    assert "jev_injuries" not in report

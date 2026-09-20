@@ -343,7 +343,20 @@ and the operator runbook [docs/TEAM_OPERATOR.md](docs/TEAM_OPERATOR.md).
 - `yahoo/league.py` + `tools/league_report.py` — standings, live matchup score,
   opponent rosters; every read fails fast on Yahoo's WAF denial page.
 - `yahoo/wire.py` + `tools/waiver_targets.py` — paced available-player wire
-  scan (WAF-aware) and target ranking.
+  scan (WAF-aware) and target ranking; `--jev N` attaches an advisory Jev
+  review to the top N targets.
+- `src/jev.py` — the **Jev (TypeSafe System One) advisory layer**: SDK facade
+  plus the fantasy question packs (waiver review, injury triage, trade
+  judgment). Jev has no live NFL knowledge — it judges only the projections
+  and statuses we put into the state, so every answer is a second opinion
+  alongside the numbers, never the source of truth. Key comes from
+  `TYPESAFE_API_KEY` (env or `.env`). Consumers: `tools/waiver_targets.py
+  --jev N`, `tools/team_operator.py --jev N` (injury triage + wire review,
+  fail-soft — a Jev outage never changes run status), and
+  `tools/trade_check.py --give X --receive Y` (manual trade verdict).
+- `tools/trade_check.py` — manual trade evaluator: our season projections
+  supply the numbers, Jev returns a structured verdict
+  (accept/roughly_fair/reject + fairness score + risk).
 - `yahoo/league_strength.py`, `yahoo/recommend.py` — pure analysis: optimal-lineup
   league ranks, dead spots / model blind spots, lineup + monitoring proposals.
 - `yahoo/waf.py` — shared 'Request denied' signature; a block is throttling,

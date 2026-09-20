@@ -22,7 +22,7 @@ for entry in (str(ROOT), str(ROOT / "tools")):
     if entry not in sys.path:
         sys.path.insert(0, entry)
 
-from src import corpus as corpus_mod, ingest, projections, schedule as sched  # noqa: E402
+from src import corpus as corpus_mod, ingest, jev, projections, schedule as sched  # noqa: E402
 from src.config import league_preset  # noqa: E402
 from yahoo.browser import BrowserError  # noqa: E402
 from yahoo.cdp import CdpClient, CdpError  # noqa: E402
@@ -126,6 +126,33 @@ def run(args) -> dict:
                 report["status"] = "waf_blocked"  # distinct from a crash
                 return report
 
+        if args.jev:
+            # Advisory layer: never changes status, never blocks --apply.
+            try:
+                proj_by_yid = {p["yahoo_id"]: p["proj_week"]
+                               for p in report["proposal"]["plan"]}
+                with jev.connect() as jev_client:
+                    injured = [
+                        {"name": p.name, "position": p.position, "team": p.team,
+                         "slot": p.slot, "injury_status": p.injury_status,
+                         "proj_week": proj_by_yid.get(p.yahoo_id)}
+                        for p in snapshot.roster if p.injury_status
+                    ]
+                    if injured:
+                        failures = jev.review_injured_players(injured, week,
+                                                              client=jev_client)
+                        report["jev_injuries"] = injured
+                        if failures:
+                            report["jev_injury_failures"] = len(failures)
+                    if "wire" in report:
+                        failures = jev.review_waiver_targets(
+                            report["wire"]["targets"][: args.jev], week,
+                            client=jev_client)
+                        if failures:
+                            report["jev_wire_failures"] = len(failures)
+            except jev.JevError as exc:
+                report["jev_error"] = str(exc)
+
         if args.apply and proposal.moves:
             try:
                 receipt = YahooLineupOperator(client).apply(proposal.moves)
@@ -147,6 +174,9 @@ def main() -> int:
     parser.add_argument("--waiver-scan", action="store_true",
                         help="also scan and rank the wire (slow, ~1 min)")
     parser.add_argument("--top", type=int, default=10)
+    parser.add_argument("--jev", type=int, default=0, metavar="N",
+                        help="advisory Jev review: injury triage for tagged roster "
+                             "players plus the top N wire targets (never blocks --apply)")
     parser.add_argument("--refresh-data", action="store_true",
                         help="re-download nflverse data first")
     parser.add_argument("--endpoint", default="http://127.0.0.1:9222")

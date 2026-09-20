@@ -575,3 +575,16 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
   double-loaded job (gui + system domains); gui copy booted out + disabled, system
   LaunchDaemon booted out + disabled via sudo. jra stack not running; only the nfl
   tunnel (5000) remains. jra plists left on disk (reversible).
+
+## 2026-09-20 — Jev advisory layer wired across the codebase
+
+- src/jev.py holds the typesafe-sdk facade + all fantasy question packs
+  (waiver / injury / trade). LEAGUE_CONTEXT fixed to the real 10-team .5PPR
+  format (the first inline copy wrongly said 12-team).
+- Consumers: tools/waiver_targets.py --jev N; tools/team_operator.py --jev N
+  (injury triage for tagged roster players + top-N wire review in the report;
+  fail-soft — Jev down never changes run status or blocks --apply);
+  tools/trade_check.py --give X --receive Y (manual verdict + proj delta).
+- Cron: Wednesday waiver-scan now runs --jev 5; the twice-daily runs stay
+  Jev-free to bound API cost. Jev is advisory only — projections remain the
+  source of truth.

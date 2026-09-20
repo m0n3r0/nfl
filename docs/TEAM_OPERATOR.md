@@ -243,7 +243,11 @@ are never auto-submitted — `--waiver-scan` only ranks targets for a human.
 current week from the snapshot); `--apply` refuses to run when it disagrees
 with Yahoo's week. `--top N` caps the waiver-target list (default 10);
 `--refresh-data` re-downloads nflverse data first; `--endpoint` overrides the
-CDP endpoint. Timing note: the NFL's official statistician (Elias Sports
+CDP endpoint. `--jev N` adds an advisory Jev (TypeSafe) layer: injury triage
+for every tagged roster player plus a profile/claim/risk review of the top N
+wire targets, written into the report as `jev_injuries` / per-target `jev`
+blocks — it never changes the run status and never blocks `--apply`.
+Timing note: the NFL's official statistician (Elias Sports
 Bureau) publishes midweek stat corrections, typically by Thursday US — a
 `--refresh-data` run after they land keeps our projections aligned with
 Yahoo's corrected numbers (see README "Data source" for the full provenance
@@ -257,7 +261,7 @@ Suggested crontab (times are JST, the host's local zone). Replace
 24 8,20 * * *  cd /path/to/nfl && .venv/bin/python tools/team_operator.py >> logs/team-operator-cron.log 2>&1
 47 23 * * 0    cd /path/to/nfl && .venv/bin/python tools/team_operator.py --apply >> logs/team-operator-cron.log 2>&1
 23 1 * * 1     cd /path/to/nfl && .venv/bin/python tools/team_operator.py --apply >> logs/team-operator-cron.log 2>&1
-11 20 * * 3    cd /path/to/nfl && .venv/bin/python tools/team_operator.py --waiver-scan --refresh-data >> logs/team-operator-cron.log 2>&1
+11 20 * * 3    cd /path/to/nfl && .venv/bin/python tools/team_operator.py --waiver-scan --refresh-data --jev 5 >> logs/team-operator-cron.log 2>&1
 19 21 * * *    cd /path/to/nfl && .venv/bin/python tools/league_report.py --all-rosters --out logs/league-report.json --audit logs/league-report.jsonl >> logs/league-report-cron.log 2>&1
 5,35 8-13 * * 5  cd /path/to/nfl && .venv/bin/python tools/league_report.py --light --out logs/league-report.json --audit logs/league-report.jsonl >> logs/league-report-cron.log 2>&1
 5,35 2-13 * * 1  cd /path/to/nfl && .venv/bin/python tools/league_report.py --light --out logs/league-report.json --audit logs/league-report.jsonl >> logs/league-report-cron.log 2>&1
