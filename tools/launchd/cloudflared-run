@@ -1,0 +1,12 @@
+#!/bin/bash
+# cloudflared-run — quick-tunnel launcher for the local web UI
+# (127.0.0.1:5000). Same method as jra-van-re: background the URL watcher,
+# then exec cloudflared so the watcher's $PPID is the tunnel process.
+# launchd (com.fdnation.cloudflared) keeps this alive; the web app itself
+# must be running separately (`python cli.py web`).
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+
+"$ROOT/tools/launchd/cloudflared-url-watch" &
+exec /opt/homebrew/bin/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:5000

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+ "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!--
+    FD nation cloudflared quick-tunnel template. Do NOT copy this file
+    directly: tools/install_launchd.py renders @REPO_ROOT@ to the actual
+    repo location and installs the result to ~/Library/LaunchAgents.
+
+    Exposes the local web UI (127.0.0.1:5000) on an ephemeral, unauthenticated
+    *.trycloudflare.com URL — anyone with the URL can read every page. The
+    live URL is published (mode 0600) to logs/cloudflared-url.txt by
+    tools/launchd/cloudflared-url-watch.
+  -->
+  <key>Label</key><string>com.fdnation.cloudflared</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>@REPO_ROOT@/tools/launchd/cloudflared-run</string>
+  </array>
+  <key>WorkingDirectory</key><string>@REPO_ROOT@</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>5</integer>
+  <key>StandardOutPath</key><string>@REPO_ROOT@/logs/cloudflared.log</string>
+  <key>StandardErrorPath</key><string>@REPO_ROOT@/logs/cloudflared.log</string>
+</dict>
+</plist>

@@ -1,0 +1,40 @@
+#!/bin/bash
+# cloudflared-url-watch — keep logs/cloudflared-url.txt in sync with the live
+# Quick Tunnel (same pattern as jra-van-re's issue #79 watcher).
+#
+# cloudflared-run backgrounds this right before exec'ing cloudflared, so
+# $PPID is the process that becomes cloudflared. Every sync: take the NEWEST
+# quick-tunnel URL in the log; if it differs from the published file, gate on
+# the edge actually serving the web UI root (quick tunnels take a few seconds
+# to propagate after the banner prints — a dead URL must never be published),
+# then replace the file atomically (mode 0600). Exits when the parent
+# (cloudflared) dies, after a final sweep.
+#
+# Env overrides exist for testing: WATCH_LOG, WATCH_OUT, WATCH_INTERVAL.
+set -u
+
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+LOG="${WATCH_LOG:-$ROOT/logs/cloudflared.log}"
+OUT="${WATCH_OUT:-$ROOT/logs/cloudflared-url.txt}"
+INTERVAL="${WATCH_INTERVAL:-15}"
+parent=$PPID
+
+sync_url() {
+  local url cur tmp
+  url=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' "$LOG" 2>/dev/null | tail -1) || true
+  [ -n "${url:-}" ] || return 0
+  cur=$(cat "$OUT" 2>/dev/null) || true
+  [ "$url" = "${cur:-}" ] && return 0
+  # Publish only once the edge really serves the web UI — never a dead URL.
+  curl -fsS -m 8 -o /dev/null "$url/" 2>/dev/null || return 0
+  tmp="$OUT.tmp.$$"
+  if printf '%s' "$url" > "$tmp" && chmod 600 "$tmp" && mv "$tmp" "$OUT"; then
+    printf '[url-watch] published tunnel URL: %s\n' "$url"
+  fi
+}
+
+while kill -0 "$parent" 2>/dev/null; do
+  sync_url
+  sleep "$INTERVAL"
+done
+sync_url

@@ -216,6 +216,25 @@ python cli.py web            # http://127.0.0.1:5000
 # or: python web/app.py
 ```
 
+### Public tunnel (optional, ephemeral — same method as jra-van-re)
+
+A Cloudflare quick tunnel can expose the app beyond localhost:
+
+```bash
+python tools/install_launchd.py --agent cloudflared   # install + load the LaunchAgent
+cat logs/cloudflared-url.txt                          # the live public URL
+```
+
+This runs `cloudflared tunnel --no-autoupdate --url http://127.0.0.1:5000`
+under launchd (`com.fdnation.cloudflared`, KeepAlive). A watcher
+(`tools/launchd/cloudflared-url-watch`) publishes the live
+`https://*.trycloudflare.com` URL to `logs/cloudflared-url.txt` (mode 0600)
+only once the edge actually serves the app. Caveats, same as jra-van-re's:
+the URL is **ephemeral** (new one every cloudflared restart — nothing
+bookmarkable), **unauthenticated** (anyone with the URL can read every page —
+treat the URL file like a password), and the web app must be running
+separately (`python cli.py web`); the tunnel alone serves nothing.
+
 Pages: **my team** (latest operator report: matchup, lineup plan, monitor
 flags), **league** (standings + matchup from the nightly league snapshot),
 **cron** (operator run history + schedule), dashboard (projections + model
