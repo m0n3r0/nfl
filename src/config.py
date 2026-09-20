@@ -150,6 +150,11 @@ def league_preset():
         return _FP_SCORING_TO_PRESET.get(raw.strip().upper(), DEFAULT_PRESET)
     return DEFAULT_PRESET
 
+
+def typesafe_api_key():
+    """TypeSafe (Jev) API key from TYPESAFE_API_KEY (env or repo-root .env)."""
+    return _env_var("TYPESAFE_API_KEY")
+
 # Positions we surface in rankings.
 FANTASY_POSITIONS = ["QB", "RB", "WR", "TE", "K", "DEF"]
 
