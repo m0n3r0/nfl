@@ -49,6 +49,19 @@ Player stats, rosters, and schedules are pulled from the public
 [nflverse-data](https://github.com/nflverse/nflverse-data) GitHub release assets
 (no API key required). Data is cached under `data/raw/` and not committed.
 
+**Provenance chain — why our numbers match Yahoo's.** Every NFL stat originates
+from in-stadium official scorers feeding the league's central database (GSIS,
+Game Statistics & Information System), audited by the Elias Sports Bureau, the
+NFL's official statistician. Elias/the league office issue **official stat
+corrections** during the week (typically landing Thursday US). The feed reaches
+consumers through licensed distributors (Sportradar is the NFL's official data
+distribution partner); Yahoo applies the same corrections, and nflverse scrapes
+the same official play-by-play from nfl.com — one source, two paths. Player
+*tracking* data (snap counts, separation) is a separate feed: Next Gen Stats
+(Zebra RFID chips + AWS). Practical rule: midweek, our tables and Yahoo's can
+briefly drift until corrections land — re-run `python cli.py ingest --refresh`
+after Thursday (US) corrections, before weekend lineup decisions.
+
 The "current" season is configured in `src/config.py`:
 - `SCHEDULE_SEASON = 2026` — the game schedule we pull.
 - `STATS_SEASON = 2026` — the current season; 2026 weekly player stats flow in

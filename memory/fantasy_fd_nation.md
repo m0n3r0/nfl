@@ -541,3 +541,20 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
   applied). k3 side notes (accepted, not bugs): navigate() doesn't tolerate
   transient evaluate errors mid-commit (pre-existing, shared with restore);
   first-candidate could sacrifice a half-filled human form (user-sanctioned).
+
+## 2026-09-20 — where the stats actually come from (provenance chain)
+
+- One central source: in-stadium official scorers feed the NFL's GSIS (Game
+  Statistics & Information System); Elias Sports Bureau is the NFL's official
+  statistician and issues official stat corrections midweek (land by Thursday
+  US). Every fantasy platform mirrors these (Yahoo has a statcorrections page).
+- Distribution: Sportradar is the NFL's official data distribution partner
+  (licensed real-time feeds to Yahoo/ESPN/etc.); Next Gen Stats tracking is a
+  separate feed (Zebra RFID chips + AWS). Yahoo player projections are
+  Rotowire-powered (fine print on their pages).
+- This repo never touches Yahoo for stats: src/ingest.py pulls nflverse
+  release CSVs, which scrape the same official nfl.com/GSIS play-by-play.
+  One source, two paths.
+- Operational rule: our tables and Yahoo's can drift midweek until corrections
+  land — run `cli.py ingest --refresh` (or team_operator `--refresh-data`)
+  after Thursday US corrections, before weekend lineup decisions.

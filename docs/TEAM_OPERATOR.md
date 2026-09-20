@@ -243,7 +243,11 @@ are never auto-submitted — `--waiver-scan` only ranks targets for a human.
 current week from the snapshot); `--apply` refuses to run when it disagrees
 with Yahoo's week. `--top N` caps the waiver-target list (default 10);
 `--refresh-data` re-downloads nflverse data first; `--endpoint` overrides the
-CDP endpoint.
+CDP endpoint. Timing note: the NFL's official statistician (Elias Sports
+Bureau) publishes midweek stat corrections, typically by Thursday US — a
+`--refresh-data` run after they land keeps our projections aligned with
+Yahoo's corrected numbers (see README "Data source" for the full provenance
+chain).
 
 Suggested crontab (times are JST, the host's local zone). Replace
 `/path/to/nfl` with the local clone path — the launchd installer
