@@ -10,7 +10,7 @@ use axum::{
     response::{Html, IntoResponse, Response},
 };
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 
 use crate::{artifacts, pins, AppState};
 
@@ -121,6 +121,24 @@ pub async fn pin_toggle(State(st): State<AppState>, Form(form): Form<PinForm>) -
     }
 }
 
+/// Team name -> served logo path, for entries whose file exists on disk.
+/// Cron (tools/logo_sync.py) owns the downloads; we only serve local files.
+fn logo_urls(root: &std::path::Path) -> Map<String, Value> {
+    let mut out = Map::new();
+    if let Some(manifest) = artifacts::read_logo_manifest(root) {
+        if let Some(obj) = manifest.as_object() {
+            for (name, entry) in obj {
+                if let Some(file) = entry.get("file").and_then(Value::as_str) {
+                    if root.join("data/logos").join(file).is_file() {
+                        out.insert(name.clone(), json!(format!("/logos/{file}")));
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
 pub async fn league(State(st): State<AppState>) -> Response {
     let report = artifacts::read_league_report(&st.cfg.root);
     let standings = report
@@ -172,7 +190,8 @@ pub async fn league(State(st): State<AppState>) -> Response {
         other => other,
     };
     let ctx = json!({"report": report.unwrap_or(Value::Null), "standings": standings,
-                     "scoreboard": scoreboard, "my_name": my_name});
+                     "scoreboard": scoreboard, "my_name": my_name,
+                     "logos": logo_urls(&st.cfg.root)});
     render(&st, "league.html", ctx)
 }
 
@@ -282,13 +301,18 @@ pub async fn league_team(State(st): State<AppState>, Path(name): Path<String>) -
     if row.is_none() && trend.is_empty() {
         let ctx = json!({"name": name, "row": Value::Null, "trend": [], "games": 0,
                          "matchup": Value::Null, "roster": Value::Null,
-                         "roster_date": Value::Null, "captured_at": Value::Null});
+                         "roster_date": Value::Null, "captured_at": Value::Null,
+                         "logo": Value::Null});
         return (StatusCode::NOT_FOUND, render(&st, "league_team.html", ctx)).into_response();
     }
     let games = row
         .as_ref()
         .map(|r| record_games(r.get("record").unwrap_or(&Value::Null)))
         .unwrap_or(0);
+    let logo = logo_urls(&st.cfg.root)
+        .get(&name)
+        .cloned()
+        .unwrap_or(Value::Null);
     let ctx = json!({
         "name": name,
         "row": row.unwrap_or(Value::Null),
@@ -298,6 +322,7 @@ pub async fn league_team(State(st): State<AppState>, Path(name): Path<String>) -
         "roster": roster.unwrap_or(Value::Null),
         "roster_date": roster_date.map(Value::String).unwrap_or(Value::Null),
         "captured_at": get("captured_at").unwrap_or(Value::Null),
+        "logo": logo,
     });
     render(&st, "league_team.html", ctx)
 }
@@ -453,6 +478,7 @@ pub async fn teamview(
     let ctx = json!({
         "a_name": a_name, "b_name": b_name, "week": week,
         "starters": starters, "bench": bench, "missing": missing,
+        "logos": logo_urls(&st.cfg.root),
     });
     render(&st, "teamview.html", ctx)
 }

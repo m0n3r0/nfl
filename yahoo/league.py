@@ -317,6 +317,41 @@ def matchup(client: LeagueClient, timeout: float = 30) -> MatchupScore:
     return _build_matchup_score(payload)
 
 
+def team_logos(client: LeagueClient, timeout: float = 30) -> dict[str, dict[str, str]]:
+    """Map team names to their logo URLs (standings-table avatars).
+
+    Evaluates on the league home page — call right after standings() so this
+    costs no extra request. The URLs point at public CDNs (s.yimg.com /
+    cloudinary); downloading them is tools/logo_sync.py's job, never the
+    web layer's.
+    """
+    payload = client.evaluate(
+        r'''/* yahoo-league-team-logos */ (() => {
+          const out = {};
+          document.querySelectorAll('a[href*="%s"]').forEach(a => {
+            const m = (a.getAttribute('href')||'').match(/\/f1\/\d+\/(\d+)([/?#]|$)/);
+            const name = (a.innerText||'').trim();
+            if (!m || !name || name === 'My Team') return;
+            const tr = a.closest('tr');
+            const img = tr ? tr.querySelector('img[class*="Avatar"]') : null;
+            if (!img) return;
+            if (!(name in out)) out[name] = {id: m[1], url: img.src};
+          });
+          return {path: location.pathname.replace(/\/$/, ''), logos: out};
+        })()''' % LEAGUE_HOME
+    )
+    if not isinstance(payload, dict) or payload.get("path") != LEAGUE_HOME:
+        raise LeagueReadError("not on the league home page")
+    logos = payload.get("logos")
+    if not isinstance(logos, dict):
+        raise LeagueReadError("team logos payload is missing")
+    out: dict[str, dict[str, str]] = {}
+    for name, entry in logos.items():
+        if isinstance(entry, dict) and entry.get("id") and entry.get("url"):
+            out[str(name)] = {"id": str(entry["id"]), "url": str(entry["url"])}
+    return out
+
+
 def opponent_roster(client: LeagueClient, team_id: str, timeout: float = 30) -> tuple[dict[str, str], ...]:
     """Read another team's roster (read-only). team_id is the Yahoo roster number."""
     if team_id == TEAM_ID:

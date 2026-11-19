@@ -30,7 +30,7 @@ use std::time::Duration;
 
 use axum::{
     body::Body,
-    extract::{ConnectInfo, Request, State},
+    extract::{ConnectInfo, Path, Request, State},
     http::{header, StatusCode},
     response::{IntoResponse, Response},
     routing::{any, get, post},
@@ -105,6 +105,7 @@ pub fn router(cfg: Config) -> Router {
         .route("/league", get(pages::league))
         .route("/league/team/{name}", get(pages::league_team))
         .route("/league/teamview", get(pages::teamview))
+        .route("/logos/{file}", get(logo))
         .route("/cron", get(pages::cron))
         .fallback(any(proxy))
         .with_state(st)
@@ -114,6 +115,40 @@ pub fn router(cfg: Config) -> Router {
 async fn dashboard(State(st): State<AppState>, mut req: Request) -> Response {
     *req.uri_mut() = "/".parse().expect("static uri");
     proxy(State(st), req).await
+}
+
+/// /logos/<file> — team logos captured by cron into data/logos/.
+/// Strict filename allowlist: no path traversal, no hidden files.
+async fn logo(State(st): State<AppState>, Path(file): Path<String>) -> Response {
+    let ok = !file.is_empty()
+        && file.len() <= 64
+        && !file.contains("..")
+        && file
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "._-".contains(c));
+    if !ok {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let bytes = match std::fs::read(st.cfg.root.join("data/logos").join(&file)) {
+        Ok(b) => b,
+        Err(_) => return StatusCode::NOT_FOUND.into_response(),
+    };
+    let ctype = match file.rsplit('.').next().unwrap_or("") {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        _ => "application/octet-stream",
+    };
+    (
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, ctype),
+            (header::CACHE_CONTROL, "public, max-age=86400"),
+        ],
+        bytes,
+    )
+        .into_response()
 }
 
 /// RFC 7230 hop-by-hop headers, never forwarded in either direction.

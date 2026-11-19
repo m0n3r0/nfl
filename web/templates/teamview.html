@@ -25,11 +25,13 @@
                    height: 24px; padding: 4px 10px; }
   .tv-head-names th { text-align: left; }
   .tv-head-proj th { text-align: right; }
+  .tv-logo { width: 32px; height: 32px; border-radius: 50%; object-fit: cover;
+             vertical-align: middle; margin-right: 8px; border: 1px solid #2c4055; }
 </style>
 {% macro player(p) %}{% if p %}<span class="tv-name">{{ p.name }}</span>{% if p.team %}<span class="tv-team">{{ p.team }}</span>{% endif %}{% if p.note %}<div class="tv-note">{{ p.note }}</div>{% endif %}{% else %}<span class="tv-empty">—</span>{% endif %}{% endmacro %}
 {% macro proj(p) %}{% if p and p.proj is not none %}{{ p.proj }}{% else %}<span class="tv-empty">—</span>{% endif %}{% endmacro %}
 
-<h1>Team View{% if a_name and b_name %} — {{ a_name }} vs {{ b_name }}{% endif %}</h1>
+<h1>{% if logos[a_name] %}<img class="tv-logo" src="{{ logos[a_name] }}" alt="">{% endif %}Team View{% if a_name and b_name %} — {{ a_name }} vs {{ b_name }}{% endif %}{% if logos[b_name] %}<img class="tv-logo" style="margin: 0 0 0 8px" src="{{ logos[b_name] }}" alt="">{% endif %}</h1>
 <p class="muted"><a href="/league">← Back to league</a>
 {% if week %} · week {{ week }}{% endif %} · players aligned by starting slot,
 GameChannel-style. Left projections: our model (operator report). Right:

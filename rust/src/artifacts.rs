@@ -63,6 +63,15 @@ pub fn read_league_history(root: &Path) -> Vec<Value> {
         .collect()
 }
 
+/// Team logo manifest (data/logos.json, written by tools/logo_sync.py via
+/// cron). Maps team name -> {id, url, file, fetched_at}; None when absent
+/// or invalid — logos are decorative, never fatal.
+pub fn read_logo_manifest(root: &Path) -> Option<Value> {
+    let text = std::fs::read_to_string(root.join("data/logos.json")).ok()?;
+    let manifest: Value = serde_json::from_str(&text).ok()?;
+    manifest.is_object().then_some(manifest)
+}
+
 /// JSON value -> display string the way Python str() would for the artifact
 /// fields we slice (captured_at): strings verbatim, null -> "", else JSON.
 pub fn as_display_string(v: Option<&Value>) -> String {

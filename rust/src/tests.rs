@@ -454,6 +454,49 @@ fn teamview_fixtures(root: &Path) {
 }
 
 #[tokio::test]
+async fn logos_route_serves_local_files_only() {
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    std::fs::create_dir_all(root.join("data/logos")).unwrap();
+    std::fs::write(root.join("data/logos/2.png"), b"\x89PNG fake").unwrap();
+    std::fs::write(
+        root.join("data/logos.json"),
+        r#"{"Team Alpha": {"id": "2", "url": "https://cdn/x.png", "file": "2.png"}}"#,
+    )
+    .unwrap();
+    let report = json!({
+        "captured_at": "2026-11-20T00:00:00+00:00",
+        "standings": [{"rank": 1, "team": "Team Alpha", "record": "8-2-0"}],
+        "matchup": {"week": 11, "team": "Team Alpha", "opponent": "Team Beta"},
+        "scoreboard": [{"team1": "Team Alpha", "team2": "Team Beta",
+                        "score1": 0, "score2": 0}]
+    });
+    std::fs::write(root.join("logs/league-report.json"), report.to_string()).unwrap();
+    let app = router(cfg(&root));
+
+    let res = app
+        .clone()
+        .oneshot(Request::get("/logos/2.png").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(res.headers()["content-type"], "image/png");
+    let bytes = res.into_body().collect().await.unwrap().to_bytes();
+    assert_eq!(&bytes[..], b"\x89PNG fake");
+
+    // traversal and unknown files -> 404, never a read outside data/logos
+    for path in ["/logos/..%2f..%2fetc%2fpasswd", "/logos/nope.png"] {
+        let (status, _) = get_body(app.clone(), path).await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{path}");
+    }
+
+    // the league page renders the logo img when manifest + file exist
+    // (minijinja HTML-escapes "/" in attributes as &#x2f; — browsers decode it)
+    let (_, html) = get_body(app, "/league").await;
+    assert!(html.contains("<img class=\"mu-logo\" src=\"&#x2f;logos&#x2f;2.png\""));
+}
+
+#[tokio::test]
 async fn teamview_pairs_players_by_slot() {
     let tmp = tempfile_dir();
     let root = fixture_root(&tmp);

@@ -20,6 +20,8 @@
                background: #1d2b3a; border: 1px solid #2c4055; color: #9fd0ff;
                display: flex; align-items: center; justify-content: center;
                font-size: 15px; font-weight: 700; }
+  .mu-logo { width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0;
+             object-fit: cover; border: 1px solid #2c4055; background: #1d2b3a; }
   .mu-name { font-size: 17px; font-weight: 600; color: #7fb3ff; text-decoration: none;
              overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
   .mu-name:hover { color: #bcd6ff; }
@@ -40,7 +42,7 @@
   .mu-tv { font-size: 11px; color: #7fb3ff; text-decoration: none; margin: 3px auto 0; }
   .mu-tv:hover { color: #bcd6ff; }
   @media (max-width: 700px) {
-    .mu-avatar { display: none; }
+    .mu-avatar, .mu-logo { display: none; }
     .mu-name { font-size: 14px; }
     .mu-score { font-size: 20px; }
     .mu-center { min-width: 140px; }
@@ -77,7 +79,8 @@ data may be incomplete. Live reads retry on the next cron run.</div>
   <div class="mu-card {{ 'mine' if mine else '' }}">
     <div class="mu-team mu-left">
       <div class="mu-inner">
-        <div class="mu-avatar">{{ e.t1_initials | default(e.team1[0] | upper) }}</div>
+        {% if logos[e.team1] %}<img class="mu-logo" src="{{ logos[e.team1] }}" alt="{{ e.team1 }}">
+        {% else %}<div class="mu-avatar">{{ e.t1_initials | default(e.team1[0] | upper) }}</div>{% endif %}
         <div class="mu-text">
           <a class="mu-name" href="/league/team/{{ e.team1 | urlencode }}">{{ e.team1 }}</a>
           <div class="mu-meta">{% for r in standings or [] if r.team == e.team1 %}{{ r.record }} | #{{ r.rank }}{% endfor %}</div>
@@ -101,7 +104,8 @@ data may be incomplete. Live reads retry on the next cron run.</div>
     </div>
     <div class="mu-team mu-right">
       <div class="mu-inner">
-        <div class="mu-avatar">{{ e.t2_initials | default(e.team2[0] | upper) }}</div>
+        {% if logos[e.team2] %}<img class="mu-logo" src="{{ logos[e.team2] }}" alt="{{ e.team2 }}">
+        {% else %}<div class="mu-avatar">{{ e.t2_initials | default(e.team2[0] | upper) }}</div>{% endif %}
         <div class="mu-text">
           <a class="mu-name" href="/league/team/{{ e.team2 | urlencode }}">{{ e.team2 }}</a>
           <div class="mu-meta">{% for r in standings or [] if r.team == e.team2 %}{{ r.record }} | #{{ r.rank }}{% endfor %}</div>

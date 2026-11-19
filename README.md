@@ -263,6 +263,22 @@ The fantasy pages read only local artifacts (`logs/team-operator.jsonl`,
 `logs/league-report.json`) written by the cron operators — the web process
 never touches Yahoo live.
 
+### Team logos (cron-captured)
+
+`tools/logo_sync.py` reads each team's avatar URL from the league home page
+standings table (free evaluate on the page `standings()` already loaded) and
+downloads the images from the public CDNs (s.yimg.com / cloudinary) into
+`data/logos/<team_id>.<ext>` with a `data/logos.json` manifest. It is wired
+into `tools/league_report.py`, so every cron run (nightly `--all-rosters` and
+game-day `--light`) keeps logos fresh; unchanged URLs are cached and never
+re-downloaded. Type is sniffed from magic bytes (cloudinary URLs have no
+extension). Fail-soft: a logo failure is a warning, never a broken report.
+nfl-webd serves them at `/logos/<file>` (strict filename allowlist, no
+traversal) and the league matchup cards, Team View headers, and team pages
+show them, falling back to initials when a logo is absent. Both `data/logos/`
+and the manifest are gitignored — managers' custom logos can be personal
+photos. Manual retry: `python tools/logo_sync.py`.
+
 ## Scoring
 
 The generic preset weights were reverse-engineered from nflverse's own shipped `fantasy_points` /

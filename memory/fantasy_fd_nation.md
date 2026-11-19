@@ -716,3 +716,23 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
 - Verified live: 9 teams refreshed, opponent 13/15 with proj (Stafford bye
   -> null); /league/teamview shows CMC 16.38 vs Taylor 13.1, Deebo 3.6 vs
   Higgins 14.8 etc. 266 Python fast + 24 Rust tests pass.
+
+## 2026-11-20 — Team logos captured via cron, served by nfl-webd
+
+- yahoo/league.py team_logos(): free evaluate on the league home page (call
+  right after standings()); standings-table rows map team name -> avatar URL
+  (img[class*=Avatar] inside the link's tr; skip "My Team" nav link). The
+  div-based matchup list pairs two teams per container — do NOT use it.
+- tools/logo_sync.py: downloads from public CDNs (s.yimg.com / cloudinary),
+  magic-byte type sniff (cloudinary URLs lack extensions -> .jpg/.png),
+  data/logos/<id>.<ext> + data/logos.json manifest, URL-cache (unchanged URL
+  + file present = skip), fail-soft per team. Wired into league_report.py
+  after the scoreboard read, so all 4 cron league_report entries refresh
+  logos automatically; no crontab edit needed. Standalone retry CLI.
+- nfl-webd: /logos/{file} route (allowlist [A-Za-z0-9._-], no "..", 404/400
+  on traversal), logo_urls() only maps entries whose file exists; league
+  cards (mu-logo img, initials fallback), Team View header logos, team page
+  logo. data/logos/ + manifest gitignored (personal photos possible).
+- Verified live: 10/10 logos (Shiba Innu = catbot 2.png), tunnel /league has
+  10 imgs, /logos/2.png 200 image/png, traversal 400, teamview 2 header
+  logos. 274 Python fast + 25 Rust tests pass.

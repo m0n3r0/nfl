@@ -140,6 +140,26 @@ def test_opponent_team_id_excludes_authorized_team():
         opponent_team_id(ambiguous)
 
 
+def test_team_logos_maps_names_to_urls():
+    from yahoo.league import team_logos
+    client = Client({"yahoo-league-team-logos": {
+        "path": "/f1/1329011",
+        "logos": {"Team Seven": {"id": "7", "url": "https://cdn.example/7.png"},
+                  "Junk Entry": {"id": "", "url": ""}},
+    }})
+    logos = team_logos(client)
+    assert logos == {"Team Seven": {"id": "7", "url": "https://cdn.example/7.png"}}
+
+
+def test_team_logos_requires_league_home():
+    from yahoo.league import team_logos
+    client = Client({"yahoo-league-team-logos": {
+        "path": "/f1/1329011/elsewhere", "logos": {},
+    }})
+    with pytest.raises(LeagueReadError, match="league home"):
+        team_logos(client)
+
+
 def test_league_reads_fail_fast_on_waf_denial_page():
     # Empty payload maps: the denial check must fire before any payload read.
     with pytest.raises(LeagueWafBlocked, match="Request denied"):

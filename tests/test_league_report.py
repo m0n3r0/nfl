@@ -33,6 +33,10 @@ def harness(monkeypatch):
     def no_scoreboard(client):
         raise LeagueReadError("no scoreboard in fixture")
     monkeypatch.setattr(league_report, "scoreboard", no_scoreboard)
+    # Default: no logos in the fixture. The real path evaluates on the page
+    # and downloads from CDNs; tests that care override these stubs.
+    monkeypatch.setattr(league_report, "team_logos", lambda client: {})
+    monkeypatch.setattr(league_report, "sync_logos", lambda logos: {})
     client = FakeClient()
 
     @contextlib.contextmanager

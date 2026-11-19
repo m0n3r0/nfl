@@ -41,6 +41,9 @@ draft_log.txt
 logs/
 data/pins.json
 data/pins.json.lock
+# Team logos: managers' custom images can be personal photos — local only.
+data/logos/
+data/logos.json
 
 # --- Rust build artifacts (nfl-webd front door) ---
 rust/target/

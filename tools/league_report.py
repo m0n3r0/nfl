@@ -30,8 +30,10 @@ from yahoo.league import (  # noqa: E402
     scoreboard,
     standings,
     team_ids,
+    team_logos,
 )
 from yahoo.team import TEAM_ID, TEAM_PATH, find_team_target  # noqa: E402
+from logo_sync import sync_logos  # noqa: E402  # tools/logo_sync.py
 
 BASE = "https://football.fantasysports.yahoo.com"
 
@@ -138,6 +140,15 @@ def main() -> int:
                 # A scoreboard miss — parse failure OR a CDP hiccup on this
                 # free read — must never kill the standings+matchup core.
                 print(f"warning: scoreboard skipped: {exc}", file=sys.stderr)
+            try:
+                # Free like team_ids: evaluates on the page standings() loaded.
+                # Downloads hit public CDNs only, cached by URL; decorative,
+                # so any failure is a warning, never a broken report.
+                sync_logos(team_logos(client))
+            except LeagueWafBlocked:
+                raise  # never downgrade a block to a warning
+            except (LeagueReadError, CdpError, OSError) as exc:
+                print(f"warning: team logos skipped: {exc}", file=sys.stderr)
             ids = {}
             if args.all_rosters:
                 try:
