@@ -202,9 +202,10 @@ async fn nav_groups_fantasy_apart_from_prediction_pages() {
     }
     assert!(html.contains("FD nation") && html.contains("Prediction engines"));
     let idx = |s: &str| html.find(s).unwrap();
-    assert!(idx("FD nation") < idx("href=\"/team\""));
-    assert!(idx("href=\"/team\"") < idx("Prediction engines"));
-    assert!(idx("href=\"/league\"") < idx("Prediction engines"));
+    // menu order: League, My Team, Cron — then the prediction engines
+    assert!(idx("FD nation") < idx("href=\"/league\""));
+    assert!(idx("href=\"/league\"") < idx("href=\"/team\""));
+    assert!(idx("href=\"/team\"") < idx("href=\"/cron\""));
     assert!(idx("href=\"/cron\"") < idx("Prediction engines"));
     assert!(idx("href=\"/players\"") > idx("Prediction engines"));
     assert!(idx("href=\"/predictions\"") > idx("Prediction engines"));
@@ -214,7 +215,7 @@ async fn nav_groups_fantasy_apart_from_prediction_pages() {
 // --- native pages through the real templates ---
 
 #[tokio::test]
-async fn root_redirects_to_my_team() {
+async fn root_redirects_to_league() {
     let tmp = tempfile_dir();
     let root = fixture_root(&tmp);
     let res = router(cfg(&root))
@@ -222,7 +223,7 @@ async fn root_redirects_to_my_team() {
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::FOUND);
-    assert_eq!(res.headers()["location"], "/team");
+    assert_eq!(res.headers()["location"], "/league");
 }
 
 #[tokio::test]

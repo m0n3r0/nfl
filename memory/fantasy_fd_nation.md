@@ -736,3 +736,11 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
 - Verified live: 10/10 logos (Shiba Innu = catbot 2.png), tunnel /league has
   10 imgs, /logos/2.png 200 image/png, traversal 400, teamview 2 header
   logos. 274 Python fast + 25 Rust tests pass.
+
+## 2026-11-20 — League is the default homepage; menu League/My Team/Cron
+
+- / now 302 -> /league (was /team); nav order in layout.html: League,
+  My Team, Cron (shared template, so analytics pages get it too).
+- Tests updated: root_redirects_to_league + explicit nav-order asserts.
+- Verified through tunnel: / -> 302 -> /league 200, menu renders in the
+  requested order. 25 Rust tests pass.

@@ -93,11 +93,11 @@ pub fn router(cfg: Config) -> Router {
         .expect("reqwest client");
     let st = AppState { cfg, http, env };
     Router::new()
-        // The public face of the stack is the fantasy team, not the model
-        // card: / lands on My Team; the dashboard lives at /dashboard.
+        // The public face of the stack is the league, not the model card:
+        // / lands on League; the dashboard lives at /dashboard.
         .route(
             "/",
-            get(|| async { (StatusCode::FOUND, [(header::LOCATION, "/team")]).into_response() }),
+            get(|| async { (StatusCode::FOUND, [(header::LOCATION, "/league")]).into_response() }),
         )
         .route("/dashboard", get(dashboard))
         .route("/team", get(pages::team))
