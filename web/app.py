@@ -1,157 +1,38 @@
-"""Local web UI for the fantasy football + win-prediction toolkit.
+"""Analytics compute backend for the FD nation web UI (pandas/sklearn).
 
-Compute backend behind nfl-webd (rust/, the jra-van-re jv-webd method):
-the axum front door on :5000 serves the fantasy pages natively and proxies
-the analytics routes here (loopback :5001 under com.fdnation.backend).
-Standalone use still works:
+Behind nfl-webd (rust/, the jra-van-re jv-webd method): the axum front door
+on :5000 serves the fantasy pages (/team, /league, /cron, pins) natively and
+reverse-proxies the analytics routes here (loopback :5001 under
+com.fdnation.backend). This process never faces the tunnel directly.
 
-    python web/app.py            # http://127.0.0.1:5000 (or PORT=...)
-    python cli.py web            # same, via the CLI
-
-Pages:
+Routes (all proxied by nfl-webd):
   /            dashboard (2026 projections + model card)
-  /team        my FD nation team (latest operator report: matchup, lineup, flags)
-  /league      league standings + week scoreboard (how the other teams are doing)
-  /league/team/<name>  one team's standing, trajectory, and roster when captured
-  /cron        operator/cron status (run history + schedule)
   /players     searchable player list with 2022-2026 stats + 2026 projection
   /player/<id> single player detail (history + projection)
   /predictions 2026 win probabilities by week
   /sos        2026 strength-of-schedule ranking
   /ratings     2026 team efficiency ratings (as-of season, per-play EPA etc.)
   /strategy     game-strategy situation splits for a team (3rd down, red zone, pass/run)
+  /api/predictions, /api/modelcard  JSON APIs
 
-The fantasy pages read LOCAL artifacts only (logs/team-operator.jsonl,
-logs/league-report.json, logs/league-report.jsonl — written by the cron
-operators). The web process never touches Yahoo live — live reads belong to
-the gentle, WAF-aware cron jobs.
+Run standalone (analytics only): python web/app.py  # PORT env, default 5000
 """
 
 from __future__ import annotations
 
-import json
-import math
 import os
 from pathlib import Path
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, request, jsonify
 
 ROOT = Path(__file__).resolve().parents[1]
 import sys
 sys.path.insert(0, str(ROOT))
 
 from src import corpus, projections, analysis, model, ingest, features  # noqa: E402
-from src import pins as pins_mod  # noqa: E402
 from src.config import SCHEDULE_SEASON, STATS_SEASON, PBP_SEASONS, league_preset  # noqa: E402
 
 app = Flask(__name__, template_folder=str(Path(__file__).parent / "templates"))
-
-OPERATOR_AUDIT = ROOT / "logs" / "team-operator.jsonl"
-LEAGUE_REPORT = ROOT / "logs" / "league-report.json"
-LEAGUE_AUDIT = ROOT / "logs" / "league-report.jsonl"
-PINS_PATH = pins_mod.PINS_PATH
-
-# The host crontab (docs/TEAM_OPERATOR.md is the authoritative runbook).
-CRON_SCHEDULE = [
-    ("24 8,20 * * *", "twice daily 08:24 / 20:24", "team_operator.py — monitor + report"),
-    ("47 23 * * 0", "Sun 23:47", "team_operator.py --apply — lineup safety net"),
-    ("23 1 * * 1", "Mon 01:23", "team_operator.py --apply — final pre-kickoff set"),
-    ("11 20 * * 3", "Wed 20:11", "team_operator.py --waiver-scan --refresh-data"),
-    ("19 21 * * *", "nightly 21:19", "league_report.py --all-rosters --out --audit — league snapshot"),
-    ("5,35 8-13 * * 5", "Fri 08:05–13:35 (TNF)", "league_report.py --light — score refresh"),
-    ("5,35 2-13 * * 1", "Mon 02:05–13:35 (Sun slate)", "league_report.py --light — score refresh"),
-    ("5,35 8-13 * * 2", "Tue 08:05–13:35 (MNF)", "league_report.py --light — score refresh"),
-    ("37 9 * * 0", "Sun 09:37", "profile_backup.py — browser-profile backup"),
-]
-
-
-def _read_operator_runs(limit: int = 30, path: Path | None = None) -> list[dict]:
-    """Parse the operator audit log, newest first; non-dict/broken lines skipped."""
-    path = path or OPERATOR_AUDIT
-    try:
-        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-    except OSError:
-        return []
-    runs = []
-    for line in reversed(lines):
-        try:
-            record = json.loads(line)
-        except ValueError:
-            continue
-        if not isinstance(record, dict):
-            continue
-        proposal = record.get("proposal")
-        if isinstance(proposal, dict):
-            # Normalize at the artifact boundary so templates never see a
-            # non-list moves/plan (a corrupted record must not 500 the page).
-            if not isinstance(proposal.get("moves"), list):
-                proposal["moves"] = []
-            if not isinstance(proposal.get("plan"), (list, type(None))):
-                proposal["plan"] = None
-        runs.append(record)
-        if len(runs) >= limit:
-            break
-    return runs
-
-
-def _read_league_report(path: Path | None = None) -> dict | None:
-    """Return the latest persisted league snapshot, or None when absent/invalid."""
-    path = path or LEAGUE_REPORT
-    try:
-        report = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    return report if isinstance(report, dict) else None
-
-
-def _read_league_history(path: Path | None = None) -> list[dict]:
-    """Return the season's nightly league snapshots, oldest first."""
-    path = path or LEAGUE_AUDIT
-    try:
-        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-    except OSError:
-        return []
-    snaps = []
-    for line in lines:
-        try:
-            record = json.loads(line)
-        except ValueError:
-            continue
-        if isinstance(record, dict):
-            snaps.append(record)
-    return snaps
-
-
-def _team_row(standings, team_name: str) -> dict | None:
-    """Find one team's row in a standings list (exact name match).
-
-    Numeric fields are coerced to floats at this boundary so templates can
-    do arithmetic without trusting the artifact's types.
-    """
-    if not isinstance(standings, list):
-        return None
-    row = next((r for r in standings
-                if isinstance(r, dict) and r.get("team") == team_name), None)
-    if row is None:
-        return None
-
-    def num(key: str) -> float:
-        try:
-            value = float(row.get(key) or 0)
-        except (TypeError, ValueError):
-            return 0.0
-        return value if math.isfinite(value) else 0.0
-
-    return {**row, "points_for": num("points_for"),
-            "points_against": num("points_against")}
-
-
-def _record_games(record: str) -> int:
-    """Games played from a 'W-L-T' record string (0 when unparseable)."""
-    try:
-        return sum(int(part) for part in str(record).split("-")[:3])
-    except ValueError:
-        return 0
 
 
 def _get_corpus(preset=None):
@@ -178,117 +59,6 @@ def dashboard():
             "cv_folds": cv["folds"],
         },
     )
-
-
-@app.route("/team")
-def my_team():
-    """My FD nation team, from the newest operator audit record."""
-    return render_template("team.html", **_team_context())
-
-
-def _team_context() -> dict:
-    """Shared render context for /team and the pin-toggle error path.
-
-    Pins are read live from data/pins.json (not from the report, which may
-    be stale). A corrupt pin file is shown as a notice — the operator
-    refuses to run until it is fixed, so the page must say so loudly.
-    """
-    runs = _read_operator_runs(limit=200)  # deep window: the ok-fallback spans outages
-    latest = runs[0] if runs else None
-    latest_ok = next((r for r in runs if r.get("status") == "ok"), None)
-    try:
-        pins = pins_mod.load_pins(PINS_PATH)
-        pins_error = None
-    except pins_mod.PinsError as exc:
-        pins, pins_error = {}, str(exc)
-    return {"latest": latest, "report": latest_ok, "pins": pins,
-            "pins_error": pins_error}
-
-
-@app.route("/team/pin", methods=["POST"])
-def pin_toggle():
-    """Tick one player's pin on/off (form post from /team), then redirect.
-
-    Pinned players are never moved by the operator's --apply runs. On a
-    corrupt pin file we refuse to overwrite it and re-render the page with
-    the error (409) — the user's protection must not be silently reset.
-    """
-    yahoo_id = (request.form.get("yahoo_id") or "").strip()
-    name = (request.form.get("name") or "").strip()
-    if not yahoo_id:
-        return "missing yahoo_id", 400
-    try:
-        pins_mod.toggle_pin(yahoo_id, name, path=PINS_PATH)
-    except pins_mod.PinsError as exc:
-        ctx = _team_context()
-        ctx["pins_error"] = str(exc)
-        return render_template("team.html", **ctx), 409
-    return redirect(url_for("my_team"))
-
-
-@app.route("/league")
-def league():
-    """League standings + week scoreboard (how the other teams are doing)."""
-    report = _read_league_report()
-    standings = report.get("standings") if report else None
-    if not isinstance(standings, list):
-        standings = None
-    matchup = report.get("matchup") if report else None
-    my_name = matchup.get("team") if isinstance(matchup, dict) else None
-    scoreboard = report.get("scoreboard") if report else None
-    if not isinstance(scoreboard, list) or not all(isinstance(e, dict) for e in scoreboard):
-        scoreboard = None  # older snapshots predate the scoreboard capture
-    return render_template("league.html", report=report, standings=standings,
-                           scoreboard=scoreboard, my_name=my_name)
-
-
-@app.route("/league/team/<path:team_name>")
-def league_team(team_name):
-    """Detail page for one league team: standing, trend, roster when captured."""
-    latest = _read_league_report()
-    row = _team_row(latest.get("standings") if latest else None, team_name)
-    matchup = latest.get("matchup") if latest else None
-    is_opponent = isinstance(matchup, dict) and matchup.get("opponent") == team_name
-    roster = None
-    roster_date = None
-    rosters = latest.get("rosters") if latest else None
-    if isinstance(rosters, dict) and isinstance(rosters.get(team_name), list):
-        roster = rosters[team_name]
-    elif latest and is_opponent:  # older snapshots only carried the opponent's
-        fallback = latest.get("opponent_roster")
-        roster = fallback if isinstance(fallback, list) else None
-    history = _read_league_history()
-    if roster is None:
-        # A per-team read can fail on a given night; fall back to the newest
-        # history snapshot that still holds this team's roster.
-        for snap in reversed(history):
-            past = snap.get("rosters")
-            if isinstance(past, dict) and isinstance(past.get(team_name), list):
-                roster = past[team_name]
-                roster_date = str(snap.get("captured_at", ""))[:10]
-                break
-    trend = []
-    for snap in history:
-        mine = _team_row(snap.get("standings"), team_name)
-        if mine:
-            trend.append({**mine, "captured_at": str(snap.get("captured_at", ""))})
-    if row is None and not trend:
-        return render_template("league_team.html", name=team_name, row=None,
-                               trend=[], games=0, matchup=None, roster=None,
-                               roster_date=None, captured_at=None), 404
-    games = _record_games(row.get("record", "")) if row else 0
-    return render_template("league_team.html", name=team_name, row=row,
-                           trend=trend, games=games,
-                           matchup=matchup if is_opponent else None,
-                           roster=roster, roster_date=roster_date,
-                           captured_at=latest.get("captured_at") if latest else None)
-
-
-@app.route("/cron")
-def cron_status():
-    """Operator run history + the cron schedule that produces it."""
-    return render_template("cron.html", runs=_read_operator_runs(limit=14),
-                           schedule=CRON_SCHEDULE)
 
 
 @app.route("/players")

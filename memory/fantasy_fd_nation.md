@@ -638,3 +638,19 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
 - Verified: 16 Rust tests + 297 Python fast tests; all routes 200 via :5000
   and the public tunnel (URL unchanged — cloudflared untouched); dashboard
   proxied in ~4s; SIGTERM exits clean. Werkzeug no longer faces the tunnel.
+
+## 2026-11-20 — Old-web code removed (Flask = analytics backend only)
+
+- Clarification: the old HTTP engine was Werkzeug (Flask's dev server);
+  Flask itself stays as the analytics compute backend (:5001) — the
+  pandas/sklearn pages proxy through it. Removed the duplicated fantasy
+  serving path from Python: web/app.py lost /team, /team/pin, /league,
+  /league/team, /cron + artifact readers + CRON_SCHEDULE + pins wiring
+  (axum serves all of that natively); cli.py lost the `web` subcommand.
+- tests/test_web.py deleted; its 3 artifact-writer tests moved to
+  test_league_report.py; the fantasy coverage lives in rust/src/tests.rs
+  (added parity tests: bad/non-dict lines, bad UTF-8 tolerance — Rust
+  readers now use from_utf8_lossy like Python's errors="replace" —
+  garbage league report, nav grouping). 20 Rust + 265 Python fast pass.
+- Verified after redeploy: all routes 200 via :5000 and the tunnel;
+  backend :5001/team now 404 (fantasy code gone from Python).

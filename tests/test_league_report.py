@@ -317,3 +317,35 @@ def test_light_merge_tolerates_corrupt_and_stub_snapshots(harness, monkeypatch, 
     persisted = json.loads(out_path.read_text())
     assert "status" not in persisted  # a healthy merge never carries the stub flag
     assert persisted["captured_at"] != "2026-09-13T00:00:00+00:00"
+
+
+# --- artifact writers (moved from test_web.py when Flask stopped serving
+# the fantasy pages; nfl-webd reads these artifacts natively) ---
+
+def test_write_report_sequential_writes_and_no_tmp_residue(tmp_path):
+    out = tmp_path / "league.json"
+    league_report.write_report(str(out), {"standings": [{"team": "First"}]})
+    league_report.write_report(str(out), {"standings": [{"team": "Second"}]})
+    persisted = json.loads(out.read_text())
+    assert persisted["standings"] == [{"team": "Second"}]
+    assert list(tmp_path.glob("*.tmp")) == []  # unique tmp files cleaned up
+
+
+def test_league_report_write_report_atomic(tmp_path):
+    out = tmp_path / "sub" / "league-report.json"
+    league_report.write_report(str(out), {"standings": []})
+    persisted = json.loads(out.read_text())
+    assert persisted["standings"] == []
+    assert "captured_at" in persisted  # persisted copy is timestamped
+    assert not (tmp_path / "sub" / "league-report.json.tmp").exists()
+
+
+def test_append_audit_appends_stamped_lines(tmp_path):
+    out = tmp_path / "sub" / "league.jsonl"
+    league_report.append_audit(str(out), {"standings": []})
+    league_report.append_audit(str(out), {"standings": [{"team": "X"}]})
+    lines = out.read_text().splitlines()
+    assert len(lines) == 2
+    first, second = (json.loads(l) for l in lines)
+    assert first["standings"] == [] and "captured_at" in first
+    assert second["standings"] == [{"team": "X"}]

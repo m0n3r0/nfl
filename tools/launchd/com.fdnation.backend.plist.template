@@ -11,7 +11,7 @@
     The Flask app (pandas/sklearn analytics: dashboard, players, predictions,
     sos, ratings, strategy, /api/*) on loopback :5001. Never exposed directly:
     nfl-webd (com.fdnation.web) is the only surface and proxies these routes
-    here. Also keeps the fantasy routes for standalone `cli.py web` use.
+    here. Fantasy pages are served natively by nfl-webd, not by this app.
   -->
   <key>Label</key><string>com.fdnation.backend</string>
   <key>ProgramArguments</key>

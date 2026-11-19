@@ -225,8 +225,8 @@ start/sit choices survive the automated lineup set. Pins live in
 cd rust && cargo build --release                 # build the front door
 python tools/install_launchd.py --agent backend  # Flask analytics :5001
 python tools/install_launchd.py --agent web      # nfl-webd :5000
-# standalone (no Rust, everything on one port):
-python cli.py web            # http://127.0.0.1:5000
+# analytics backend standalone (fantasy pages need nfl-webd):
+python web/app.py            # PORT env, default 5000
 ```
 
 ### Public tunnel (optional, ephemeral — same method as jra-van-re)

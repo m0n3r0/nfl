@@ -164,15 +164,6 @@ def cmd_predict(args) -> int:
     return 0
 
 
-def cmd_web(args) -> int:
-    import os
-    from web import app
-    port = args.port
-    print(f"Starting web UI at http://127.0.0.1:{port}  (Ctrl-C to stop)")
-    app.run(host="127.0.0.1", port=port, debug=False)
-    return 0
-
-
 def _print_table(df):
     if df is None or len(df) == 0:
         print("(no rows)")
@@ -272,10 +263,6 @@ def build_parser() -> argparse.ArgumentParser:
     ppred = sub.add_parser("predict", help="2026 win probabilities")
     ppred.add_argument("week", type=int, nargs="?", default=None, help="2026 week (omit for all)")
     ppred.set_defaults(func=cmd_predict)
-
-    pw = sub.add_parser("web", help="launch the local web UI")
-    pw.add_argument("--port", type=int, default=5000)
-    pw.set_defaults(func=cmd_web)
 
     return p
 

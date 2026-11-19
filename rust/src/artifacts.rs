@@ -9,12 +9,14 @@ use serde_json::Value;
 /// Parse the operator audit log, newest first; non-dict/broken lines skipped.
 /// Normalizes proposal.moves/plan at the artifact boundary so templates
 /// never see a non-list (a corrupted record must not 500 the page).
+/// Invalid UTF-8 is replaced, not fatal (parity with the old Python reader).
 pub fn read_operator_runs(root: &Path, limit: usize) -> Vec<Value> {
     let path = root.join("logs/team-operator.jsonl");
-    let text = match std::fs::read_to_string(&path) {
-        Ok(t) => t,
+    let bytes = match std::fs::read(&path) {
+        Ok(b) => b,
         Err(_) => return Vec::new(),
     };
+    let text = String::from_utf8_lossy(&bytes);
     let mut runs = Vec::new();
     for line in text.lines().rev() {
         let Ok(mut record) = serde_json::from_str::<Value>(line) else {
@@ -51,9 +53,10 @@ pub fn read_league_report(root: &Path) -> Option<Value> {
 
 /// The season's nightly league snapshots, oldest first.
 pub fn read_league_history(root: &Path) -> Vec<Value> {
-    let Ok(text) = std::fs::read_to_string(root.join("logs/league-report.jsonl")) else {
+    let Ok(bytes) = std::fs::read(root.join("logs/league-report.jsonl")) else {
         return Vec::new();
     };
+    let text = String::from_utf8_lossy(&bytes);
     text.lines()
         .filter_map(|l| serde_json::from_str::<Value>(l).ok())
         .filter(Value::is_object)

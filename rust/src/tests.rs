@@ -153,6 +153,62 @@ fn operator_runs_newest_first_and_normalizes() {
     assert_eq!(runs[0]["proposal"]["plan"], Value::Null);
 }
 
+#[test]
+fn operator_runs_skips_bad_and_non_dict_lines() {
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    let body = format!(
+        "not json at all\n[1,2,3]\n\"a string\"\n{}\n",
+        operator_record("ok")
+    );
+    std::fs::write(root.join("logs/team-operator.jsonl"), body).unwrap();
+    let runs = crate::artifacts::read_operator_runs(&root, 30);
+    assert_eq!(runs.len(), 1);
+    assert_eq!(runs[0]["status"], "ok");
+}
+
+#[test]
+fn operator_runs_tolerates_bad_utf8() {
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    let mut body = operator_record("ok").to_string().into_bytes();
+    body.extend_from_slice(b"\n\xff\xfe invalid utf8 line\n");
+    body.extend_from_slice(operator_record("error").to_string().as_bytes());
+    std::fs::write(root.join("logs/team-operator.jsonl"), body).unwrap();
+    let runs = crate::artifacts::read_operator_runs(&root, 30);
+    assert_eq!(runs.len(), 2); // bad line skipped, good lines survive
+    assert_eq!(runs[0]["status"], "error");
+}
+
+#[test]
+fn league_report_garbage_is_none() {
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    std::fs::write(root.join("logs/league-report.json"), "{garbage").unwrap();
+    assert!(crate::artifacts::read_league_report(&root).is_none());
+    std::fs::write(root.join("logs/league-report.json"), "[1,2]").unwrap();
+    assert!(crate::artifacts::read_league_report(&root).is_none());
+}
+
+#[tokio::test]
+async fn nav_groups_fantasy_apart_from_prediction_pages() {
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    write_runs(&root, &[operator_record("ok")]);
+    let (_, html) = get_body(router(cfg(&root)), "/team").await;
+    for href in ["href=\"/team\"", "href=\"/league\"", "href=\"/cron\""] {
+        assert!(html.contains(href), "{href} missing");
+    }
+    assert!(html.contains("FD nation") && html.contains("Prediction engines"));
+    let idx = |s: &str| html.find(s).unwrap();
+    assert!(idx("FD nation") < idx("href=\"/team\""));
+    assert!(idx("href=\"/team\"") < idx("Prediction engines"));
+    assert!(idx("href=\"/league\"") < idx("Prediction engines"));
+    assert!(idx("href=\"/cron\"") < idx("Prediction engines"));
+    assert!(idx("href=\"/players\"") > idx("Prediction engines"));
+    assert!(idx("href=\"/predictions\"") > idx("Prediction engines"));
+}
+
 // --- native pages through the real templates ---
 
 #[tokio::test]
