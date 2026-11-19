@@ -104,6 +104,7 @@ pub fn router(cfg: Config) -> Router {
         .route("/team/pin", post(pages::pin_toggle))
         .route("/league", get(pages::league))
         .route("/league/team/{name}", get(pages::league_team))
+        .route("/league/teamview", get(pages::teamview))
         .route("/cron", get(pages::cron))
         .fallback(any(proxy))
         .with_state(st)

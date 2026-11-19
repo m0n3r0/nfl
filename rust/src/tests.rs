@@ -26,6 +26,7 @@ fn fixture_root(tmp: &Path) -> PathBuf {
         "league.html",
         "league_team.html",
         "cron.html",
+        "teamview.html",
     ] {
         std::fs::copy(tpl_src.join(name), tpl_dst.join(name)).unwrap();
     }
@@ -391,6 +392,7 @@ async fn league_page_and_team_detail_and_404() {
     assert!(html.contains("mu-card mine"));
     assert!(html.contains("mu-score mu-leading"));
     assert!(html.contains("Week 2 matchups"));
+    assert!(html.contains("/league/teamview?a=Shiba%20Innu&amp;b=Team%20Beta"));
     let (status, html) = get_body(app.clone(), "/league/team/Team%20Beta").await;
     assert_eq!(status, StatusCode::OK);
     assert!(html.contains("Beta Rb"));
@@ -429,6 +431,60 @@ async fn league_team_roster_falls_back_to_history() {
     assert!(html.contains("Alpha Rb") && !html.contains("Old Rb")); // newest holder wins
     assert!(html.contains("2026-09-13")); // dated-snapshot note
     assert!(html.contains("Season trajectory"));
+}
+
+// --- Team View (players side by side) ---
+
+fn teamview_fixtures(root: &Path) {
+    write_runs(root, &[operator_record("ok")]);
+    let report = json!({
+        "captured_at": "2026-09-13T12:19:00+00:00",
+        "matchup": {"week": 2, "team": "Shiba Innu", "opponent": "Team Beta",
+                    "score": 0, "opponent_score": 0, "team_proj": 100.0,
+                    "opponent_proj": 99.0},
+        "rosters": {"Team Beta": [
+            {"name": "Enemy Qb", "team": "KC", "position": "QB", "slot": "QB",
+             "injury_status": ""},
+            {"name": "Enemy Rb", "team": "DAL", "position": "RB", "slot": "RB",
+             "injury_status": "Q"},
+            {"name": "Enemy Bench", "team": "MIN", "position": "WR", "slot": "BN",
+             "injury_status": ""}]}
+    });
+    std::fs::write(root.join("logs/league-report.json"), report.to_string()).unwrap();
+}
+
+#[tokio::test]
+async fn teamview_pairs_players_by_slot() {
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    teamview_fixtures(&root);
+    let (status, html) = get_body(router(cfg(&root)), "/league/teamview").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("Shiba Innu vs Team Beta"));
+    // our side from the operator plan (with proj), opponent from the roster
+    assert!(html.contains("Quarter Back") && html.contains("Enemy Qb"));
+    assert!(html.contains("17.8")); // our QB projection
+    assert!(html.contains("tv-pos\">QB<")); // the Pos spine
+    assert!(html.contains("tv-note\">Q</div>")); // opponent injury tag
+    assert!(html.contains("Starters") && html.contains("Bench / IR"));
+    assert!(html.contains("Enemy Bench"));
+    // opponent has no projection data -> dash, never fabricated
+    assert!(html.contains("tv-empty"));
+}
+
+#[tokio::test]
+async fn teamview_query_override_and_missing_roster() {
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    teamview_fixtures(&root);
+    let app = router(cfg(&root));
+    let (status, html) =
+        get_body(app.clone(), "/league/teamview?a=Team%20Beta&b=Team%20Beta").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(html.matches("Enemy Qb").count(), 2); // both sides same roster
+    let (status, html) = get_body(app, "/league/teamview?a=No%20Such%20Team&b=Team%20Beta").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("roster for one of these teams"));
 }
 
 // --- proxy (jv-webd method) ---

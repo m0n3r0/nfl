@@ -685,3 +685,20 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
   "My matchup" card removed (covered by the highlighted card).
 - 22 Rust tests pass (layout assertions added); verified through the
   tunnel with real week-11 data.
+
+## 2026-11-20 — Team View (players side-by-side) on /league/teamview
+
+- Reverse-engineered the GameChannel "Team View" tab via CDP (click tab,
+  dump DOM): a real mirrored TABLE — Stats|Player|Proj|Fan Pts|POS|Fan
+  Pts|Proj|Player|Stats, Pos column shaded as the center spine, player
+  cells = name + 11px NFL-team tag + game-info subline, 37px bordered
+  rows, separate starter/bench tbodies, All Players/Starters/Bench tabs.
+- Implemented /league/teamview?a=<team>&b=<team> (defaults to the current
+  matchup): same mirrored table + Pos spine, dark theme. Rows aligned by
+  slot occurrence (QB vs QB, 1st RB vs 1st RB, ...), starters then bench/IR.
+  Our side from the latest ok operator plan (HAS projections); other teams
+  from league-report rosters (no proj -> "—", never fabricated). Fan Pts /
+  Stats / game-info omitted: not in our artifacts. "Team View →" link on
+  every /league matchup card. Missing roster -> notice, one-sided rows.
+- 24 Rust tests pass; verified through the tunnel: 15 paired rows for
+  Shiba Innu vs Take it in the Browns (Purdy/Stafford QB, CMC/Taylor RB...).

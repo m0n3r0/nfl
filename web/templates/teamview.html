@@ -1,0 +1,89 @@
+{% extends "layout.html" %}
+{% block title %}Team View — NFL Toolkit{% endblock %}
+{% block body %}
+<style>
+  /* Yahoo GameChannel "Team View" (reverse-engineered 2026-11-20 via CDP):
+     a mirrored table with the Pos column as the shaded center spine,
+     player cells with name + small team tag + note subline, projections
+     right-aligned toward the spine, 37px bordered rows, separate starter
+     and bench bodies. Fan Pts / Stats columns omitted: not in our artifacts. */
+  .tv { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tv th { font-size: 11px; font-weight: 400; color: #7a8a99; background: #16202c;
+           padding: 6px 10px; border-bottom: 1px solid #243240; }
+  .tv td { padding: 6px 10px; border-bottom: 1px solid #202c38; height: 37px;
+           vertical-align: middle; }
+  .tv-player { text-align: left; width: 34%; }
+  .tv-proj { text-align: right; width: 12%; font-variant-numeric: tabular-nums; }
+  .tv-pos { text-align: center; width: 8%; min-width: 50px; background: #1d2b3a;
+            color: #9fd0ff; font-size: 12px; }
+  .tv-name { font-weight: 600; }
+  .tv-team { font-size: 11px; color: #7a8a99; padding-left: 4px; }
+  .tv-note { font-size: 11px; color: #e8c98a; }
+  .tv-empty { color: #4a5a6a; }
+  .tv-section td { background: #16202c; color: #7a8a99; font-size: 11px;
+                   font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+                   height: 24px; padding: 4px 10px; }
+  .tv-head-names th { text-align: left; }
+  .tv-head-proj th { text-align: right; }
+</style>
+{% macro player(p) %}{% if p %}<span class="tv-name">{{ p.name }}</span>{% if p.team %}<span class="tv-team">{{ p.team }}</span>{% endif %}{% if p.note %}<div class="tv-note">{{ p.note }}</div>{% endif %}{% else %}<span class="tv-empty">—</span>{% endif %}{% endmacro %}
+{% macro proj(p) %}{% if p and p.proj is not none %}{{ p.proj }}{% else %}<span class="tv-empty">—</span>{% endif %}{% endmacro %}
+
+<h1>Team View{% if a_name and b_name %} — {{ a_name }} vs {{ b_name }}{% endif %}</h1>
+<p class="muted"><a href="/league">← Back to league</a>
+{% if week %} · week {{ week }}{% endif %} · players aligned by starting slot,
+GameChannel-style. Projections come from our operator report (our team only);
+“—” = no data in the local artifacts.</p>
+
+{% if missing %}
+<div class="notice">A roster for one of these teams is not in the latest league
+snapshot yet — the nightly <code>league_report.py --all-rosters</code> run fills
+it in. Rows show whichever side is available.</div>
+{% endif %}
+
+{% if not starters and not bench %}
+<div class="notice">No player rows to show yet.</div>
+{% else %}
+<div class="card">
+  <table class="tv">
+    <thead>
+      <tr>
+        <th class="tv-head-names">Player</th>
+        <th class="tv-head-proj">Proj</th>
+        <th>Pos</th>
+        <th class="tv-head-proj">Proj</th>
+        <th class="tv-head-names">Player</th>
+      </tr>
+    </thead>
+    {% if starters %}
+    <tbody>
+      <tr class="tv-section"><td colspan="5">Starters</td></tr>
+      {% for row in starters %}
+      <tr>
+        <td class="tv-player">{{ player(row.left) }}</td>
+        <td class="tv-proj">{{ proj(row.left) }}</td>
+        <td class="tv-pos">{{ row.slot }}</td>
+        <td class="tv-proj">{{ proj(row.right) }}</td>
+        <td class="tv-player">{{ player(row.right) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    {% endif %}
+    {% if bench %}
+    <tbody>
+      <tr class="tv-section"><td colspan="5">Bench / IR</td></tr>
+      {% for row in bench %}
+      <tr>
+        <td class="tv-player">{{ player(row.left) }}</td>
+        <td class="tv-proj">{{ proj(row.left) }}</td>
+        <td class="tv-pos">{{ row.slot }}</td>
+        <td class="tv-proj">{{ proj(row.right) }}</td>
+        <td class="tv-player">{{ player(row.right) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    {% endif %}
+  </table>
+</div>
+{% endif %}
+{% endblock %}

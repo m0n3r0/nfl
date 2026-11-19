@@ -37,6 +37,8 @@
            border: 1px solid #2c4055; color: #7a8a99; font-size: 12px;
            display: flex; align-items: center; justify-content: center; margin: 0 auto; }
   .mu-leading { color: #5fd38a; }
+  .mu-tv { font-size: 11px; color: #7fb3ff; text-decoration: none; margin: 3px auto 0; }
+  .mu-tv:hover { color: #bcd6ff; }
   @media (max-width: 700px) {
     .mu-avatar { display: none; }
     .mu-name { font-size: 14px; }
@@ -92,6 +94,9 @@ data may be incomplete. Live reads retry on the next cron run.</div>
         <div class="mu-val mu-left-val"><span class="mu-proj">{{ e.proj1 }}</span></div>
         <div class="mu-label">Proj Pts</div>
         <div class="mu-val mu-right-val"><span class="mu-proj">{{ e.proj2 }}</span></div>
+      </div>
+      <div class="mu-row">
+        <a class="mu-tv" href="/league/teamview?a={{ e.team1 | urlencode }}&amp;b={{ e.team2 | urlencode }}">Team View →</a>
       </div>
     </div>
     <div class="mu-team mu-right">

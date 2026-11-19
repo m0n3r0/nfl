@@ -2,8 +2,10 @@
 //! /league/team/<name>, /cron routes. Same artifacts, same templates, same
 //! fallback semantics (newest ok report, history roster fallback, 404).
 
+use std::collections::HashMap;
+
 use axum::{
-    extract::{Form, Path, State},
+    extract::{Form, Path, Query, State},
     http::{header, StatusCode},
     response::{Html, IntoResponse, Response},
 };
@@ -308,4 +310,147 @@ pub async fn cron(State(st): State<AppState>) -> Response {
         .collect();
     let ctx = json!({"runs": runs, "schedule": schedule});
     render(&st, "cron.html", ctx)
+}
+
+// --- Team View: players side by side (Yahoo GameChannel method) ---
+
+/// One player row entry. Our own team comes from the operator plan (has
+/// projections); other teams from the league snapshot rosters (no proj).
+struct TvEntry {
+    name: String,
+    team: String,
+    slot: String,
+    proj: Option<f64>,
+    note: String,
+}
+
+impl TvEntry {
+    fn to_json(&self) -> Value {
+        json!({"name": self.name, "team": self.team, "slot": self.slot,
+               "proj": self.proj, "note": self.note})
+    }
+}
+
+fn tv_side(
+    team: &str,
+    my_name: Option<&str>,
+    plan: Option<&Vec<Value>>,
+    rosters: Option<&Value>,
+) -> Option<Vec<TvEntry>> {
+    if Some(team) == my_name {
+        if let Some(plan) = plan {
+            return Some(
+                plan.iter()
+                    .map(|p| TvEntry {
+                        name: artifacts::as_display_string(p.get("name")),
+                        team: String::new(),
+                        slot: artifacts::as_display_string(p.get("current_slot")),
+                        proj: p.get("proj_week").and_then(Value::as_f64),
+                        note: artifacts::as_display_string(p.get("note")),
+                    })
+                    .collect(),
+            );
+        }
+    }
+    let rows = rosters?.get(team)?.as_array()?;
+    Some(
+        rows.iter()
+            .map(|p| TvEntry {
+                name: artifacts::as_display_string(p.get("name")),
+                team: artifacts::as_display_string(p.get("team")),
+                slot: artifacts::as_display_string(p.get("slot")),
+                proj: None,
+                note: artifacts::as_display_string(p.get("injury_status")),
+            })
+            .collect(),
+    )
+}
+
+/// Align two sides by slot occurrence (QB vs QB, 1st RB vs 1st RB, ...),
+/// starters first then bench/IR — Yahoo pairs rows around the Pos spine.
+fn tv_rows(a: Option<&Vec<TvEntry>>, b: Option<&Vec<TvEntry>>) -> (Vec<Value>, Vec<Value>) {
+    let empty: Vec<TvEntry> = Vec::new();
+    let a = a.unwrap_or(&empty);
+    let b = b.unwrap_or(&empty);
+    let mut slots: Vec<String> = [
+        "QB", "RB", "WR", "TE", "W/R/T", "K", "DEF", "BN", "IR", "IL",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
+    for e in a.iter().chain(b.iter()) {
+        if !slots.contains(&e.slot) {
+            slots.push(e.slot.clone());
+        }
+    }
+    let (mut starters, mut bench) = (Vec::new(), Vec::new());
+    for slot in &slots {
+        let ga: Vec<&TvEntry> = a.iter().filter(|e| &e.slot == slot).collect();
+        let gb: Vec<&TvEntry> = b.iter().filter(|e| &e.slot == slot).collect();
+        for i in 0..ga.len().max(gb.len()) {
+            let row = json!({
+                "slot": slot,
+                "left": ga.get(i).map(|e| e.to_json()).unwrap_or(Value::Null),
+                "right": gb.get(i).map(|e| e.to_json()).unwrap_or(Value::Null),
+            });
+            if matches!(slot.as_str(), "BN" | "IR" | "IL") {
+                bench.push(row);
+            } else {
+                starters.push(row);
+            }
+        }
+    }
+    (starters, bench)
+}
+
+/// /league/teamview?a=<team>&b=<team> — defaults to the current matchup.
+pub async fn teamview(
+    State(st): State<AppState>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Response {
+    let report = artifacts::read_league_report(&st.cfg.root);
+    let matchup = report.as_ref().and_then(|r| r.get("matchup"));
+    let my_name = matchup
+        .and_then(|m| m.get("team"))
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    let a_name = params
+        .get("a")
+        .filter(|s| !s.trim().is_empty())
+        .cloned()
+        .or_else(|| my_name.clone())
+        .unwrap_or_default();
+    let b_name = params
+        .get("b")
+        .filter(|s| !s.trim().is_empty())
+        .cloned()
+        .or_else(|| {
+            matchup
+                .and_then(|m| m.get("opponent"))
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        })
+        .unwrap_or_default();
+    let week = matchup
+        .and_then(|m| m.get("week"))
+        .cloned()
+        .unwrap_or(Value::Null);
+    let rosters = report.as_ref().and_then(|r| r.get("rosters"));
+    let runs = artifacts::read_operator_runs(&st.cfg.root, 200);
+    let plan: Option<Vec<Value>> = runs
+        .iter()
+        .find(|r| r.get("status").and_then(Value::as_str) == Some("ok"))
+        .and_then(|r| r.get("proposal"))
+        .and_then(|p| p.get("plan"))
+        .and_then(Value::as_array)
+        .cloned();
+    let a = tv_side(&a_name, my_name.as_deref(), plan.as_ref(), rosters);
+    let b = tv_side(&b_name, my_name.as_deref(), plan.as_ref(), rosters);
+    let missing = a.is_none() || b.is_none();
+    let (starters, bench) = tv_rows(a.as_ref(), b.as_ref());
+    let ctx = json!({
+        "a_name": a_name, "b_name": b_name, "week": week,
+        "starters": starters, "bench": bench, "missing": missing,
+    });
+    render(&st, "teamview.html", ctx)
 }
