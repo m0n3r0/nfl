@@ -663,3 +663,25 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
   link + url_for("dashboard") updated. 22 Rust tests pass (root redirect +
   dashboard rewrite + nav). Verified local and through the tunnel:
   / -> 302 -> /team 200.
+
+## 2026-11-20 — GameChannel-style matchup layout on /league
+
+- Reverse-engineered sports.yahoo.com/nfl/gamechannel/?lid=1329011 via CDP
+  (one tab, one navigation, DOM+computed-style dumps; tab closed after).
+  Yahoo's method: flex row grow-ratio 5:3:5 — mirrored team blocks
+  (left: flex-direction row-reverse + text-align end; right mirrored)
+  flanking a center column of value|label|value rows (each row a 1:2:1
+  flex, label min-width 60px): scores 26px with a 24px circular "vs"
+  badge, Orig Proj + Proj Pts rows 16px/11px; 80px circular avatars;
+  team name links to the fantasy team page; manager + record|rank below.
+- Implemented in web/templates/league.html (native axum page): same 5:3:5
+  flex + mirror + center rows, dark-theme adapted; all 5 matchups stacked,
+  ours highlighted; leader green (score when live, else projection);
+  record|rank joined from standings via filtered for-loop; initials
+  avatars computed in the Rust handler (minijinja strings lack .split();
+  template falls back to first letter via |default for engine parity).
+  Dropped: manager names, win-% footer, players-remaining (not in our
+  artifacts — no fabricated stats). Standings table kept; redundant
+  "My matchup" card removed (covered by the highlighted card).
+- 22 Rust tests pass (layout assertions added); verified through the
+  tunnel with real week-11 data.

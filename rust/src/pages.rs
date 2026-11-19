@@ -147,9 +147,40 @@ pub async fn league(State(st): State<AppState>) -> Response {
         })
         .cloned()
         .unwrap_or(Value::Null);
+    // Initials for the matchup avatars (minijinja strings have no .split();
+    // the template falls back to the first letter when these are absent).
+    let scoreboard = match scoreboard {
+        Value::Array(entries) => Value::Array(
+            entries
+                .into_iter()
+                .map(|mut e| {
+                    if let Some(obj) = e.as_object_mut() {
+                        for (team_key, out_key) in
+                            [("team1", "t1_initials"), ("team2", "t2_initials")]
+                        {
+                            if let Some(name) = obj.get(team_key).and_then(Value::as_str) {
+                                obj.insert(out_key.into(), Value::String(initials(name)));
+                            }
+                        }
+                    }
+                    e
+                })
+                .collect(),
+        ),
+        other => other,
+    };
     let ctx = json!({"report": report.unwrap_or(Value::Null), "standings": standings,
                      "scoreboard": scoreboard, "my_name": my_name});
     render(&st, "league.html", ctx)
+}
+
+/// First letters of the first two words, uppercased ("Shiba Innu" -> "SI").
+fn initials(name: &str) -> String {
+    name.split_whitespace()
+        .take(2)
+        .filter_map(|w| w.chars().next())
+        .flat_map(|c| c.to_uppercase())
+        .collect()
 }
 
 /// One team's row in a standings list (exact name match), with PF/PA

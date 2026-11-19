@@ -379,6 +379,18 @@ async fn league_page_and_team_detail_and_404() {
     assert_eq!(status, StatusCode::OK);
     assert!(html.contains("Shiba Innu"));
     assert!(html.contains("/league/team/Team%20Beta")); // urlencode filter
+                                                        // GameChannel-style matchup cards: 5:3:5 flex, vs badge, proj row,
+                                                        // record|rank joined from standings, initials avatar, mine highlight,
+                                                        // projection leader marked (100.0 > 99.0 pre-kickoff).
+    assert!(html.contains("mu-card"), "{html}");
+    assert!(html.contains("mu-vs"));
+    assert!(html.contains("Proj Pts"));
+    assert!(html.contains("1-0-0 | #1"));
+    assert!(html.contains(">SI</div>")); // Shiba Innu initials
+    assert!(html.contains(">TB</div>")); // Team Beta initials
+    assert!(html.contains("mu-card mine"));
+    assert!(html.contains("mu-score mu-leading"));
+    assert!(html.contains("Week 2 matchups"));
     let (status, html) = get_body(app.clone(), "/league/team/Team%20Beta").await;
     assert_eq!(status, StatusCode::OK);
     assert!(html.contains("Beta Rb"));
