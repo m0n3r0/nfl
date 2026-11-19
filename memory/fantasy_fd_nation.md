@@ -744,3 +744,33 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
 - Tests updated: root_redirects_to_league + explicit nav-order asserts.
 - Verified through tunnel: / -> 302 -> /league 200, menu renders in the
   requested order. 25 Rust tests pass.
+
+## 2026-11-20 — Realtime points research: free feeds investigated
+
+- User hypothesis CONFIRMED from Yahoo GameChannel page source: footer
+  strings "Certain Data by {first_provider} and {second_provider}" with
+  FOOTER_SPORTRADAR="Sportradar", FOOTER_ROTOWIRE="Rotowire". Sportradar is
+  the NFL's official data distributor (the "central broadcaster"); paid
+  enterprise push feeds. developer.sportradar.com offers a Free Trial
+  (REST, rate-limited) — no free WebSocket.
+- NO free public WebSocket feed of NFL player points exists. Free path =
+  REST polling + our own axum WS push.
+- ESPN hidden API VERIFIED LIVE (free, no auth, no key):
+  * site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard
+    (week 11, TNF Colts@Texans 2026-11-20T01:15Z, event id 401873066)
+  * .../nfl/summary?event=<id> -> boxscore.players with FULL per-player
+    stats: passing C/ATT YDS TD INT, rushing CAR YDS TD, receiving REC
+    YDS TD TGTS, fumbles, defensive, kicking, returns. Verified on
+    finished week-10 game 401873052 (Daniels 249yds 3TD, Diggs 6/83/1).
+    Live cadence unmeasured (no game live at probe time) — measure at TNF.
+- NFL.com legacy liveupdate game-center JSON: 404 for 3 eids — endpoint
+  appears retired/moved. /api/schedule also 404.
+- the-odds-api: NFL odds/props only, not fantasy points; limited free
+  credits. api-sports.io: 403 from this network (unverified).
+- KEY: we already own the conversion — src/scoring.py score_row(stats,
+  weights) + FD nation overrides (INT -1.0, receptions 0.5, no milestone
+  bonuses, per README Scoring). ESPN raw stats -> our exact league points
+  with zero Yahoo dependency (different host = no WAF risk).
+- Plan: game-window poller (ESPN scoreboard -> live game ids -> summary
+  boxscores -> score_row -> logs/live-points.json) + axum "ws" feature +
+  /ws broadcast + vanilla JS score-cell updates. Latency ~1 min.
