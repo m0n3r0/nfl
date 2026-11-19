@@ -28,15 +28,30 @@ def test_cloudflared_template_renders_keepalive_tunnel():
     assert plist["StandardOutPath"].endswith("logs/cloudflared.log")
 
 
-def test_web_template_renders_loopback_app():
+def test_web_template_renders_axum_front_door():
     plist = install_launchd.render("web")
     assert plist["Label"] == "com.fdnation.web"
+    assert plist["KeepAlive"] is True
+    (program,) = plist["ProgramArguments"]
+    assert program.endswith("rust/target/release/nfl-webd")
+    assert "@REPO_ROOT@" not in program
+    env = plist["EnvironmentVariables"]
+    assert env["NFL_WEBD_BIND"] == "127.0.0.1:5000"
+    assert env["NFL_WEBD_BACKEND"] == "http://127.0.0.1:5001"
+    assert "@REPO_ROOT@" not in env["NFL_WEBD_ROOT"]
+    assert plist["StandardOutPath"].endswith("logs/web.log")
+
+
+def test_backend_template_renders_loopback_flask():
+    plist = install_launchd.render("backend")
+    assert plist["Label"] == "com.fdnation.backend"
     assert plist["KeepAlive"] is True
     python, script = plist["ProgramArguments"]
     assert python.endswith(".venv/bin/python")
     assert script.endswith("web/app.py")
     assert "@REPO_ROOT@" not in script
-    assert plist["StandardOutPath"].endswith("logs/web.log")
+    assert plist["EnvironmentVariables"]["PORT"] == "5001"
+    assert plist["StandardOutPath"].endswith("logs/backend.log")
 
 
 def test_unknown_agent_rejected():

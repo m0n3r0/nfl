@@ -5,6 +5,8 @@ Run manually or via cron. Read-only by default: prints one JSON report and
 appends one durable audit line to logs/team-operator.jsonl. --apply submits
 the recommended lineup moves through the verified operator (lineup only;
 waiver claims always remain a human decision -- the report just ranks targets).
+Players pinned in the web UI (/team, stored in data/pins.json) are never
+moved, starter or bench; a corrupt pin file aborts the run (pins_error).
 An flock prevents overlapping cron/manual runs.
 """
 
@@ -22,7 +24,7 @@ for entry in (str(ROOT), str(ROOT / "tools")):
     if entry not in sys.path:
         sys.path.insert(0, entry)
 
-from src import corpus as corpus_mod, ingest, jev, projections, schedule as sched  # noqa: E402
+from src import corpus as corpus_mod, ingest, jev, pins as pins_mod, projections, schedule as sched  # noqa: E402
 from src.config import league_preset  # noqa: E402
 from yahoo.browser import BrowserError  # noqa: E402
 from yahoo.cdp import CdpClient, CdpError  # noqa: E402
@@ -60,6 +62,15 @@ def run(args) -> dict:
         report["status"] = "preflight_failed"
         return report
 
+    # Manual pins (web UI /team -> data/pins.json). Fail-closed: a corrupt
+    # pin file aborts the run before any Yahoo navigation, so --apply can
+    # never trample a manually set lineup it cannot verify.
+    try:
+        pinned = pins_mod.pinned_ids()
+    except pins_mod.PinsError as exc:
+        report.update({"status": "pins_error", "error": str(exc)})
+        return report
+
     if args.refresh_data:
         ingest.collect_corpus(refresh=True)
 
@@ -75,12 +86,13 @@ def run(args) -> dict:
         proj = projections.project_for_week(corp, week)
         snapshot, lock_warnings = apply_schedule_locks(
             snapshot, sched.locked_teams(corp["schedule_2026"], week))
-        proposal = propose_lineup(snapshot, proj, week)
+        proposal = propose_lineup(snapshot, proj, week, pinned=pinned)
 
         report.update({
             "week": week,
             "record": snapshot.record,
             "waiver_priority": snapshot.waiver_priority,
+            "pinned": sorted(pinned),
             "lock_warnings": list(lock_warnings),
             "monitor": monitor_report(snapshot, proj, week),
             "proposal": proposal.as_dict(),

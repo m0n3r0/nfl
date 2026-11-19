@@ -4,18 +4,23 @@
 <plist version="1.0">
 <dict>
   <!--
-    FD nation web UI template. Do NOT copy this file directly:
+    FD nation web front door template. Do NOT copy this file directly:
     tools/install_launchd.py renders @REPO_ROOT@ to the actual repo location
     and installs the result to ~/Library/LaunchAgents.
 
-    Runs the Flask app on 127.0.0.1:5000 (loopback only; public exposure,
-    when wanted, goes through the com.fdnation.cloudflared quick tunnel).
+    nfl-webd (Rust/axum, the jra-van-re jv-webd method) binds 127.0.0.1:5000:
+    it serves the fantasy pages (/team, /league, /cron, pins) natively from
+    web/templates + local artifacts, and reverse-proxies the analytics pages
+    to the Python compute backend (com.fdnation.backend, loopback :5001).
+    Public exposure, when wanted, goes through the com.fdnation.cloudflared
+    quick tunnel, which still points at 127.0.0.1:5000.
+
+    Build the binary first: the rust/ crate, release profile.
   -->
   <key>Label</key><string>com.fdnation.web</string>
   <key>ProgramArguments</key>
   <array>
-    <string>@REPO_ROOT@/.venv/bin/python</string>
-    <string>@REPO_ROOT@/web/app.py</string>
+    <string>@REPO_ROOT@/rust/target/release/nfl-webd</string>
   </array>
   <key>WorkingDirectory</key><string>@REPO_ROOT@</string>
   <key>RunAtLoad</key><true/>
@@ -24,6 +29,11 @@
   <key>StandardOutPath</key><string>@REPO_ROOT@/logs/web.log</string>
   <key>StandardErrorPath</key><string>@REPO_ROOT@/logs/web.log</string>
   <key>EnvironmentVariables</key>
-  <dict><key>PYTHONIOENCODING</key><string>utf-8</string></dict>
+  <dict>
+    <key>NFL_WEBD_BIND</key><string>127.0.0.1:5000</string>
+    <key>NFL_WEBD_BACKEND</key><string>http://127.0.0.1:5001</string>
+    <key>NFL_WEBD_ROOT</key><string>@REPO_ROOT@</string>
+    <key>RUST_LOG</key><string>info</string>
+  </dict>
 </dict>
 </plist>

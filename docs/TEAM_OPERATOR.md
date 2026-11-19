@@ -230,6 +230,27 @@ The default output is `logs/yahoo-player-map.json`, which is runtime state and
 must not be committed. Rebuild it before each recommendation or mutation rather
 than treating IDs, availability, or NFL teams as static season data.
 
+## Manual pins (web UI)
+
+Players pinned on the web UI's `/team` page are never moved by the operator —
+starter or bench. A pin is the user's manual start/sit decision and outranks
+the projections in every `--apply` run.
+
+- Toggle: `/team` → the pin button on any lineup-plan row (📌 = pinned). The
+  "Pinned" card also lists and unpins players who left the latest report.
+- Storage: `data/pins.json` (git-ignored; atomic writes, flock-serialized
+  toggles). Shape: `{"pinned": {"<yahoo_id>": {"name", "pinned_at"}}}`.
+- Semantics: a pinned player keeps his CURRENT slot, exactly like a
+  game-locked player; the optimizer fills the remaining slots around him.
+  Pinning a starter does not freeze the position — the other slots at that
+  position are still optimized. The plan's note column shows `pinned`, and
+  the audit report lists the active pin set under `"pinned"`.
+- Fail-closed: an unreadable/corrupt pin file aborts every operator run with
+  status `pins_error` BEFORE any Yahoo navigation, and the web UI refuses
+  toggles (409) until the file is fixed. `--apply` can never trample a manual
+  lineup it cannot verify.
+- Pins do not touch waiver claims (always human) or the read-only monitor.
+
 ## Scheduled operation
 
 `tools/team_operator.py` is the single entry point for in-season maintenance:

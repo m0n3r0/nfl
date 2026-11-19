@@ -1,7 +1,35 @@
 {% extends "layout.html" %}
 {% block title %}My Team — NFL Toolkit{% endblock %}
 {% block body %}
+<style>
+  .pin-btn { background: #1d2b3a; border: 1px solid #2c4055; color: #7a8a99;
+             border-radius: 12px; padding: 2px 10px; font-size: 12px; cursor: pointer; }
+  .pin-btn:hover { border-color: #7fb3ff; color: #bcd6ff; }
+  .pin-btn.on { background: #2a2118; border-color: #5c4526; color: #e8c98a; }
+</style>
 <h1>My Team{% if report and report.matchup %} — {{ report.matchup.team }}{% endif %}</h1>
+
+{% if pins_error %}
+<div class="notice">Pin file problem: {{ pins_error }} — the operator refuses to
+run (status <b>pins_error</b>) until <code>data/pins.json</code> is fixed.
+No lineup moves will be applied meanwhile.</div>
+{% endif %}
+
+{% if pins %}
+<div class="card">
+  <h2 style="margin-top:0">Pinned — the operator never moves these</h2>
+  <p class="muted">Manual pins outrank the projections in every <code>--apply</code>
+  run (Sun 23:47 / Mon 01:23 JST). Untick to hand the player back to the optimizer.</p>
+  {% for yahoo_id in pins %}
+  {% set meta = pins[yahoo_id] %}
+  <form method="post" action="{{ url_for('pin_toggle') }}" style="display:inline-block; margin: 2px 6px 2px 0">
+    <input type="hidden" name="yahoo_id" value="{{ yahoo_id }}">
+    <input type="hidden" name="name" value="{{ meta.name }}">
+    <button type="submit" class="pin-btn on" title="Pinned {{ meta.pinned_at }} — click to unpin">📌 {{ meta.name }}</button>
+  </form>
+  {% endfor %}
+</div>
+{% endif %}
 
 {% if not report and not latest %}
 <div class="notice">No operator report yet. The cron operator writes
@@ -44,13 +72,23 @@ recent healthy report once one lands.</div>
 {% if report.proposal and report.proposal.plan %}
 <div class="card">
   <h2>Lineup plan ({{ report.proposal.moves | length }} move(s) recommended)</h2>
+  <p class="muted">📌 pin a player to freeze his current slot — the operator's
+  <code>--apply</code> runs will never move him, starter or bench.</p>
   <table>
-    <tr><th>Slot</th><th>Player</th><th>Pos</th><th>Proj (wk)</th><th>Note</th></tr>
+    <tr><th>Slot</th><th>Player</th><th>Pos</th><th>Proj (wk)</th><th>Note</th><th>Pin</th></tr>
     {% for p in report.proposal.plan %}
     <tr>
       <td>{{ p.current_slot }}{% if p.proposed_slot != p.current_slot %} → {{ p.proposed_slot }}{% endif %}</td>
       <td>{{ p.name }}</td><td>{{ p.position }}</td><td>{{ p.proj_week }}</td>
       <td class="muted">{{ p.note }}</td>
+      <td>
+        <form method="post" action="{{ url_for('pin_toggle') }}">
+          <input type="hidden" name="yahoo_id" value="{{ p.yahoo_id }}">
+          <input type="hidden" name="name" value="{{ p.name }}">
+          <button type="submit" class="pin-btn {{ 'on' if pins[p.yahoo_id] else '' }}"
+                  title="{{ 'Pinned — click to unpin' if pins[p.yahoo_id] else 'Pin: keep this slot, never auto-move' }}">{{ "📌" if pins[p.yahoo_id] else "pin" }}</button>
+        </form>
+      </td>
     </tr>
     {% endfor %}
   </table>

@@ -588,3 +588,53 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
 - Cron: Wednesday waiver-scan now runs --jev 5; the twice-daily runs stay
   Jev-free to bound API cost. Jev is advisory only — projections remain the
   source of truth.
+
+## 2026-11-20 — Repo move to ~/m0n3r0/nfl + manual lineup pins
+
+- Repo moved /Users/user/nfl → /Users/user/m0n3r0/nfl. Crontab (9 entries)
+  rewritten to the new path — installed manually: `crontab <file>` hangs on
+  this host (reads fine, writes block; no lock file visible in tabs/).
+  com.fdnation.web reinstalled via tools/install_launchd.py (fixed the
+  post-move certifi 500: the old process cached the old CA-bundle path).
+  cloudflared + browser plists still reference the old path — running
+  processes survived, but reinstall before their next restart (a cloudflared
+  restart issues a NEW trycloudflare URL; watcher republishes).
+- Manual pins (user request: Sun 23:47 / Mon 01:23 --apply runs were
+  reverting manual start/sit calls — audit shows 6 moves applied Nov 15):
+  /team pin toggles → data/pins.json (git-ignored, atomic, flock).
+  propose_lineup(..., pinned=...) keeps pinned players' current slots like
+  game locks; optimizer works around them. Operator loads pins fail-closed:
+  corrupt file → status pins_error BEFORE any Yahoo navigation; web refuses
+  toggles (409) and shows a notice. Audit reports carry "pinned": [ids].
+  Tests: test_pins.py + pin cases in recommend/web/operator suites (296 fast
+  pass). Docs: TEAM_OPERATOR "Manual pins", README web section.
+- Roster sanity error since Nov 18 20:24 JST: "expected 15-17 roster players
+  including IR, found 14" — a drop without replacement blocks ALL operator
+  runs (even monitors) until the roster is back to 15+.
+
+## 2026-11-20 — HTTP engine swapped to Rust/axum (jra-van-re method)
+
+- nfl-webd (rust/, axum 0.8 + minijinja + reqwest proxy) replaces Werkzeug
+  as the serving engine on 127.0.0.1:5000 — same jv-webd front-door pattern:
+  native fantasy pages (/team, /team/pin, /league, /league/team/<name>,
+  /cron) rendered from the SAME web/templates + local artifacts; everything
+  else (/, /players, /player/<id>, /predictions, /sos, /ratings, /strategy,
+  /api/*) reverse-proxied to the Flask compute backend, now loopback :5001
+  (new com.fdnation.backend agent; PORT=5001). Hop-by-hop stripping, XFF
+  anti-spoof (loopback peer appends chain), streaming bodies, 502 on backend
+  down, ctrl-c/SIGTERM graceful shutdown — all copied from jv-webd.
+- Templates stay single-sourced (Flask + minijinja): url_for bridged as a
+  minijinja global, tojson(indent=N) custom filter with Flask's HTML-safe
+  escaping; two adjustments: pins.get(id) -> pins[id], pins.items() loop ->
+  key loop + set (minijinja maps lack .get/.items). minijinja escapes "/"
+  as &#x2f; in attributes (browser-identical). urlencode needs the
+  minijinja "urlencode" feature.
+- Pins: rust/src/pins.rs is an exact port of src/pins.py (same file/shape,
+  flock + atomic rename, fail-closed); both writers interoperate — verified
+  live: axum toggle preserved the user's 6 pins.
+- install_launchd.py: AGENTS now (browser, cloudflared, web, backend); web
+  template runs rust/target/release/nfl-webd (build first!). XML comments
+  must not contain "--" or "&&" (plistlib/expat rejects).
+- Verified: 16 Rust tests + 297 Python fast tests; all routes 200 via :5000
+  and the public tunnel (URL unchanged — cloudflared untouched); dashboard
+  proxied in ~4s; SIGTERM exits clean. Werkzeug no longer faces the tunnel.

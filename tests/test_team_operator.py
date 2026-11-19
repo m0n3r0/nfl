@@ -15,6 +15,7 @@ from yahoo.browser import BrowserError  # noqa: E402
 def operator(tmp_path, monkeypatch):
     monkeypatch.setattr(team_operator, "AUDIT_LOG", tmp_path / "audit.jsonl")
     monkeypatch.setattr(team_operator, "LOCK_PATH", tmp_path / "lock")
+    monkeypatch.setattr(team_operator.pins_mod, "PINS_PATH", tmp_path / "pins.json")
     monkeypatch.setattr(sys, "argv", ["team_operator.py"])
     return team_operator
 
@@ -130,7 +131,7 @@ def _stub_run_pipeline(operator, monkeypatch, fake_client):
                         types.SimpleNamespace(project_for_week=lambda corp, week: None))
     monkeypatch.setattr(operator, "apply_schedule_locks", lambda snap, locked: (snap, ()))
     monkeypatch.setattr(operator, "propose_lineup",
-                        lambda snap, proj, week: types.SimpleNamespace(
+                        lambda snap, proj, week, pinned=frozenset(): types.SimpleNamespace(
                             moves=(), as_dict=lambda: {}))
     monkeypatch.setattr(operator, "monitor_report", lambda snap, proj, week: {})
 
@@ -225,7 +226,7 @@ def _stub_jev_pipeline(operator, monkeypatch):
         snapshot=lambda: types.SimpleNamespace(
             week=2, record="1-0-0", waiver_priority=4, roster=(injured, healthy))))
     monkeypatch.setattr(operator, "propose_lineup",
-                        lambda snap, proj, week: types.SimpleNamespace(
+                        lambda snap, proj, week, pinned=frozenset(): types.SimpleNamespace(
                             moves=(), as_dict=lambda: {
                                 "week": 2, "moves": [], "warnings": [],
                                 "plan": [{"yahoo_id": "1", "proj_week": 11.0}]}))
@@ -290,3 +291,44 @@ def test_jev_down_never_breaks_the_run(operator, monkeypatch):
     assert report["status"] == "ok"  # advisory layer must not affect the run
     assert report["jev_error"] == "no key"
     assert "jev_injuries" not in report
+
+
+def test_corrupt_pin_file_fails_closed_before_yahoo(operator, monkeypatch):
+    monkeypatch.setattr(operator.preflight_mod, "preflight",
+                        lambda endpoint: {"cdp": True, "team_tab": True, "auth": True})
+    operator.pins_mod.PINS_PATH.write_text("{not json", encoding="utf-8")
+
+    def must_not_reach_yahoo(endpoint):
+        raise AssertionError("navigated to Yahoo despite a corrupt pin file")
+    monkeypatch.setattr(operator, "find_team_target", must_not_reach_yahoo)
+
+    report = operator.run(_args(apply=True))
+
+    assert report["status"] == "pins_error"
+    assert "not valid JSON" in report["error"]
+
+
+def test_pins_reach_the_proposal_and_the_report(operator, monkeypatch):
+    import types
+
+    class RecordingClient:
+        def navigate(self, url, expected, timeout=25):
+            return url
+
+    _stub_run_pipeline(operator, monkeypatch, RecordingClient())
+    monkeypatch.setattr(operator, "matchup",
+                        lambda client: types.SimpleNamespace(as_dict=lambda: {}))
+    operator.pins_mod.save_pins({"7": {"name": "Wr Three", "pinned_at": "t"}},
+                                operator.pins_mod.PINS_PATH)
+    seen = {}
+
+    def recording_proposal(snap, proj, week, pinned=frozenset()):
+        seen["pinned"] = set(pinned)
+        return types.SimpleNamespace(moves=(), as_dict=lambda: {})
+    monkeypatch.setattr(operator, "propose_lineup", recording_proposal)
+
+    report = operator.run(_args(apply=True))
+
+    assert report["status"] == "ok"
+    assert seen["pinned"] == {"7"}
+    assert report["pinned"] == ["7"]

@@ -9,6 +9,7 @@ warnings a human must see. Fail-closed: unevaluated players stay put.
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Set as AbstractSet
 from dataclasses import asdict, dataclass, replace
 from typing import Any
 
@@ -70,13 +71,16 @@ def _evaluation_maps(projections: pd.DataFrame) -> tuple[dict, dict, dict]:
     return proj_week, on_bye, injury
 
 
-def propose_lineup(snapshot: TeamSnapshot, projections: pd.DataFrame, week: int) -> LineupProposal:
+def propose_lineup(snapshot: TeamSnapshot, projections: pd.DataFrame, week: int,
+                   pinned: AbstractSet[str] = frozenset()) -> LineupProposal:
     """Recommend the best legal lineup and the exact moves to reach it.
 
     Locked players (their game already kicked off) keep their slot — Yahoo will
-    not move them anyway. Unmapped players keep their slot with a warning: a
-    player we cannot evaluate is never swapped on a guess. Bye-week players
-    count as 0 and sink below any evaluated bench replacement; if no
+    not move them anyway. Pinned players (manual pins from the web UI, see
+    src/pins.py) keep their slot too, starter or bench: the user's manual
+    choice outranks the projection. Unmapped players keep their slot with a
+    warning: a player we cannot evaluate is never swapped on a guess. Bye-week
+    players count as 0 and sink below any evaluated bench replacement; if no
     replacement exists the starter stays and a warning says the slot is
     effectively empty.
     """
@@ -112,6 +116,8 @@ def propose_lineup(snapshot: TeamSnapshot, projections: pd.DataFrame, week: int)
             warnings.append(f"{player.name} ({player.position}) is {mapping.status}; kept in {player.slot}")
         if player.locked:
             note = (note + ", " if note else "") + "locked"
+        if player.yahoo_id in pinned:
+            note = (note + ", " if note else "") + "pinned"
         evaluated[player.yahoo_id] = value
         notes[player.yahoo_id] = note
         if note == "bye" and player.slot != "BN":
@@ -121,7 +127,8 @@ def propose_lineup(snapshot: TeamSnapshot, projections: pd.DataFrame, week: int)
 
     fixed: dict[str, str] = {}  # yahoo_id -> slot kept
     for player in snapshot.roster:
-        if player.locked or player.position in {"K", "DEF"} or player.slot in {"IR", "IL"}:
+        if player.locked or player.yahoo_id in pinned \
+                or player.position in {"K", "DEF"} or player.slot in {"IR", "IL"}:
             fixed[player.yahoo_id] = player.slot
 
     open_slots = list(OPTIMIZED_SLOTS)

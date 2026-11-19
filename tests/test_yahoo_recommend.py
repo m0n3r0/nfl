@@ -261,3 +261,50 @@ def test_monitor_report_uses_yahoo_only_injury_tag():
 
     assert any(i.startswith("Rb One (Questionable") for i in report["injury_tags"])
     assert report["needs_attention"] is True
+
+
+def test_pinned_starter_keeps_slot_against_better_bench():
+    # Same setup as the swap test: Wr Bench (id 9) outranks Wr Two (id 5).
+    # Pinning Wr Two protects HIS slot only: the other WR slot stays open
+    # and Wr Bench fills it, outranking Wr One (id 4) instead.
+    values = dict(BASE, **{"Wr Bench": 16.0, "Wr Two": 8.0})
+    proposal = propose_lineup(snapshot(), projections(values), week=1,
+                              pinned={"5"})
+    assert proposed_slot(proposal, "5") == "WR"
+    assert not any(m.yahoo_id == "5" for m in proposal.moves)
+    assert proposed_slot(proposal, "9") == "WR"
+    assert proposed_slot(proposal, "4") == "W/R/T"
+    assert proposed_slot(proposal, "7") == "BN"
+    note = next(p.note for p in proposal.plan if p.yahoo_id == "5")
+    assert "pinned" in note
+
+
+def test_pinned_bench_player_is_never_promoted():
+    values = dict(BASE, **{"Wr Bench": 16.0, "Wr Two": 8.0})
+    proposal = propose_lineup(snapshot(), projections(values), week=1,
+                              pinned={"9"})
+    assert proposed_slot(proposal, "9") == "BN"
+    assert not any(m.yahoo_id == "9" for m in proposal.moves)
+    # The rest of the optimization still runs: Wr Three (10) replaces Wr Two (8).
+    assert proposed_slot(proposal, "7") == "WR"
+    assert proposed_slot(proposal, "5") == "BN"
+
+
+def test_pin_preserves_slot_counts_and_combines_with_locked():
+    values = dict(BASE, **{"Wr Bench": 16.0, "Wr Two": 8.0})
+    snap = snapshot(locked={"5"})
+    proposal = propose_lineup(snap, projections(values), week=1, pinned={"5"})
+    before = Counter(p.slot for p in snap.roster)
+    after = Counter(p.proposed_slot for p in proposal.plan)
+    assert before == after
+    note = next(p.note for p in proposal.plan if p.yahoo_id == "5")
+    assert "locked" in note and "pinned" in note
+
+
+def test_no_pins_is_the_default_behaviour():
+    values = dict(BASE, **{"Wr Bench": 16.0, "Wr Two": 8.0})
+    default = propose_lineup(snapshot(), projections(values), week=1)
+    explicit = propose_lineup(snapshot(), projections(values), week=1,
+                              pinned=frozenset())
+    assert moves_of(default) == moves_of(explicit)
+    assert ("9", "BN", "WR") in moves_of(default)  # the swap still happens

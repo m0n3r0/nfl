@@ -1,8 +1,11 @@
 """Local web UI for the fantasy football + win-prediction toolkit.
 
-Server-rendered (Jinja) so it runs with no build step:
+Compute backend behind nfl-webd (rust/, the jra-van-re jv-webd method):
+the axum front door on :5000 serves the fantasy pages natively and proxies
+the analytics routes here (loopback :5001 under com.fdnation.backend).
+Standalone use still works:
 
-    python web/app.py            # http://127.0.0.1:5000
+    python web/app.py            # http://127.0.0.1:5000 (or PORT=...)
     python cli.py web            # same, via the CLI
 
 Pages:
@@ -31,13 +34,14 @@ import math
 import os
 from pathlib import Path
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 
 ROOT = Path(__file__).resolve().parents[1]
 import sys
 sys.path.insert(0, str(ROOT))
 
 from src import corpus, projections, analysis, model, ingest, features  # noqa: E402
+from src import pins as pins_mod  # noqa: E402
 from src.config import SCHEDULE_SEASON, STATS_SEASON, PBP_SEASONS, league_preset  # noqa: E402
 
 app = Flask(__name__, template_folder=str(Path(__file__).parent / "templates"))
@@ -45,6 +49,7 @@ app = Flask(__name__, template_folder=str(Path(__file__).parent / "templates"))
 OPERATOR_AUDIT = ROOT / "logs" / "team-operator.jsonl"
 LEAGUE_REPORT = ROOT / "logs" / "league-report.json"
 LEAGUE_AUDIT = ROOT / "logs" / "league-report.jsonl"
+PINS_PATH = pins_mod.PINS_PATH
 
 # The host crontab (docs/TEAM_OPERATOR.md is the authoritative runbook).
 CRON_SCHEDULE = [
@@ -178,10 +183,47 @@ def dashboard():
 @app.route("/team")
 def my_team():
     """My FD nation team, from the newest operator audit record."""
+    return render_template("team.html", **_team_context())
+
+
+def _team_context() -> dict:
+    """Shared render context for /team and the pin-toggle error path.
+
+    Pins are read live from data/pins.json (not from the report, which may
+    be stale). A corrupt pin file is shown as a notice — the operator
+    refuses to run until it is fixed, so the page must say so loudly.
+    """
     runs = _read_operator_runs(limit=200)  # deep window: the ok-fallback spans outages
     latest = runs[0] if runs else None
     latest_ok = next((r for r in runs if r.get("status") == "ok"), None)
-    return render_template("team.html", latest=latest, report=latest_ok)
+    try:
+        pins = pins_mod.load_pins(PINS_PATH)
+        pins_error = None
+    except pins_mod.PinsError as exc:
+        pins, pins_error = {}, str(exc)
+    return {"latest": latest, "report": latest_ok, "pins": pins,
+            "pins_error": pins_error}
+
+
+@app.route("/team/pin", methods=["POST"])
+def pin_toggle():
+    """Tick one player's pin on/off (form post from /team), then redirect.
+
+    Pinned players are never moved by the operator's --apply runs. On a
+    corrupt pin file we refuse to overwrite it and re-render the page with
+    the error (409) — the user's protection must not be silently reset.
+    """
+    yahoo_id = (request.form.get("yahoo_id") or "").strip()
+    name = (request.form.get("name") or "").strip()
+    if not yahoo_id:
+        return "missing yahoo_id", 400
+    try:
+        pins_mod.toggle_pin(yahoo_id, name, path=PINS_PATH)
+    except pins_mod.PinsError as exc:
+        ctx = _team_context()
+        ctx["pins_error"] = str(exc)
+        return render_template("team.html", **ctx), 409
+    return redirect(url_for("my_team"))
 
 
 @app.route("/league")

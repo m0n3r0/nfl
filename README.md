@@ -208,12 +208,25 @@ rush EPA/play, success rate, and pass/shotgun tendency.
 
 ## Web UI
 
-A local Flask app (no build step, loopback-only) shows your fantasy team, league
-standings, cron status, player stats, team ratings, and predictions:
+Two loopback processes (the jra-van-re method): **nfl-webd** (Rust/axum,
+`rust/`) is the front door on 127.0.0.1:5000 — it serves the fantasy pages
+(`/team`, `/league`, `/cron`, pin toggles) natively with minijinja over the
+same `web/templates/`, and reverse-proxies the analytics pages to the
+**Flask compute backend** on 127.0.0.1:5001 (pandas/sklearn stay in Python).
+The public tunnel points at :5000 only; the backend is never exposed.
+
+On `/team` you can pin players (📌) to freeze their current slot: the
+operator's `--apply` cron runs never move a pinned player, so manual
+start/sit choices survive the automated lineup set. Pins live in
+`data/pins.json` (git-ignored); a corrupt pin file fails the operator closed
+(`pins_error`). See `docs/TEAM_OPERATOR.md` → "Manual pins".
 
 ```bash
+cd rust && cargo build --release                 # build the front door
+python tools/install_launchd.py --agent backend  # Flask analytics :5001
+python tools/install_launchd.py --agent web      # nfl-webd :5000
+# standalone (no Rust, everything on one port):
 python cli.py web            # http://127.0.0.1:5000
-# or: python web/app.py
 ```
 
 ### Public tunnel (optional, ephemeral — same method as jra-van-re)

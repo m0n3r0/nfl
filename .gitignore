@@ -39,5 +39,10 @@ data/scrapes/
 # --- Runtime logs / local state (never commit) ---
 draft_log.txt
 logs/
+data/pins.json
+data/pins.json.lock
+
+# --- Rust build artifacts (nfl-webd front door) ---
+rust/target/
 # (__pycache__/ already covered above -- do not duplicate it here)
 .worktrees/

@@ -400,3 +400,58 @@ def test_league_team_roster_falls_back_to_history(client, tmp_path, monkeypatch)
     html = client.get("/league/team/Team Alpha").get_data(as_text=True)
     assert "Alpha Rb" in html and "Old Rb" not in html
     assert "2026-09-13" in html  # dated-snapshot note rendered
+
+
+# --- Manual pins (/team toggles -> data/pins.json) ---
+
+@pytest.fixture
+def pin_env(tmp_path, monkeypatch):
+    """Point the team page + pin store at tmp fixtures."""
+    audit = tmp_path / "operator.jsonl"
+    audit.write_text(json.dumps(operator_record()) + "\n", encoding="utf-8")
+    monkeypatch.setattr(webapp, "OPERATOR_AUDIT", audit)
+    path = tmp_path / "pins.json"
+    monkeypatch.setattr(webapp, "PINS_PATH", path)
+    return path
+
+
+def test_team_page_renders_pin_buttons(client, pin_env):
+    html = client.get("/team").get_data(as_text=True)
+    assert 'action="/team/pin"' in html
+    assert 'name="yahoo_id" value="2"' in html
+
+
+def test_pin_toggle_roundtrip(client, pin_env):
+    resp = client.post("/team/pin", data={"yahoo_id": "2", "name": "Running Back"})
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/team")
+    assert json.loads(pin_env.read_text(encoding="utf-8"))["pinned"]["2"]["name"] == "Running Back"
+    html = client.get("/team").get_data(as_text=True)
+    assert "pin-btn on" in html and "Running Back" in html
+    # Tick again -> unpinned, file empty of pins.
+    client.post("/team/pin", data={"yahoo_id": "2", "name": "Running Back"})
+    assert json.loads(pin_env.read_text(encoding="utf-8"))["pinned"] == {}
+    assert "pin-btn on" not in client.get("/team").get_data(as_text=True)
+
+
+def test_pin_toggle_requires_yahoo_id(client, pin_env):
+    assert client.post("/team/pin", data={"name": "Nobody"}).status_code == 400
+    assert not pin_env.exists()
+
+
+def test_pins_card_lists_player_absent_from_plan(client, pin_env):
+    # A pinned player who left the roster (or the report) stays unpin-able.
+    client.post("/team/pin", data={"yahoo_id": "99", "name": "Ghost Player"})
+    html = client.get("/team").get_data(as_text=True)
+    assert "Ghost Player" in html
+    assert "never moves these" in html
+
+
+def test_corrupt_pin_file_shows_notice_and_refuses_toggle(client, pin_env):
+    pin_env.write_text("{corrupt", encoding="utf-8")
+    html = client.get("/team").get_data(as_text=True)
+    assert "Pin file problem" in html
+    resp = client.post("/team/pin", data={"yahoo_id": "2", "name": "Running Back"})
+    assert resp.status_code == 409
+    assert "Pin file problem" in resp.get_data(as_text=True)
+    assert pin_env.read_text(encoding="utf-8") == "{corrupt"  # never overwritten

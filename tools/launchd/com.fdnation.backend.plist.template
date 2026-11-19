@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+ "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!--
+    FD nation compute backend template. Do NOT copy this file directly:
+    tools/install_launchd.py renders @REPO_ROOT@ to the actual repo location
+    and installs the result to ~/Library/LaunchAgents.
+
+    The Flask app (pandas/sklearn analytics: dashboard, players, predictions,
+    sos, ratings, strategy, /api/*) on loopback :5001. Never exposed directly:
+    nfl-webd (com.fdnation.web) is the only surface and proxies these routes
+    here. Also keeps the fantasy routes for standalone `cli.py web` use.
+  -->
+  <key>Label</key><string>com.fdnation.backend</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>@REPO_ROOT@/.venv/bin/python</string>
+    <string>@REPO_ROOT@/web/app.py</string>
+  </array>
+  <key>WorkingDirectory</key><string>@REPO_ROOT@</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>5</integer>
+  <key>StandardOutPath</key><string>@REPO_ROOT@/logs/backend.log</string>
+  <key>StandardErrorPath</key><string>@REPO_ROOT@/logs/backend.log</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PORT</key><string>5001</string>
+    <key>PYTHONIOENCODING</key><string>utf-8</string>
+  </dict>
+</dict>
+</plist>
