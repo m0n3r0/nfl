@@ -207,9 +207,34 @@ async fn nav_groups_fantasy_apart_from_prediction_pages() {
     assert!(idx("href=\"/cron\"") < idx("Prediction engines"));
     assert!(idx("href=\"/players\"") > idx("Prediction engines"));
     assert!(idx("href=\"/predictions\"") > idx("Prediction engines"));
+    assert!(idx("href=\"/dashboard\"") > idx("Prediction engines"));
 }
 
 // --- native pages through the real templates ---
+
+#[tokio::test]
+async fn root_redirects_to_my_team() {
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    let res = router(cfg(&root))
+        .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::FOUND);
+    assert_eq!(res.headers()["location"], "/team");
+}
+
+#[tokio::test]
+async fn dashboard_proxies_to_backend_root() {
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    let mut c = cfg(&root);
+    c.backend = spawn_backend().await;
+    let (status, body) = get_body(router(c), "/dashboard").await;
+    assert_eq!(status, StatusCode::OK);
+    let v: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(v["path"], "/"); // rewritten to the Flask dashboard root
+}
 
 #[tokio::test]
 async fn team_page_renders_plan_and_pin_buttons() {

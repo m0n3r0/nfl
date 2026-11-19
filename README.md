@@ -213,7 +213,9 @@ Two loopback processes (the jra-van-re method): **nfl-webd** (Rust/axum,
 (`/team`, `/league`, `/cron`, pin toggles) natively with minijinja over the
 same `web/templates/`, and reverse-proxies the analytics pages to the
 **Flask compute backend** on 127.0.0.1:5001 (pandas/sklearn stay in Python).
-The public tunnel points at :5000 only; the backend is never exposed.
+`/` redirects to `/team` (My Team is the default page); the model-card
+dashboard lives at `/dashboard`. The public tunnel points at :5000 only;
+the backend is never exposed.
 
 On `/team` you can pin players (📌) to freeze their current slot: the
 operator's `--apply` cron runs never move a pinned player, so manual

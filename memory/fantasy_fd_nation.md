@@ -654,3 +654,12 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
   garbage league report, nav grouping). 20 Rust + 265 Python fast pass.
 - Verified after redeploy: all routes 200 via :5000 and the tunnel;
   backend :5001/team now 404 (fantasy code gone from Python).
+
+## 2026-11-20 — / defaults to My Team
+
+- nfl-webd: / now 302-redirects to /team (the public face is the fantasy
+  team, not the model card). Dashboard moved to /dashboard, proxied with a
+  path rewrite to the Flask backend's / (Flask unchanged). Nav Dashboard
+  link + url_for("dashboard") updated. 22 Rust tests pass (root redirect +
+  dashboard rewrite + nav). Verified local and through the tunnel:
+  / -> 302 -> /team 200.

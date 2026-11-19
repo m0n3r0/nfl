@@ -1,11 +1,13 @@
 //! nfl-webd: single local surface for the FD nation web UI — the jra-van-re
 //! jv-webd method applied to nfl:
 //!
+//!   /            -> 302 to /team (the public face is the fantasy team)
+//!   /dashboard   -> backend / (Flask keeps the dashboard at its root)
 //!   /team, /team/pin, /league, /league/team/<name>, /cron
 //!       -> served NATIVELY by axum + minijinja from the same Jinja
 //!          templates Flask uses (web/templates/), reading the same local
 //!          artifacts (logs/*.json[l], data/pins.json). No Python involved.
-//!   everything else (/, /players, /player/<id>, /predictions, /sos,
+//!   everything else (/players, /player/<id>, /predictions, /sos,
 //!       /ratings, /strategy, /api/*)
 //!       -> reverse-proxied to the Python compute backend (Flask on
 //!          loopback, NFL_WEBD_BACKEND) which owns the pandas/sklearn
@@ -91,6 +93,13 @@ pub fn router(cfg: Config) -> Router {
         .expect("reqwest client");
     let st = AppState { cfg, http, env };
     Router::new()
+        // The public face of the stack is the fantasy team, not the model
+        // card: / lands on My Team; the dashboard lives at /dashboard.
+        .route(
+            "/",
+            get(|| async { (StatusCode::FOUND, [(header::LOCATION, "/team")]).into_response() }),
+        )
+        .route("/dashboard", get(dashboard))
         .route("/team", get(pages::team))
         .route("/team/pin", post(pages::pin_toggle))
         .route("/league", get(pages::league))
@@ -98,6 +107,12 @@ pub fn router(cfg: Config) -> Router {
         .route("/cron", get(pages::cron))
         .fallback(any(proxy))
         .with_state(st)
+}
+
+/// /dashboard -> the backend's / (Flask keeps the dashboard at its root).
+async fn dashboard(State(st): State<AppState>, mut req: Request) -> Response {
+    *req.uri_mut() = "/".parse().expect("static uri");
+    proxy(State(st), req).await
 }
 
 /// RFC 7230 hop-by-hop headers, never forwarded in either direction.

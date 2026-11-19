@@ -44,7 +44,7 @@ fn url_for(endpoint: &str) -> &'static str {
         "league" => "/league",
         "league_team" => "/league/team/",
         "cron_status" => "/cron",
-        "dashboard" => "/",
+        "dashboard" => "/dashboard",
         "players" => "/players",
         "player_detail" => "/player/",
         "predictions" => "/predictions",
