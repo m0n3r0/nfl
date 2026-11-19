@@ -444,11 +444,11 @@ fn teamview_fixtures(root: &Path) {
                     "opponent_proj": 99.0},
         "rosters": {"Team Beta": [
             {"name": "Enemy Qb", "team": "KC", "position": "QB", "slot": "QB",
-             "injury_status": ""},
+             "injury_status": "", "proj": 15.2},
             {"name": "Enemy Rb", "team": "DAL", "position": "RB", "slot": "RB",
-             "injury_status": "Q"},
+             "injury_status": "Q", "proj": null},
             {"name": "Enemy Bench", "team": "MIN", "position": "WR", "slot": "BN",
-             "injury_status": ""}]}
+             "injury_status": "", "proj": 8.0}]}
     });
     std::fs::write(root.join("logs/league-report.json"), report.to_string()).unwrap();
 }
@@ -463,12 +463,13 @@ async fn teamview_pairs_players_by_slot() {
     assert!(html.contains("Shiba Innu vs Team Beta"));
     // our side from the operator plan (with proj), opponent from the roster
     assert!(html.contains("Quarter Back") && html.contains("Enemy Qb"));
-    assert!(html.contains("17.8")); // our QB projection
+    assert!(html.contains("17.8")); // our QB projection (model)
+    assert!(html.contains("15.2")); // opponent QB projection (Yahoo capture)
     assert!(html.contains("tv-pos\">QB<")); // the Pos spine
     assert!(html.contains("tv-note\">Q</div>")); // opponent injury tag
     assert!(html.contains("Starters") && html.contains("Bench / IR"));
     assert!(html.contains("Enemy Bench"));
-    // opponent has no projection data -> dash, never fabricated
+    // bye opponent (proj null) -> dash, never fabricated
     assert!(html.contains("tv-empty"));
 }
 

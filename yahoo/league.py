@@ -333,9 +333,16 @@ def opponent_roster(client: LeagueClient, team_id: str, timeout: float = 30) -> 
             const teamPos = (cell?.innerText || '').match(/\b([A-Za-z]{2,3})\s+-\s+(QB|RB|WR|TE|K|DEF)\b/i);
             const slot = row.querySelector('td')?.innerText?.trim() || '';
             const status = row.querySelector('.ysf-player-status')?.innerText?.trim() || '';
+            // Yahoo "Proj Pts" sits right after the Fan Pts cell (td.pts).
+            // Bye rows merge Fan Pts/Proj/%Start into one colspan cell —
+            // no projection exists for them, so null (never guess).
+            const ptsCell = row.querySelector('td.pts');
+            const projCell = (ptsCell && ptsCell.colSpan === 1) ? ptsCell.nextElementSibling : null;
+            const projText = projCell?.innerText?.trim() || '';
+            const proj = /^\d+(\.\d+)?$/.test(projText) ? parseFloat(projText) : null;
             return {name: link?.title || link?.innerText?.trim() || '',
                     team: teamPos?.[1] || '', position: teamPos?.[2] || '',
-                    slot, injury_status: status};
+                    slot, injury_status: status, proj};
           });
           return {path: location.pathname.replace(/\/$/, ''), rows};
         })()'''
@@ -345,8 +352,15 @@ def opponent_roster(client: LeagueClient, team_id: str, timeout: float = 30) -> 
     rows = payload.get("rows")
     if not isinstance(rows, list) or not rows:
         raise LeagueReadError("opponent roster rows are missing")
+
+    def typed(row: dict) -> dict:
+        out: dict[str, Any] = {k: str(v) for k, v in row.items() if k != "proj"}
+        proj = row.get("proj")
+        out["proj"] = float(proj) if isinstance(proj, (int, float)) else None
+        return out
+
     return tuple(
-        {k: str(v) for k, v in row.items()}
+        typed(row)
         for row in rows
         if isinstance(row, dict) and row.get("name")
     )

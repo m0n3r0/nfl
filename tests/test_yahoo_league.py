@@ -24,7 +24,7 @@ class Client:
         self.denied = denied
         self.navigated = []
 
-    def navigate(self, url, expected, timeout=20):
+    def navigate(self, url, expected, timeout: float = 20):
         assert expected(url)
         self.navigated.append(url)
         return url
@@ -101,15 +101,34 @@ def test_opponent_roster_reads_rows_and_blocks_own_team():
     client = Client({"yahoo-league-opponent-roster": {
         "path": "/f1/1329011/7",
         "rows": [{"name": "Some Player", "team": "KC", "position": "RB",
-                  "slot": "RB", "injury_status": ""}],
+                  "slot": "RB", "injury_status": "", "proj": 12.5},
+                 {"name": "Bye Player", "team": "LAR", "position": "QB",
+                  "slot": "QB", "injury_status": "", "proj": None}],
     }})
 
     rows = opponent_roster(client, "7")
 
     assert rows == ({"name": "Some Player", "team": "KC", "position": "RB",
-                     "slot": "RB", "injury_status": ""},)
+                     "slot": "RB", "injury_status": "", "proj": 12.5},
+                    {"name": "Bye Player", "team": "LAR", "position": "QB",
+                     "slot": "QB", "injury_status": "", "proj": None})
     with pytest.raises(LeagueReadError, match="authorized team"):
         opponent_roster(client, "2")
+
+
+def test_opponent_roster_proj_tolerates_missing_or_junk():
+    client = Client({"yahoo-league-opponent-roster": {
+        "path": "/f1/1329011/7",
+        "rows": [{"name": "Old Artifact Player", "team": "KC", "position": "RB",
+                  "slot": "RB", "injury_status": ""},  # no proj key at all
+                 {"name": "Junk Proj", "team": "BUF", "position": "WR",
+                  "slot": "WR", "injury_status": "", "proj": "89%"}],
+    }})
+
+    rows = opponent_roster(client, "7")
+
+    assert rows[0]["proj"] is None  # older payloads stay readable
+    assert rows[1]["proj"] is None  # non-numeric never becomes a number
 
 
 def test_opponent_team_id_excludes_authorized_team():

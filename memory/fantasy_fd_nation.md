@@ -702,3 +702,17 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
   every /league matchup card. Missing roster -> notice, one-sided rows.
 - 24 Rust tests pass; verified through the tunnel: 15 paired rows for
   Shiba Innu vs Take it in the Browns (Purdy/Stafford QB, CMC/Taylor RB...).
+
+## 2026-11-20 — Opponent projections captured (Yahoo Proj Pts)
+
+- opponent_roster (yahoo/league.py) now extracts Yahoo's per-player "Proj
+  Pts": the td right after the Fan Pts cell (td.pts); bye rows merge
+  FanPts/Proj/%Start into a colspan=3 cell -> proj null (never guessed).
+  Numeric-only regex; Python keeps proj as float|None (other fields stay
+  strings). Old artifacts without proj still read fine.
+- Nightly --all-rosters captures it automatically; --light merges keep the
+  last good rosters. Team View (Rust tv_side) reads roster proj; template
+  labels sources: left = our model, right = Yahoo Proj Pts.
+- Verified live: 9 teams refreshed, opponent 13/15 with proj (Stafford bye
+  -> null); /league/teamview shows CMC 16.38 vs Taylor 13.1, Deebo 3.6 vs
+  Higgins 14.8 etc. 266 Python fast + 24 Rust tests pass.

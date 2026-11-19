@@ -32,8 +32,9 @@
 <h1>Team View{% if a_name and b_name %} — {{ a_name }} vs {{ b_name }}{% endif %}</h1>
 <p class="muted"><a href="/league">← Back to league</a>
 {% if week %} · week {{ week }}{% endif %} · players aligned by starting slot,
-GameChannel-style. Projections come from our operator report (our team only);
-“—” = no data in the local artifacts.</p>
+GameChannel-style. Left projections: our model (operator report). Right:
+Yahoo “Proj Pts” from the nightly roster capture. “—” = no data (bye players
+have no Yahoo projection).</p>
 
 {% if missing %}
 <div class="notice">A roster for one of these teams is not in the latest league

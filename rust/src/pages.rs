@@ -359,7 +359,9 @@ fn tv_side(
                 name: artifacts::as_display_string(p.get("name")),
                 team: artifacts::as_display_string(p.get("team")),
                 slot: artifacts::as_display_string(p.get("slot")),
-                proj: None,
+                // Yahoo "Proj Pts" captured by the nightly roster reads;
+                // null for bye players / older artifacts.
+                proj: p.get("proj").and_then(Value::as_f64),
                 note: artifacts::as_display_string(p.get("injury_status")),
             })
             .collect(),
