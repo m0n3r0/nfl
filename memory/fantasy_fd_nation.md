@@ -855,3 +855,29 @@ Parallel-lane audit of every doc against the current code/architecture:
   CODEBASE_REVIEW_INSEASON.md (DELIVERED banner), PROJECTION_BACKTEST.md
   (measurement record), drafts/2026-09-02 (draft record), memory journal
   entries (history is never rewritten).
+
+## 2026-11-20 — Team View rebuilt as the Yahoo /matchup layout
+
+- Reverse-engineered /f1/1329011/matchup via CDP: header card (team blocks
+  flanking score + Orig/Live Proj + players remaining), ONE mirrored
+  fixed-layout table Stats|Player|Proj|Fan Pts|Pos spine|Fan Pts|Proj|
+  Player|Stats, starters + bench bodies, totals row.
+- teamview.html rewritten: table-layout fixed + colgroup (5/24/9/9/6/9/9/
+  24/5), left side right-aligned toward the spine, right mirrored; player
+  cell = name + "SF - QB" + game-info subline; injury/bye tags in Stats col;
+  Fan Pts = live points (week-matched artifact), Proj = model (left) /
+  Yahoo Proj Pts (right); header scores prefer live totals, fallback to
+  the Yahoo snapshot; records from standings; players remaining counted
+  from game states (matches Yahoo's 9 vs 7 exactly).
+- Rust: TvEntry + position/fan_pts/game_info; tv_norm_name/tv_canon_team
+  (Was->WSH etc); tv_team_games from artifact games meta (poller now
+  captures homeAway); game times parsed from ESPN's no-seconds dates
+  ("%Y-%m-%dT%H:%MZ" fallback) and shown JST-labeled; totals/remaining in
+  handler. JS: data-live-fanpts(-def) updates the Fan Pts cells directly.
+- GAP FIXED: snapshot rosters held only the OTHER 9 teams — our own roster
+  was missing, so our side had no NFL teams/game info. yahoo/league.py
+  my_roster() evaluates the shared roster JS on the team page with ZERO
+  navigation; league_report --all-rosters now captures it as the last read
+  (doubles as the tab restore). Verified live: 15 rows merged, Team View
+  shows SF - QB etc + JST game lines + 9/7 remaining + Taylor 4.70 live.
+- 299 Python fast + 27 Rust tests pass.

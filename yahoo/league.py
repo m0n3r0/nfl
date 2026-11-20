@@ -352,41 +352,34 @@ def team_logos(client: LeagueClient, timeout: float = 30) -> dict[str, dict[str,
     return out
 
 
-def opponent_roster(client: LeagueClient, team_id: str, timeout: float = 30) -> tuple[dict[str, str], ...]:
-    """Read another team's roster (read-only). team_id is the Yahoo roster number."""
-    if team_id == TEAM_ID:
-        raise LeagueReadError("use YahooTeamReader for the authorized team")
-    path = f"/f1/{LEAGUE_ID}/{team_id}"
-    client.navigate(f"{BASE}{path}", lambda url: urlparse(url).path.rstrip("/") == path, timeout)
-    time.sleep(2)
-    _fail_if_denied(client)
-    payload = client.evaluate(
-        r'''/* yahoo-league-opponent-roster */ (() => {
-          const rows = [...document.querySelectorAll('tr')].filter(r => r.querySelector('.ysf-player-name')).map(row => {
-            const link = row.querySelector('.ysf-player-name a');
-            const cell = row.querySelector('td.player');
-            const teamPos = (cell?.innerText || '').match(/\b([A-Za-z]{2,3})\s+-\s+(QB|RB|WR|TE|K|DEF)\b/i);
-            const slot = row.querySelector('td')?.innerText?.trim() || '';
-            const status = row.querySelector('.ysf-player-status')?.innerText?.trim() || '';
-            // Yahoo "Proj Pts" sits right after the Fan Pts cell (td.pts).
-            // Bye rows merge Fan Pts/Proj/%Start into one colspan cell —
-            // no projection exists for them, so null (never guess).
-            const ptsCell = row.querySelector('td.pts');
-            const projCell = (ptsCell && ptsCell.colSpan === 1) ? ptsCell.nextElementSibling : null;
-            const projText = projCell?.innerText?.trim() || '';
-            const proj = /^\d+(\.\d+)?$/.test(projText) ? parseFloat(projText) : null;
-            return {name: link?.title || link?.innerText?.trim() || '',
-                    team: teamPos?.[1] || '', position: teamPos?.[2] || '',
-                    slot, injury_status: status, proj};
-          });
-          return {path: location.pathname.replace(/\/$/, ''), rows};
-        })()'''
-    )
-    if not isinstance(payload, dict) or payload.get("path") != path:
-        raise LeagueReadError("opponent team page did not load")
+_ROSTER_JS = r'''/* yahoo-league-opponent-roster */ (() => {
+  const rows = [...document.querySelectorAll('tr')].filter(r => r.querySelector('.ysf-player-name')).map(row => {
+    const link = row.querySelector('.ysf-player-name a');
+    const cell = row.querySelector('td.player');
+    const teamPos = (cell?.innerText || '').match(/\b([A-Za-z]{2,3})\s+-\s+(QB|RB|WR|TE|K|DEF)\b/i);
+    const slot = row.querySelector('td')?.innerText?.trim() || '';
+    const status = row.querySelector('.ysf-player-status')?.innerText?.trim() || '';
+    // Yahoo "Proj Pts" sits right after the Fan Pts cell (td.pts).
+    // Bye rows merge Fan Pts/Proj/%Start into one colspan cell —
+    // no projection exists for them, so null (never guess).
+    const ptsCell = row.querySelector('td.pts');
+    const projCell = (ptsCell && ptsCell.colSpan === 1) ? ptsCell.nextElementSibling : null;
+    const projText = projCell?.innerText?.trim() || '';
+    const proj = /^\d+(\.\d+)?$/.test(projText) ? parseFloat(projText) : null;
+    return {name: link?.title || link?.innerText?.trim() || '',
+            team: teamPos?.[1] || '', position: teamPos?.[2] || '',
+            slot, injury_status: status, proj};
+  });
+  return {path: location.pathname.replace(/\/$/, ''), rows};
+})()'''
+
+
+def _roster_rows(payload: Any, expected_path: str, what: str) -> tuple[dict, ...]:
+    if not isinstance(payload, dict) or payload.get("path") != expected_path:
+        raise LeagueReadError(f"{what} page did not load")
     rows = payload.get("rows")
     if not isinstance(rows, list) or not rows:
-        raise LeagueReadError("opponent roster rows are missing")
+        raise LeagueReadError(f"{what} roster rows are missing")
 
     def typed(row: dict) -> dict:
         out: dict[str, Any] = {k: str(v) for k, v in row.items() if k != "proj"}
@@ -399,6 +392,32 @@ def opponent_roster(client: LeagueClient, team_id: str, timeout: float = 30) -> 
         for row in rows
         if isinstance(row, dict) and row.get("name")
     )
+
+
+def opponent_roster(client: LeagueClient, team_id: str, timeout: float = 30) -> tuple[dict[str, str], ...]:
+    """Read another team's roster (read-only). team_id is the Yahoo roster number."""
+    if team_id == TEAM_ID:
+        raise LeagueReadError("use YahooTeamReader for the authorized team")
+    path = f"/f1/{LEAGUE_ID}/{team_id}"
+    client.navigate(f"{BASE}{path}", lambda url: urlparse(url).path.rstrip("/") == path, timeout)
+    time.sleep(2)
+    _fail_if_denied(client)
+    payload = client.evaluate(_ROSTER_JS)
+    return _roster_rows(payload, path, "opponent team")
+
+
+MY_TEAM_PATH = f"/f1/{LEAGUE_ID}/{TEAM_ID}"
+
+
+def my_roster(client: LeagueClient, timeout: float = 30) -> tuple[dict, ...]:
+    """Our own roster with team/position/Proj Pts — evaluated on the team
+    page with NO navigation (the caller must already be there; the nightly
+    league report uses this as its last read, doubling as the tab restore).
+    Fills the gap where the snapshot's rosters map held only the other 9
+    teams, which left Team View without our players' NFL teams."""
+    _fail_if_denied(client)
+    payload = client.evaluate(_ROSTER_JS)
+    return _roster_rows(payload, MY_TEAM_PATH, "own team")
 
 
 def opponent_team_id(client: LeagueClient, timeout: float = 30) -> str:

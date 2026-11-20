@@ -72,6 +72,13 @@ pub fn read_logo_manifest(root: &Path) -> Option<Value> {
     manifest.is_object().then_some(manifest)
 }
 
+/// Live points artifact (logs/live-points.json, written by the ESPN poller).
+/// None when absent/invalid — pages fall back to snapshot data.
+pub fn read_live_points(root: &Path) -> Option<Value> {
+    let text = std::fs::read_to_string(root.join("logs/live-points.json")).ok()?;
+    serde_json::from_str(&text).ok()
+}
+
 /// JSON value -> display string the way Python str() would for the artifact
 /// fields we slice (captured_at): strings verbatim, null -> "", else JSON.
 pub fn as_display_string(v: Option<&Value>) -> String {

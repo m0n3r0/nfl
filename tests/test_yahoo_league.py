@@ -160,6 +160,25 @@ def test_team_logos_requires_league_home():
         team_logos(client)
 
 
+def test_my_roster_reads_on_team_page_without_navigation():
+    from yahoo.league import my_roster
+    client = Client({"yahoo-league-opponent-roster": {
+        "path": "/f1/1329011/2",
+        "rows": [{"name": "Brock Purdy", "team": "SF", "position": "QB",
+                  "slot": "QB", "injury_status": "", "proj": 18.44}],
+    }})
+    rows = my_roster(client)
+    assert rows == ({"name": "Brock Purdy", "team": "SF", "position": "QB",
+                     "slot": "QB", "injury_status": "", "proj": 18.44},)
+    assert client.navigated == []  # no navigation — evaluated in place
+
+    wrong_page = Client({"yahoo-league-opponent-roster": {
+        "path": "/f1/1329011/7", "rows": [{"name": "X"}],
+    }})
+    with pytest.raises(LeagueReadError, match="own team"):
+        my_roster(wrong_page)
+
+
 def test_league_reads_fail_fast_on_waf_denial_page():
     # Empty payload maps: the denial check must fire before any payload read.
     with pytest.raises(LeagueWafBlocked, match="Request denied"):

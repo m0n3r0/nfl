@@ -2,41 +2,96 @@
 {% block title %}Team View — NFL Toolkit{% endblock %}
 {% block body %}
 <style>
-  /* Yahoo GameChannel "Team View" (reverse-engineered 2026-11-20 via CDP):
-     a mirrored table with the Pos column as the shaded center spine,
-     player cells with name + small team tag + note subline, projections
-     right-aligned toward the spine, 37px bordered rows, separate starter
-     and bench bodies. Fan Pts / Stats columns omitted: not in our artifacts. */
-  .tv { width: 100%; border-collapse: collapse; font-size: 13px; }
+  /* Yahoo /f1/1329011/matchup layout (reverse-engineered 2026-11-20 via CDP):
+     header card (team blocks flanking score + proj), then ONE mirrored
+     fixed-layout table — Stats | Player | Proj | Fan Pts | Pos spine |
+     Fan Pts | Proj | Player | Stats — starters body + bench body, rows
+     paired by slot. Left side right-aligned toward the spine, right side
+     mirrored. Fan Pts = live points (ESPN under Yahoo weights); Proj =
+     our model (left) / Yahoo Proj Pts (right). */
+  .tv-head { display: flex; align-items: center; justify-content: center;
+             gap: 18px; padding: 6px 0 14px; }
+  .tv-side { flex: 5; display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .tv-side.left { flex-direction: row-reverse; text-align: right; }
+  .tv-side .tv-logo { width: 44px; height: 44px; margin: 0; }
+  .tv-tname { font-size: 17px; font-weight: 700; color: #e8eef4;
+              overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tv-trec { font-size: 12px; color: #7a8a99; }
+  .tv-center { flex: 4; text-align: center; min-width: 170px; }
+  .tv-score { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .tv-score .vs { font-size: 13px; color: #7a8a99; font-weight: 400; padding: 0 8px; }
+  .tv-projline { font-size: 12px; color: #b8c4d0; font-style: italic;
+                 font-variant-numeric: tabular-nums; }
+  .tv-remaining { font-size: 11px; color: #7a8a99; margin-top: 2px; }
+
+  .tv { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px; }
   .tv th { font-size: 11px; font-weight: 400; color: #7a8a99; background: #16202c;
-           padding: 6px 10px; border-bottom: 1px solid #243240; }
-  .tv td { padding: 6px 10px; border-bottom: 1px solid #202c38; height: 37px;
-           vertical-align: middle; }
-  .tv-player { text-align: left; width: 34%; }
-  .tv-proj { text-align: right; width: 12%; font-variant-numeric: tabular-nums; }
-  .tv-pos { text-align: center; width: 8%; min-width: 50px; background: #1d2b3a;
-            color: #9fd0ff; font-size: 12px; }
-  .tv-name { font-weight: 600; }
-  .tv-team { font-size: 11px; color: #7a8a99; padding-left: 4px; }
+           padding: 6px 8px; border-bottom: 1px solid #243240; }
+  .tv td { padding: 6px 8px; border-bottom: 1px solid #202c38; height: 40px;
+           vertical-align: middle; overflow: hidden; }
+  .tv .c-stats { width: 5%; text-align: center; }
+  .tv .c-player { width: 24%; }
+  .tv .c-proj { width: 9%; font-variant-numeric: tabular-nums; }
+  .tv .c-fan { width: 9%; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .tv .c-pos { width: 6%; text-align: center; background: #1d2b3a;
+               color: #9fd0ff; font-size: 12px; }
+  .tv .left { text-align: right; }
+  .tv .right { text-align: left; }
+  .tv th.left { text-align: right; }
+  .tv th.right { text-align: left; }
+  .tv-name { font-weight: 600; display: block; overflow: hidden;
+             text-overflow: ellipsis; white-space: nowrap; }
+  .tv-teampos { font-size: 11px; color: #7a8a99; display: block; }
+  .tv-game { font-size: 11px; color: #5f7183; display: block; overflow: hidden;
+             text-overflow: ellipsis; white-space: nowrap; }
   .tv-note { font-size: 11px; color: #e8c98a; }
   .tv-empty { color: #4a5a6a; }
   .tv-section td { background: #16202c; color: #7a8a99; font-size: 11px;
                    font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
-                   height: 24px; padding: 4px 10px; }
-  .tv-head-names th { text-align: left; }
-  .tv-head-proj th { text-align: right; }
+                   height: 24px; padding: 4px 8px; }
+  .tv-total td { background: #16202c; font-weight: 700; border-top: 1px solid #2c4055;
+                 font-variant-numeric: tabular-nums; }
   .tv-logo { width: 32px; height: 32px; border-radius: 50%; object-fit: cover;
              vertical-align: middle; margin-right: 8px; border: 1px solid #2c4055; }
+  @media (max-width: 700px) {
+    .tv .c-stats, .tv .c-proj { display: none; }
+    .tv .c-player { width: 33%; }
+    .tv .c-fan { width: 12%; }
+    .tv .c-pos { width: 10%; }
+    .tv-game { display: none; }
+  }
 </style>
-{% macro player(p) %}{% if p %}<span class="tv-name">{{ p.name }}</span>{% if p.team %}<span class="tv-team">{{ p.team }}</span>{% endif %}{% if p.note %}<div class="tv-note">{{ p.note }}</div>{% endif %}{% else %}<span class="tv-empty">—</span>{% endif %}{% endmacro %}
-{% macro proj(p) %}{% if p and p.proj is not none %}{{ p.proj }}{% else %}<span class="tv-empty">—</span>{% endif %}{% endmacro %}
+{% macro player(p, side) %}{% if p %}<span class="tv-name">{{ p.name }}</span><span class="tv-teampos">{% if p.team %}{{ p.team }}{% endif %}{% if p.team and p.position %} - {% endif %}{% if p.position %}{{ p.position }}{% endif %}</span>{% if p.game_info %}<span class="tv-game">{{ p.game_info }}</span>{% endif %}{% else %}<span class="tv-empty">—</span>{% endif %}{% endmacro %}
+{% macro num(v) %}{% if v is not none %}{{ "%.2f"|format(v) }}{% else %}<span class="tv-empty">–</span>{% endif %}{% endmacro %}
+{% macro note(p) %}{% if p and p.note %}<span class="tv-note">{{ p.note }}</span>{% else %}<span class="tv-empty">–</span>{% endif %}{% endmacro %}
+{% macro fanattrs(p) %}{% if p and p.slot == 'DEF' %}data-live-fanpts-def="{{ p.name }}"{% elif p %}data-live-fanpts="{{ p.name }}"{% endif %}{% endmacro %}
 
-<h1>{% if logos[a_name] %}<img class="tv-logo" src="{{ logos[a_name] }}" alt="">{% endif %}Team View{% if a_name and b_name %} — {{ a_name }} vs {{ b_name }}{% endif %}{% if logos[b_name] %}<img class="tv-logo" style="margin: 0 0 0 8px" src="{{ logos[b_name] }}" alt="">{% endif %}</h1>
-<p class="muted"><a href="/league">← Back to league</a>
-{% if week %} · week {{ week }}{% endif %} · players aligned by starting slot,
-GameChannel-style. Left projections: our model (operator report). Right:
-Yahoo “Proj Pts” from the nightly roster capture. “—” = no data (bye players
-have no Yahoo projection).</p>
+<div class="tv-head" data-week="{{ week }}">
+  <div class="tv-side left">
+    {% if logos[a_name] %}<img class="tv-logo" src="{{ logos[a_name] }}" alt="">{% endif %}
+    <div>
+      <div class="tv-tname">{{ a_name }}</div>
+      {% if a_record %}<div class="tv-trec">{{ a_record }}</div>{% endif %}
+      {% if a_remaining is not none %}<div class="tv-remaining">{{ a_remaining }} players remaining</div>{% endif %}
+    </div>
+  </div>
+  <div class="tv-center">
+    <div class="tv-score"><span data-live-team="{{ a_name }}">{{ num(a_score) }}</span><span class="vs">vs</span><span data-live-team="{{ b_name }}">{{ num(b_score) }}</span></div>
+    <div class="tv-projline">Proj {{ num(a_proj) }} vs {{ num(b_proj) }}</div>
+    {% if week %}<div class="tv-remaining">Week {{ week }}</div>{% endif %}
+  </div>
+  <div class="tv-side right">
+    {% if logos[b_name] %}<img class="tv-logo" src="{{ logos[b_name] }}" alt="">{% endif %}
+    <div>
+      <div class="tv-tname">{{ b_name }}</div>
+      {% if b_record %}<div class="tv-trec">{{ b_record }}</div>{% endif %}
+      {% if b_remaining is not none %}<div class="tv-remaining">{{ b_remaining }} players remaining</div>{% endif %}
+    </div>
+  </div>
+</div>
+<p class="muted"><a href="/league">← Back to league</a> · layout copied from
+Yahoo’s matchup page. Fan Pts = live points (Yahoo-exact weights); Proj =
+our model (left) / Yahoo Proj Pts (right). “–” = no data yet.</p>
 
 {% if missing %}
 <div class="notice">A roster for one of these teams is not in the latest league
@@ -49,39 +104,67 @@ it in. Rows show whichever side is available.</div>
 {% else %}
 <div class="card">
   <table class="tv" data-week="{{ week }}">
+    <colgroup>
+      <col class="c-stats"><col class="c-player"><col class="c-proj"><col class="c-fan">
+      <col class="c-pos">
+      <col class="c-fan"><col class="c-proj"><col class="c-player"><col class="c-stats">
+    </colgroup>
     <thead>
       <tr>
-        <th class="tv-head-names">Player</th>
-        <th class="tv-head-proj">Proj</th>
-        <th>Pos</th>
-        <th class="tv-head-proj">Proj</th>
-        <th class="tv-head-names">Player</th>
+        <th class="c-stats"></th>
+        <th class="c-player left">Player</th>
+        <th class="c-proj left">Proj</th>
+        <th class="c-fan left">Fan Pts</th>
+        <th class="c-pos">Pos</th>
+        <th class="c-fan right">Fan Pts</th>
+        <th class="c-proj right">Proj</th>
+        <th class="c-player right">Player</th>
+        <th class="c-stats"></th>
       </tr>
     </thead>
     {% if starters %}
     <tbody>
-      <tr class="tv-section"><td colspan="5">Starters</td></tr>
+      <tr class="tv-section"><td colspan="9">Starters</td></tr>
       {% for row in starters %}
       <tr>
-        <td class="tv-player" {% if row.left and row.left.slot == 'DEF' %}data-live-def="{{ row.left.name }}"{% elif row.left %}data-live-player="{{ row.left.name }}"{% endif %}>{{ player(row.left) }}</td>
-        <td class="tv-proj">{{ proj(row.left) }}</td>
-        <td class="tv-pos">{{ row.slot }}</td>
-        <td class="tv-proj">{{ proj(row.right) }}</td>
-        <td class="tv-player" {% if row.right and row.right.slot == 'DEF' %}data-live-def="{{ row.right.name }}"{% elif row.right %}data-live-player="{{ row.right.name }}"{% endif %}>{{ player(row.right) }}</td>
+        <td class="c-stats">{{ note(row.left) }}</td>
+        <td class="c-player left">{{ player(row.left, 'left') }}</td>
+        <td class="c-proj left">{{ num(row.left.proj if row.left else none) }}</td>
+        <td class="c-fan left" {{ fanattrs(row.left) }}>{{ num(row.left.fan_pts if row.left else none) }}</td>
+        <td class="c-pos tv-pos">{{ row.slot }}</td>
+        <td class="c-fan right" {{ fanattrs(row.right) }}>{{ num(row.right.fan_pts if row.right else none) }}</td>
+        <td class="c-proj right">{{ num(row.right.proj if row.right else none) }}</td>
+        <td class="c-player right">{{ player(row.right, 'right') }}</td>
+        <td class="c-stats">{{ note(row.right) }}</td>
       </tr>
       {% endfor %}
+      <tr class="tv-total">
+        <td class="c-stats"></td>
+        <td class="c-player left">Total</td>
+        <td class="c-proj left">{{ num(a_proj) }}</td>
+        <td class="c-fan left" data-live-team="{{ a_name }}">{{ num(a_fan_total) }}</td>
+        <td class="c-pos tv-pos">—</td>
+        <td class="c-fan right" data-live-team="{{ b_name }}">{{ num(b_fan_total) }}</td>
+        <td class="c-proj right">{{ num(b_proj) }}</td>
+        <td class="c-player right">Total</td>
+        <td class="c-stats"></td>
+      </tr>
     </tbody>
     {% endif %}
     {% if bench %}
     <tbody>
-      <tr class="tv-section"><td colspan="5">Bench / IR</td></tr>
+      <tr class="tv-section"><td colspan="9">Bench / IR</td></tr>
       {% for row in bench %}
       <tr>
-        <td class="tv-player" {% if row.left and row.left.slot == 'DEF' %}data-live-def="{{ row.left.name }}"{% elif row.left %}data-live-player="{{ row.left.name }}"{% endif %}>{{ player(row.left) }}</td>
-        <td class="tv-proj">{{ proj(row.left) }}</td>
-        <td class="tv-pos">{{ row.slot }}</td>
-        <td class="tv-proj">{{ proj(row.right) }}</td>
-        <td class="tv-player" {% if row.right and row.right.slot == 'DEF' %}data-live-def="{{ row.right.name }}"{% elif row.right %}data-live-player="{{ row.right.name }}"{% endif %}>{{ player(row.right) }}</td>
+        <td class="c-stats">{{ note(row.left) }}</td>
+        <td class="c-player left">{{ player(row.left, 'left') }}</td>
+        <td class="c-proj left">{{ num(row.left.proj if row.left else none) }}</td>
+        <td class="c-fan left" {{ fanattrs(row.left) }}>{{ num(row.left.fan_pts if row.left else none) }}</td>
+        <td class="c-pos tv-pos">{{ row.slot }}</td>
+        <td class="c-fan right" {{ fanattrs(row.right) }}>{{ num(row.right.fan_pts if row.right else none) }}</td>
+        <td class="c-proj right">{{ num(row.right.proj if row.right else none) }}</td>
+        <td class="c-player right">{{ player(row.right, 'right') }}</td>
+        <td class="c-stats">{{ note(row.right) }}</td>
       </tr>
       {% endfor %}
     </tbody>

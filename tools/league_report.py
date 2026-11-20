@@ -25,6 +25,7 @@ from yahoo.league import (  # noqa: E402
     LeagueReadError,
     LeagueWafBlocked,
     matchup,
+    my_roster,
     opponent_roster,
     opponent_team_id,
     scoreboard,
@@ -128,7 +129,7 @@ def main() -> int:
     with CdpClient(target, args.endpoint, timeout=25) as client:
         blocked = False
         try:
-            report = {
+            report: dict = {
                 "standings": [row.as_dict() for row in standings(client)],
             }
             try:
@@ -155,7 +156,8 @@ def main() -> int:
                     ids = team_ids(client)  # free: still on the standings page
                 except LeagueReadError as exc:
                     print(f"warning: team id map skipped: {exc}", file=sys.stderr)
-            report["matchup"] = matchup(client).as_dict()
+            matchup_dict = matchup(client).as_dict()
+            report["matchup"] = matchup_dict
             if args.opponent_roster:
                 try:
                     opp_id = opponent_team_id(client)
@@ -182,6 +184,20 @@ def main() -> int:
                     except LeagueReadError as exc:
                         print(f"warning: roster for {name!r} skipped: {exc}",
                               file=sys.stderr)
+                # Our own roster too — evaluated on the team page we return
+                # to anyway (no extra load beyond the restore). Without it
+                # Team View lacks our players' NFL teams/game info.
+                my_name = matchup_dict.get("team")
+                if my_name:
+                    try:
+                        client.navigate(f"{BASE}{TEAM_PATH}",
+                                        lambda url: url.rstrip("/").endswith(TEAM_PATH), 25)
+                        time.sleep(2)
+                        rosters[my_name] = list(my_roster(client))
+                    except LeagueWafBlocked:
+                        raise
+                    except (LeagueReadError, CdpError) as exc:
+                        print(f"warning: own roster skipped: {exc}", file=sys.stderr)
                 report["rosters"] = rosters
         except LeagueWafBlocked:
             blocked = True

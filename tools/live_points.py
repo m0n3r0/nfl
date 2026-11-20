@@ -82,6 +82,7 @@ def event_meta(event: dict) -> dict:
         teams[t.get("abbreviation", "")] = {
             "display": t.get("displayName", ""),
             "score": side.get("score", "0"),
+            "home": side.get("homeAway") == "home",
         }
     last_play = (comp.get("situation") or {}).get("lastPlay") or {}
     return {"id": event.get("id"), "name": event.get("name"),

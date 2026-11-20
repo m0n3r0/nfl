@@ -71,7 +71,7 @@
    to polling /live-points if the socket drops. Week-guarded: a payload for
    a different week never touches the page. */
 (function () {
-  var targets = document.querySelectorAll('[data-live-team],[data-live-player],[data-live-def]');
+  var targets = document.querySelectorAll('[data-live-team],[data-live-player],[data-live-def],[data-live-fanpts],[data-live-fanpts-def]');
   if (!targets.length) return;
   var statusEl = document.getElementById('live-status');
   function norm(s) {
@@ -112,6 +112,22 @@
       if (!badge) { badge = document.createElement('span'); badge.className = 'live-pts'; el.appendChild(badge); }
       badge.textContent = Number(p.points).toFixed(2);
       badge.title = 'live fantasy points (Yahoo weights)';
+    });
+    document.querySelectorAll('[data-live-fanpts]').forEach(function (el) {
+      if (!weekOk(el, d)) return;
+      var p = (d.players || {})[norm(el.getAttribute('data-live-fanpts'))];
+      if (!p) return;
+      el.textContent = Number(p.points).toFixed(2);
+      el.classList.add('live-on');
+      el.title = 'live fantasy points (Yahoo weights)';
+    });
+    document.querySelectorAll('[data-live-fanpts-def]').forEach(function (el) {
+      if (!weekOk(el, d)) return;
+      var v = (d.def_named || {})[el.getAttribute('data-live-fanpts-def')];
+      if (v == null) return;
+      el.textContent = Number(v).toFixed(2);
+      el.classList.add('live-on');
+      el.title = 'live DEF points (Yahoo weights)';
     });
     document.querySelectorAll('[data-live-def]').forEach(function (el) {
       if (!weekOk(el, d)) return;

@@ -444,15 +444,36 @@ fn teamview_fixtures(root: &Path) {
         "matchup": {"week": 2, "team": "Shiba Innu", "opponent": "Team Beta",
                     "score": 0, "opponent_score": 0, "team_proj": 100.0,
                     "opponent_proj": 99.0},
-        "rosters": {"Team Beta": [
-            {"name": "Enemy Qb", "team": "KC", "position": "QB", "slot": "QB",
-             "injury_status": "", "proj": 15.2},
-            {"name": "Enemy Rb", "team": "DAL", "position": "RB", "slot": "RB",
-             "injury_status": "Q", "proj": null},
-            {"name": "Enemy Bench", "team": "MIN", "position": "WR", "slot": "BN",
-             "injury_status": "", "proj": 8.0}]}
+        "standings": [
+            {"rank": 3, "team": "Shiba Innu", "record": "8-2-0"},
+            {"rank": 5, "team": "Team Beta", "record": "5-5-0"}],
+        "scoreboard": [{"week": 2, "team1": "Shiba Innu", "team2": "Team Beta",
+                        "score1": 0, "score2": 4.7}],
+        "rosters": {
+            "Shiba Innu": [
+                {"name": "Quarter Back", "team": "SF", "position": "QB",
+                 "slot": "QB", "injury_status": "", "proj": null},
+                {"name": "Running Back", "team": "DAL", "position": "RB",
+                 "slot": "RB", "injury_status": "", "proj": null}],
+            "Team Beta": [
+                {"name": "Enemy Qb", "team": "KC", "position": "QB", "slot": "QB",
+                 "injury_status": "", "proj": 15.2},
+                {"name": "Enemy Rb", "team": "DAL", "position": "RB", "slot": "RB",
+                 "injury_status": "Q", "proj": null},
+                {"name": "Enemy Bench", "team": "MIN", "position": "WR", "slot": "BN",
+                 "injury_status": "", "proj": 8.0}]}
     });
     std::fs::write(root.join("logs/league-report.json"), report.to_string()).unwrap();
+    // live artifact for the same week: Fan Pts column + game info + totals
+    let live = json!({
+        "week": 2,
+        "players": {"quarter back": {"points": 21.35}, "enemy qb": {"points": 9.1}},
+        "def_named": {},
+        "totals": {"Shiba Innu": 21.35, "Team Beta": 9.1},
+        "games": {"g1": {"state": "in", "date": "2026-09-13T17:00Z",
+                         "teams": {"KC": {"home": true}, "DAL": {"home": false}}}}
+    });
+    std::fs::write(root.join("logs/live-points.json"), live.to_string()).unwrap();
 }
 
 #[tokio::test]
@@ -580,17 +601,31 @@ async fn teamview_pairs_players_by_slot() {
     teamview_fixtures(&root);
     let (status, html) = get_body(router(cfg(&root)), "/league/teamview").await;
     assert_eq!(status, StatusCode::OK);
-    assert!(html.contains("Shiba Innu vs Team Beta"));
+    // matchup-page header: team blocks flanking the score
+    assert!(html.contains("tv-tname\">Shiba Innu<") && html.contains("tv-tname\">Team Beta<"));
+    assert!(html.contains("8-2-0 | #3") && html.contains("5-5-0 | #5"));
     // our side from the operator plan (with proj), opponent from the roster
     assert!(html.contains("Quarter Back") && html.contains("Enemy Qb"));
     assert!(html.contains("17.8")); // our QB projection (model)
     assert!(html.contains("15.2")); // opponent QB projection (Yahoo capture)
     assert!(html.contains("tv-pos\">QB<")); // the Pos spine
-    assert!(html.contains("tv-note\">Q</div>")); // opponent injury tag
+    assert!(html.contains("tv-note\">Q</span>")); // opponent injury tag (Stats col)
     assert!(html.contains("Starters") && html.contains("Bench / IR"));
     assert!(html.contains("Enemy Bench"));
     // bye opponent (proj null) -> dash, never fabricated
     assert!(html.contains("tv-empty"));
+    // 9-column mirrored header, Yahoo matchup style
+    assert!(html.contains("Fan Pts"));
+    assert_eq!(html.matches(">Fan Pts</th>").count(), 2);
+    // live Fan Pts column (week-matched artifact) + game info + totals
+    assert!(html.contains("21.35")); // our QB live points
+    assert!(html.contains("9.10")); // enemy QB live points
+    assert!(html.contains("Mon 2:00 am JST vs DAL")); // KC home, ESPN no-seconds date, JST
+    assert!(html.contains("Mon 2:00 am JST @ KC")); // DAL away game
+    assert!(html.contains("Bye")); // SF has no game this week
+    assert!(html.contains("tv-total")); // totals row
+    assert!(html.contains("players remaining"));
+    assert!(html.contains("data-live-fanpts=\"Quarter Back\""));
 }
 
 #[tokio::test]

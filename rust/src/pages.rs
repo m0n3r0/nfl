@@ -340,20 +340,167 @@ pub async fn cron(State(st): State<AppState>) -> Response {
 // --- Team View: players side by side (Yahoo GameChannel method) ---
 
 /// One player row entry. Our own team comes from the operator plan (has
-/// projections); other teams from the league snapshot rosters (no proj).
+/// projections); other teams from the league snapshot rosters. Fan Pts and
+/// game info come from the live-points artifact when its week matches.
 struct TvEntry {
     name: String,
     team: String,
+    position: String,
     slot: String,
     proj: Option<f64>,
+    fan_pts: Option<f64>,
     note: String,
+    game_info: String,
 }
 
 impl TvEntry {
     fn to_json(&self) -> Value {
-        json!({"name": self.name, "team": self.team, "slot": self.slot,
-               "proj": self.proj, "note": self.note})
+        json!({"name": self.name, "team": self.team, "position": self.position,
+               "slot": self.slot, "proj": self.proj, "fan_pts": self.fan_pts,
+               "note": self.note, "game_info": self.game_info})
     }
+    fn is_bench(&self) -> bool {
+        matches!(self.slot.as_str(), "BN" | "IR" | "IL")
+    }
+}
+
+/// ESPN<->Yahoo player-name normalization (mirrors src/live_scoring.py).
+fn tv_norm_name(s: &str) -> String {
+    let mut tokens: Vec<String> = s
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { ' ' })
+        .collect::<String>()
+        .split_whitespace()
+        .map(str::to_string)
+        .collect();
+    while tokens
+        .last()
+        .map(|t| matches!(t.as_str(), "sr" | "jr" | "ii" | "iii" | "iv" | "v"))
+        .unwrap_or(false)
+    {
+        tokens.pop();
+    }
+    tokens.join(" ")
+}
+
+/// Yahoo team abbr -> ESPN abbr (uppercase + the irregular ones).
+fn tv_canon_team(abbr: &str) -> String {
+    let up = abbr.trim().to_uppercase();
+    match up.as_str() {
+        "WAS" => "WSH".to_string(),
+        "LA" | "ST" | "STL" => "LAR".to_string(),
+        _ => up,
+    }
+}
+
+struct TvGame {
+    opp: String,
+    date: String,
+    state: String,
+    home: bool,
+}
+
+/// team abbr -> this week's game, from the live artifact's games meta.
+fn tv_team_games(live: Option<&Value>) -> HashMap<String, TvGame> {
+    let mut out = HashMap::new();
+    let games = match live.and_then(|l| l.get("games")).and_then(Value::as_object) {
+        Some(g) => g,
+        None => return out,
+    };
+    for g in games.values() {
+        let teams = match g.get("teams").and_then(Value::as_object) {
+            Some(t) => t,
+            None => continue,
+        };
+        let abbrs: Vec<&String> = teams.keys().collect();
+        for abbr in &abbrs {
+            let opp = abbrs
+                .iter()
+                .find(|a| a != &abbr)
+                .map(|a| a.to_string())
+                .unwrap_or_default();
+            out.insert(
+                (*abbr).clone(),
+                TvGame {
+                    opp,
+                    date: artifacts::as_display_string(g.get("date")),
+                    state: artifacts::as_display_string(g.get("state")),
+                    home: teams[*abbr]
+                        .get("home")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false),
+                },
+            );
+        }
+    }
+    out
+}
+
+/// "Sun 8:20 pm JST vs Min" / "Mon 9:25 am JST @ NYG" — host-local (JST),
+/// honest about the zone. Empty when no live artifact covers the week.
+fn tv_game_info(games: &HashMap<String, TvGame>, team: &str, has_live: bool) -> String {
+    if team.trim().is_empty() || !has_live {
+        return String::new();
+    }
+    match games.get(&tv_canon_team(team)) {
+        None => "Bye".to_string(),
+        Some(g) => {
+            // ESPN dates come as "2026-11-22T18:00Z" (no seconds) — RFC3339
+            // needs seconds, so try both shapes.
+            let jst = chrono::FixedOffset::east_opt(9 * 3600).unwrap();
+            let parsed = chrono::DateTime::parse_from_rfc3339(&g.date)
+                .map(|dt| dt.with_timezone(&jst))
+                .or_else(|_| {
+                    chrono::NaiveDateTime::parse_from_str(&g.date, "%Y-%m-%dT%H:%MZ")
+                        .map(|n| n.and_utc().with_timezone(&jst))
+                });
+            let when = parsed
+                .map(|dt| {
+                    dt.format("%a %I:%M %p")
+                        .to_string()
+                        .replace("AM", "am")
+                        .replace("PM", "pm")
+                        .replace(" 0", " ") // 12-hour without leading zero
+                })
+                .unwrap_or_default();
+            let prefix = if g.home { "vs" } else { "@" };
+            format!("{when} JST {prefix} {}", g.opp)
+        }
+    }
+}
+
+/// Live fan points maps, only when the artifact's week matches the page week.
+fn tv_live_maps(
+    live: Option<&Value>,
+    week: &Value,
+) -> (HashMap<String, f64>, HashMap<String, f64>, bool) {
+    let mut players = HashMap::new();
+    let mut defs = HashMap::new();
+    let live_week = live.and_then(|l| l.get("week"));
+    let matches = match (live_week, week) {
+        (Some(lw), w) if !w.is_null() => lw == w,
+        _ => false,
+    };
+    if !matches {
+        return (players, defs, false);
+    }
+    let l = live.unwrap();
+    if let Some(obj) = l.get("players").and_then(Value::as_object) {
+        for (key, p) in obj {
+            if let Some(pts) = p.get("points").and_then(Value::as_f64) {
+                players.insert(key.clone(), pts);
+            }
+        }
+    }
+    if let Some(obj) = l.get("def_named").and_then(Value::as_object) {
+        for (key, v) in obj {
+            if let Some(pts) = v.as_f64() {
+                defs.insert(key.clone(), pts);
+            }
+        }
+    }
+    (players, defs, true)
 }
 
 fn tv_side(
@@ -361,33 +508,88 @@ fn tv_side(
     my_name: Option<&str>,
     plan: Option<&Vec<Value>>,
     rosters: Option<&Value>,
+    live_players: &HashMap<String, f64>,
+    live_defs: &HashMap<String, f64>,
+    games: &HashMap<String, TvGame>,
+    has_live: bool,
 ) -> Option<Vec<TvEntry>> {
+    // roster lookup for NFL team/position (the operator plan lacks team)
+    let roster_rows = rosters.and_then(|r| r.get(team)).and_then(Value::as_array);
+    let roster_info: HashMap<String, (String, String)> = roster_rows
+        .map(|rows| {
+            rows.iter()
+                .map(|p| {
+                    (
+                        tv_norm_name(&artifacts::as_display_string(p.get("name"))),
+                        (
+                            artifacts::as_display_string(p.get("team")),
+                            artifacts::as_display_string(p.get("position")),
+                        ),
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let fan_pts = |name: &str, slot: &str| -> Option<f64> {
+        if slot == "DEF" {
+            live_defs.get(name).copied()
+        } else {
+            live_players.get(&tv_norm_name(name)).copied()
+        }
+    };
     if Some(team) == my_name {
         if let Some(plan) = plan {
             return Some(
                 plan.iter()
-                    .map(|p| TvEntry {
-                        name: artifacts::as_display_string(p.get("name")),
-                        team: String::new(),
-                        slot: artifacts::as_display_string(p.get("current_slot")),
-                        proj: p.get("proj_week").and_then(Value::as_f64),
-                        note: artifacts::as_display_string(p.get("note")),
+                    .map(|p| {
+                        let name = artifacts::as_display_string(p.get("name"));
+                        let slot = artifacts::as_display_string(p.get("current_slot"));
+                        let (rteam, rpos) = roster_info
+                            .get(&tv_norm_name(&name))
+                            .cloned()
+                            .unwrap_or_default();
+                        let position = {
+                            let pp = artifacts::as_display_string(p.get("position"));
+                            if pp.is_empty() {
+                                rpos
+                            } else {
+                                pp
+                            }
+                        };
+                        TvEntry {
+                            game_info: tv_game_info(games, &rteam, has_live),
+                            team: rteam,
+                            position,
+                            fan_pts: fan_pts(&name, &slot),
+                            name,
+                            slot,
+                            proj: p.get("proj_week").and_then(Value::as_f64),
+                            note: artifacts::as_display_string(p.get("note")),
+                        }
                     })
                     .collect(),
             );
         }
     }
-    let rows = rosters?.get(team)?.as_array()?;
+    let rows = roster_rows?;
     Some(
         rows.iter()
-            .map(|p| TvEntry {
-                name: artifacts::as_display_string(p.get("name")),
-                team: artifacts::as_display_string(p.get("team")),
-                slot: artifacts::as_display_string(p.get("slot")),
-                // Yahoo "Proj Pts" captured by the nightly roster reads;
-                // null for bye players / older artifacts.
-                proj: p.get("proj").and_then(Value::as_f64),
-                note: artifacts::as_display_string(p.get("injury_status")),
+            .map(|p| {
+                let name = artifacts::as_display_string(p.get("name"));
+                let team_abbr = artifacts::as_display_string(p.get("team"));
+                let slot = artifacts::as_display_string(p.get("slot"));
+                TvEntry {
+                    game_info: tv_game_info(games, &team_abbr, has_live),
+                    team: team_abbr,
+                    position: artifacts::as_display_string(p.get("position")),
+                    fan_pts: fan_pts(&name, &slot),
+                    name,
+                    slot,
+                    // Yahoo "Proj Pts" captured by the nightly roster reads;
+                    // null for bye players / older artifacts.
+                    proj: p.get("proj").and_then(Value::as_f64),
+                    note: artifacts::as_display_string(p.get("injury_status")),
+                }
             })
             .collect(),
     )
@@ -471,14 +673,143 @@ pub async fn teamview(
         .and_then(|p| p.get("plan"))
         .and_then(Value::as_array)
         .cloned();
-    let a = tv_side(&a_name, my_name.as_deref(), plan.as_ref(), rosters);
-    let b = tv_side(&b_name, my_name.as_deref(), plan.as_ref(), rosters);
+    let live = artifacts::read_live_points(&st.cfg.root);
+    let (live_players, live_defs, has_live) = tv_live_maps(live.as_ref(), &week);
+    let games = tv_team_games(live.as_ref());
+    let a = tv_side(
+        &a_name,
+        my_name.as_deref(),
+        plan.as_ref(),
+        rosters,
+        &live_players,
+        &live_defs,
+        &games,
+        has_live,
+    );
+    let b = tv_side(
+        &b_name,
+        my_name.as_deref(),
+        plan.as_ref(),
+        rosters,
+        &live_players,
+        &live_defs,
+        &games,
+        has_live,
+    );
     let missing = a.is_none() || b.is_none();
     let (starters, bench) = tv_rows(a.as_ref(), b.as_ref());
+
+    // Header: records from standings, scores (live totals preferred, else
+    // the Yahoo snapshot), starter projection sums, players remaining.
+    let standings = report
+        .as_ref()
+        .and_then(|r| r.get("standings"))
+        .and_then(Value::as_array);
+    let record_of = |name: &str| -> String {
+        standings
+            .and_then(|rows| {
+                rows.iter()
+                    .find(|r| r.get("team").and_then(Value::as_str) == Some(name))
+            })
+            .map(|r| {
+                format!(
+                    "{} | #{}",
+                    artifacts::as_display_string(r.get("record")),
+                    artifacts::as_display_string(r.get("rank"))
+                )
+            })
+            .unwrap_or_default()
+    };
+    let snapshot_score = |name: &str| -> Option<f64> {
+        report
+            .as_ref()?
+            .get("scoreboard")?
+            .as_array()?
+            .iter()
+            .find_map(|e| {
+                if e.get("team1").and_then(Value::as_str) == Some(name) {
+                    e.get("score1").and_then(Value::as_f64)
+                } else if e.get("team2").and_then(Value::as_str) == Some(name) {
+                    e.get("score2").and_then(Value::as_f64)
+                } else {
+                    None
+                }
+            })
+    };
+    let live_totals = live
+        .as_ref()
+        .and_then(|l| l.get("totals"))
+        .filter(|_| has_live);
+    let score_of = |name: &str| -> Value {
+        live_totals
+            .and_then(|t| t.get(name))
+            .and_then(Value::as_f64)
+            .map(|v| json!(v))
+            .or_else(|| snapshot_score(name).map(|v| json!(v)))
+            .unwrap_or(Value::Null)
+    };
+    let proj_sum = |side: &Option<Vec<TvEntry>>| -> Value {
+        side.as_ref()
+            .map(|entries| {
+                let known: Vec<f64> = entries
+                    .iter()
+                    .filter(|e| !e.is_bench())
+                    .filter_map(|e| e.proj)
+                    .collect();
+                if known.is_empty() {
+                    Value::Null
+                } else {
+                    json!((known.iter().sum::<f64>() * 100.0).round() / 100.0)
+                }
+            })
+            .unwrap_or(Value::Null)
+    };
+    let remaining = |side: &Option<Vec<TvEntry>>| -> Value {
+        if !has_live {
+            return Value::Null;
+        }
+        side.as_ref()
+            .map(|entries| {
+                let n = entries
+                    .iter()
+                    .filter(|e| !e.is_bench())
+                    .filter(|e| {
+                        games
+                            .get(&tv_canon_team(&e.team))
+                            .map(|g| g.state == "pre" || g.state == "in")
+                            .unwrap_or(false)
+                    })
+                    .count();
+                json!(n)
+            })
+            .unwrap_or(Value::Null)
+    };
+    let fan_sum = |side: &Option<Vec<TvEntry>>| -> Value {
+        side.as_ref()
+            .map(|entries| {
+                let known: Vec<f64> = entries
+                    .iter()
+                    .filter(|e| !e.is_bench())
+                    .filter_map(|e| e.fan_pts)
+                    .collect();
+                if known.is_empty() {
+                    Value::Null
+                } else {
+                    json!((known.iter().sum::<f64>() * 100.0).round() / 100.0)
+                }
+            })
+            .unwrap_or(Value::Null)
+    };
     let ctx = json!({
         "a_name": a_name, "b_name": b_name, "week": week,
         "starters": starters, "bench": bench, "missing": missing,
         "logos": logo_urls(&st.cfg.root),
+        "a_record": record_of(&a_name), "b_record": record_of(&b_name),
+        "a_score": score_of(&a_name), "b_score": score_of(&b_name),
+        "a_proj": proj_sum(&a), "b_proj": proj_sum(&b),
+        "a_fan_total": fan_sum(&a), "b_fan_total": fan_sum(&b),
+        "a_remaining": remaining(&a), "b_remaining": remaining(&b),
+        "has_live": has_live,
     });
     render(&st, "teamview.html", ctx)
 }

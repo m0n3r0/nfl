@@ -37,6 +37,7 @@ def harness(monkeypatch):
     # and downloads from CDNs; tests that care override these stubs.
     monkeypatch.setattr(league_report, "team_logos", lambda client: {})
     monkeypatch.setattr(league_report, "sync_logos", lambda logos: {})
+    monkeypatch.setattr(league_report, "my_roster", lambda client: ())
     client = FakeClient()
 
     @contextlib.contextmanager
