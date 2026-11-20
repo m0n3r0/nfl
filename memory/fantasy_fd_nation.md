@@ -981,3 +981,19 @@ Parallel-lane audit of every doc against the current code/architecture:
   gitignore/secrets/branches clean; GAME_PLAN/SKILL/BACKTEST docs current;
   CODEBASE_REVIEW_INSEASON intentionally historical.
 - 31 Rust + 301 Python fast pass; all routes 200 via the new tunnel URL.
+
+## 2026-11-20 — "My Team" nav is now a team picker
+
+- User: top-menu My Team should be selectable to view other teams (e.g.
+  Victory Formation), not fixed to Shiba Innu.
+- layout.html: My Team link -> <select class="nav-team"> with all 10
+  teams from the latest snapshot standings (fallback roster keys).
+  Own team option -> /team (operator view); others -> /league/team/<name>.
+  nav_sel preselects the current page's team; plain-link fallback when
+  no snapshot exists.
+- Fed by BOTH renderers: Rust render() injects nav_teams/nav_my_team into
+  every ctx; Flask app.py @app.context_processor does the same for the
+  proxied analytics pages. team/league_team handlers set nav_sel.
+- Verified live: /league 10 options; Victory Formation page preselects
+  Victory Formation; /team preselects My Team: Shiba Innu; /players
+  (Flask) has the picker too. 31 Rust + 301 Python fast pass.

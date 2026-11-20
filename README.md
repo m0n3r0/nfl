@@ -327,7 +327,11 @@ natively with minijinja over the same `web/templates/`: `/league` (home),
 else (the analytics pages) is reverse-proxied to the **Flask compute
 backend** on 127.0.0.1:5001 (pandas/sklearn stay in Python).
 `/` redirects to `/league` (League is the default page; menu order
-League · My Team · Cron); the model-card dashboard lives at `/dashboard`.
+League · My Team · Cron). "My Team" is a dropdown of all 10 league teams:
+our own team opens the operator view (`/team`), any other team opens its
+league page (`/league/team/<name>`); the current team stays preselected.
+Both renderers feed it (Rust render + Flask context processor). The
+model-card dashboard lives at `/dashboard`.
 The public tunnel points at :5000 only; the backend is never exposed.
 
 On `/team` you can pin players (📌) to freeze their current slot: the

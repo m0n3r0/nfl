@@ -20,6 +20,7 @@ Run standalone (analytics only): python web/app.py  # PORT env, default 5000
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -33,6 +34,22 @@ from src import corpus, projections, analysis, model, ingest, features  # noqa: 
 from src.config import SCHEDULE_SEASON, STATS_SEASON, PBP_SEASONS, league_preset  # noqa: E402
 
 app = Flask(__name__, template_folder=str(Path(__file__).parent / "templates"))
+
+
+@app.context_processor
+def _nav_teams():
+    """The 'My Team' nav picker — the same variables the Rust renderer
+    injects, so the shared layout.html works under both renderers."""
+    try:
+        report = json.loads(
+            (ROOT / "logs" / "league-report.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    teams = [r.get("team") for r in report.get("standings") or [] if r.get("team")]
+    if not teams:
+        teams = sorted((report.get("rosters") or {}).keys())
+    my = (report.get("matchup") or {}).get("team") or "Shiba Innu"
+    return {"nav_teams": teams, "nav_my_team": my}
 
 
 def _get_corpus(preset=None):

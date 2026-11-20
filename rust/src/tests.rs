@@ -392,6 +392,10 @@ async fn league_page_and_team_detail_and_404() {
     assert!(html.contains(">SI</div>")); // Shiba Innu initials
     assert!(html.contains(">TB</div>")); // Team Beta initials
     assert!(html.contains("mu-card mine"));
+    // "My Team" nav is a team picker fed by the league snapshot
+    assert!(html.contains("<select class=\"nav-team\""));
+    assert!(html.contains("My Team: Shiba Innu"));
+    assert!(html.contains("value=\"/league/team/Team%20Beta\""));
     assert!(html.contains("mu-score mu-leading"));
     assert!(html.contains("Week 2 matchups"));
     assert!(html.contains("/league/teamview?a=Shiba%20Innu&amp;b=Team%20Beta"));
@@ -400,6 +404,9 @@ async fn league_page_and_team_detail_and_404() {
     assert!(html.contains("Beta Rb"));
     assert!(html.contains("Playing us this week")); // opponent matchup card
     assert!(html.contains("/league/teamview?a=Team%20Beta")); // Team View link
+    assert!(html.contains("value=\"/league/team/Team%20Beta\" selected")); // nav picker
+    let (_, team_html) = get_body(app.clone(), "/team").await;
+    assert!(team_html.contains("value=\"/team\" selected")); // own team preselected
     assert!(html.contains("50.4")); // PF-PA diff rounded: 90.1-140.5 = -50.4
     let (status, html) = get_body(app, "/league/team/No%20Such%20Team").await;
     assert_eq!(status, StatusCode::NOT_FOUND);
