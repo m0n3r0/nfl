@@ -908,3 +908,24 @@ Parallel-lane audit of every doc against the current code/architecture:
   (Purdy 31.66, CMC 44.30, Kamara 14.90, Olave 4.50, Watson 5.20,
   Strange 7.90, Brown 24.30, Sanders 14.00, Steelers -3.00); header
   143.76-104.02 == Yahoo official final. 301 Python fast + 28 Rust pass.
+
+## 2026-11-20 — fix: opponent side empty on historical Team View
+
+- Root cause: the historical picker took max(captured_at) of week-N
+  snapshots — the LAST ones are light runs with NO rosters, so the
+  opponent rendered 17 empty cells + missing notice (our side survived
+  via the operator plan). Fix: prefer latest snapshot WITH non-empty
+  rosters, then latest captured_at (tuple max_by). Every week has daily
+  full runs with rosters (12:20 UTC), so all weeks resolve.
+- Also: historical snapshots predate own-roster capture, so our plan rows
+  had no team/pos — tv_side now borrows team/pos from the CURRENT roster
+  when the historical one lacks our team (points/game info stay
+  week-archived; DEF nickname map covers dropped DEFs).
+- Verified week 10: opponent starters sum EXACTLY to Yahoo's official
+  104.02 (Dak 35.42, Jefferson 11.90, Amon-Ra 23.80, McBride 6.20,
+  Cam Little 19.00, Ravens DEF 2.00; Irving/Godwin bye = dash).
+- Known caveat (documented in README): week-5 opponent rows sum 95.08 vs
+  official 96.08 — the snapshot's slots predate late Sunday lineup swaps;
+  header always shows Yahoo's official total. Not a scoring bug (week 10
+  exact, accuracy gate frozen).
+- 29 Rust tests pass (2 new regression tests).

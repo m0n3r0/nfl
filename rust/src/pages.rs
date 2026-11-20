@@ -567,6 +567,7 @@ fn tv_side(
     my_name: Option<&str>,
     plan: Option<&Vec<Value>>,
     rosters: Option<&Value>,
+    fallback_rosters: Option<&Value>,
     live_players: &HashMap<String, f64>,
     live_defs: &HashMap<String, f64>,
     live_defs_abbr: &HashMap<String, f64>,
@@ -575,21 +576,30 @@ fn tv_side(
 ) -> Option<Vec<TvEntry>> {
     // roster lookup for NFL team/position (the operator plan lacks team)
     let roster_rows = rosters.and_then(|r| r.get(team)).and_then(Value::as_array);
-    let roster_info: HashMap<String, (String, String)> = roster_rows
-        .map(|rows| {
-            rows.iter()
-                .map(|p| {
-                    (
-                        tv_norm_name(&artifacts::as_display_string(p.get("name"))),
+    let build_info = |src: Option<&Value>| -> HashMap<String, (String, String)> {
+        src.and_then(|r| r.get(team))
+            .and_then(Value::as_array)
+            .map(|rows| {
+                rows.iter()
+                    .map(|p| {
                         (
-                            artifacts::as_display_string(p.get("team")),
-                            artifacts::as_display_string(p.get("position")),
-                        ),
-                    )
-                })
-                .collect()
-        })
-        .unwrap_or_default();
+                            tv_norm_name(&artifacts::as_display_string(p.get("name"))),
+                            (
+                                artifacts::as_display_string(p.get("team")),
+                                artifacts::as_display_string(p.get("position")),
+                            ),
+                        )
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    let mut roster_info = build_info(rosters);
+    if roster_info.is_empty() {
+        // Historical snapshots predate own-roster capture: borrow team/pos
+        // from the CURRENT roster (points/game info stay week-archived).
+        roster_info = build_info(fallback_rosters);
+    }
     let fan_pts = |name: &str, slot: &str, team_abbr: &str| -> Option<f64> {
         if slot == "DEF" {
             live_defs
@@ -738,12 +748,25 @@ pub async fn teamview(
     let (report, live, plan_week) = if is_past {
         let w = requested.unwrap();
         let hist = artifacts::read_league_history(&st.cfg.root);
+        // Prefer the latest snapshot that actually HAS rosters: the last
+        // snapshots of a week are light runs (standings/scoreboard only),
+        // and picking one of those leaves the opponent side empty.
         let snap = hist
             .iter()
             .filter(|r| snapshot_week(r) == Some(w))
             .max_by(|a, b| {
-                artifacts::as_display_string(a.get("captured_at"))
-                    .cmp(&artifacts::as_display_string(b.get("captured_at")))
+                let key = |r: &Value| {
+                    let has_rosters = r
+                        .get("rosters")
+                        .and_then(Value::as_object)
+                        .map(|o| !o.is_empty())
+                        .unwrap_or(false);
+                    (
+                        has_rosters,
+                        artifacts::as_display_string(r.get("captured_at")),
+                    )
+                };
+                key(a).cmp(&key(b))
             })
             .cloned();
         (
@@ -805,11 +828,13 @@ pub async fn teamview(
         .cloned();
     let (live_players, live_defs, live_defs_abbr, has_live) = tv_live_maps(live.as_ref(), &week);
     let games = tv_team_games(live.as_ref());
+    let current_rosters = current.as_ref().and_then(|r| r.get("rosters"));
     let a = tv_side(
         &a_name,
         my_name.as_deref(),
         plan.as_ref(),
         rosters,
+        current_rosters,
         &live_players,
         &live_defs,
         &live_defs_abbr,
@@ -821,6 +846,7 @@ pub async fn teamview(
         my_name.as_deref(),
         plan.as_ref(),
         rosters,
+        current_rosters,
         &live_players,
         &live_defs,
         &live_defs_abbr,

@@ -439,6 +439,11 @@ Weeks 1–10 were backfilled from ESPN on 2026-11-20; Team View's week
 selector reads these archives, with Yahoo's official final scores in the
 header. Matchup scores, standings, rosters, and projections were already
 retained in the append-only `league-report.jsonl` / `team-operator.jsonl`.
+Past-week rosters come from the latest snapshot of that week that HAS
+rosters (the last snapshots are light runs without them). Caveat: an
+opponent's starter/bench split reflects the last pre-game snapshot, so it
+can differ slightly from their final lineup (late Sunday swaps); the
+header always shows Yahoo's official total.
 
 ## Scoring
 

@@ -645,11 +645,20 @@ async fn teamview_historical_week_from_archive() {
             {"name": "Steelers D/ST", "team": "", "position": "DEF", "slot": "DEF",
              "injury_status": "", "proj": null}]}
     });
-    std::fs::write(
-        root.join("logs/league-report.jsonl"),
-        old.to_string() + "\n",
-    )
-    .unwrap();
+    // A LATER light-run snapshot of the same week without rosters must not
+    // win the pick — otherwise the opponent side renders empty.
+    let light = json!({
+        "captured_at": "2026-09-08T12:00:00+00:00",
+        "matchup": {"week": 1, "team": "Shiba Innu", "opponent": "Team Beta"},
+        "scoreboard": [{"week": 1, "team1": "Shiba Innu", "team2": "Team Beta",
+                        "score1": 120.5, "score2": 99.0}],
+        "standings": [{"rank": 1, "team": "Shiba Innu", "record": "1-0-0"}]
+    });
+    let mut hist_text = old.to_string();
+    hist_text.push('\n');
+    hist_text.push_str(&light.to_string());
+    hist_text.push('\n');
+    std::fs::write(root.join("logs/league-report.jsonl"), hist_text).unwrap();
     let arch = json!({"week": 1, "players": {"old qb": {"points": 12.34}},
                     "def_named": {}, "def": {"DEF:PIT": -3.0},
                     "totals": {"Team Beta": 12.34}, "games": {}});
@@ -670,6 +679,37 @@ async fn teamview_historical_week_from_archive() {
     assert!(!html.contains("players remaining")); // suppressed for past weeks
     let (_, html) = get_body(app, "/league/teamview").await;
     assert!(html.contains("Enemy Qb") && !html.contains("Old Qb"));
+}
+
+#[tokio::test]
+async fn teamview_past_own_side_borrows_current_teampos() {
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    teamview_fixtures(&root); // current rosters + week-1 operator plan
+                              // Week-1 snapshot WITHOUT our own roster (pre own-roster capture era).
+    let old = json!({
+        "captured_at": "2026-09-06T12:00:00+00:00",
+        "matchup": {"week": 1, "team": "Shiba Innu", "opponent": "Team Beta"},
+        "scoreboard": [{"week": 1, "team1": "Shiba Innu", "team2": "Team Beta",
+                        "score1": 120.5, "score2": 99.0}],
+        "rosters": {"Team Beta": [
+            {"name": "Enemy Qb", "team": "KC", "position": "QB", "slot": "QB",
+             "injury_status": "", "proj": 15.2}]}
+    });
+    std::fs::write(
+        root.join("logs/league-report.jsonl"),
+        old.to_string() + "\n",
+    )
+    .unwrap();
+    let arch = json!({"week": 1, "players": {"quarter back": {"points": 25.10}},
+                    "def_named": {}, "def": {}, "totals": {}, "games": {}});
+    std::fs::write(root.join("logs/live-points-week-1.json"), arch.to_string()).unwrap();
+    let app = router(cfg(&root));
+    let (status, html) = get_body(app, "/league/teamview?week=1").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("25.10")); // archived points via the week-1 plan
+    assert!(html.contains("SF - QB")); // team/pos borrowed from current roster
+    assert!(html.contains("Enemy Qb")); // opponent from the historical roster
 }
 
 #[tokio::test]
