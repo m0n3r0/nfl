@@ -141,7 +141,6 @@ def launch(binary: str, profile: str = DEFAULT_PROFILE, url: str = DEFAULT_URL,
     Path(profile).mkdir(parents=True, exist_ok=True)
     log_path = Path(LAUNCH_LOG)
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    log = open(log_path, "ab")
     args = [
         binary,
         f"--remote-debugging-port={port}",
@@ -154,7 +153,9 @@ def launch(binary: str, profile: str = DEFAULT_PROFILE, url: str = DEFAULT_URL,
         "--window-size=1400,900",
         url,
     ]
-    return subprocess.Popen(args, stdout=log, stderr=log, start_new_session=True)
+    # Popen dups the fd for the child; the parent's copy must not leak.
+    with open(log_path, "ab") as log:
+        return subprocess.Popen(args, stdout=log, stderr=log, start_new_session=True)
 
 
 def ensure_browser(endpoint: str = DEFAULT_ENDPOINT, profile: str = DEFAULT_PROFILE,

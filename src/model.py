@@ -14,6 +14,7 @@ is genuinely hard; we report results honestly rather than overstating them.
 
 from __future__ import annotations
 
+import re
 import warnings
 from pathlib import Path
 
@@ -32,10 +33,7 @@ def _feature_cols():
 
 def build_frame(seasons, refresh: bool = False) -> pd.DataFrame:
     mf = features.build_model_frame(seasons, refresh=refresh)
-    mf = mf.dropna(subset=_feature_cols() + ["spread", "home_win"])
-    # model-only features exclude the spread; model+spread includes it
-    mf["epa_diff"] = (mf["home_off_epa_pp"] - mf["away_off_epa_pp"]) - (mf["home_def_epa_pp"] - mf["away_def_epa_pp"])
-    return mf
+    return mf.dropna(subset=_feature_cols() + ["spread", "home_win"])
 
 
 # Persisted fitted models. Lives under data/processed/ (gitignored, like the
@@ -70,6 +68,7 @@ def train_and_persist(seasons=None, path=MODEL_PATH, refresh: bool = False) -> d
     Returns the in-memory bundle; it is also written to `path`.
     """
     seasons = tuple(seasons) if seasons is not None else tuple(PBP_SEASONS)
+    import sklearn
     data = build_frame(seasons, refresh=refresh)
     if data.empty:
         raise RuntimeError(f"no training rows for seasons {seasons}")
@@ -91,6 +90,10 @@ def train_and_persist(seasons=None, path=MODEL_PATH, refresh: bool = False) -> d
         "features_with_spread": feat_s,
         "seasons": list(seasons),
         "n_train": int(len(data)),
+        # Stamped so load_model() can flag cross-version unpickling (sklearn
+        # only guarantees pickle compat within a version) with a precise
+        # message instead of sklearn's generic InconsistentVersionWarning.
+        "sklearn_version": sklearn.__version__,
     }
 
     import joblib
@@ -107,6 +110,68 @@ def train_and_persist(seasons=None, path=MODEL_PATH, refresh: bool = False) -> d
 # re-unpickled the model for no reason.
 _MODEL_CACHE: dict[str, dict | None] = {}
 
+# Keys predict_2026() relies on. A bundle missing any of them (e.g. an artifact
+# written by an older schema, or a non-bundle file at MODEL_PATH) is unusable.
+_BUNDLE_REQUIRED_KEYS = ("no_spread", "with_spread", "features", "features_with_spread")
+
+
+def _validate_bundle(bundle: object, path) -> dict | None:
+    """Return the bundle if usable, else None (callers fall back gracefully).
+
+    joblib.load() succeeding is not enough: sklearn only guarantees pickle
+    compatibility within a version, so an artifact from another sklearn can
+    unpickle into something subtly or entirely wrong. Anything unexpected is
+    rejected loudly here rather than crashing predict_2026() with a KeyError.
+    """
+    if not isinstance(bundle, dict) or not all(k in bundle for k in _BUNDLE_REQUIRED_KEYS):
+        warnings.warn(f"model artifact {path} is not a valid bundle; "
+                      f"falling back to the linear formula", stacklevel=2)
+        return None
+    for name in ("no_spread", "with_spread"):
+        if not hasattr(bundle[name], "predict_proba"):
+            warnings.warn(f"model artifact {path} estimator {name!r} has no "
+                          f"predict_proba; falling back to the linear formula",
+                          stacklevel=2)
+            return None
+    trained_with = bundle.get("sklearn_version")
+    if trained_with is not None:
+        import sklearn
+        if trained_with != sklearn.__version__:
+            warnings.warn(
+                f"model artifact {path} was trained with sklearn "
+                f"{trained_with} but the runtime is {sklearn.__version__}; "
+                f"cross-version pickles can produce invalid results. "
+                f"Re-run train_and_persist() to rebuild it.",
+                stacklevel=2,
+            )
+    return bundle
+
+
+def _replay_load_warnings(caught, path) -> None:
+    """Re-emit unpickling warnings, collapsing repeated version-skew notices.
+
+    Unpickling the two calibrated estimators emits one InconsistentVersionWarning
+    per nested estimator (~50 identical lines for one artifact). One warning
+    naming the artifact and the version pair is louder than fifty vague ones;
+    every other warning is replayed untouched.
+    """
+    skewed_from = set()
+    for w in caught:
+        if w.category.__name__ == "InconsistentVersionWarning":
+            m = re.search(r"from version ([\w.]+)", str(w.message))
+            skewed_from.add(m.group(1) if m else "?")
+        else:
+            warnings.warn(w.message, w.category, stacklevel=2)
+    if skewed_from:
+        import sklearn
+        warnings.warn(
+            f"model artifact {path} was pickled under sklearn "
+            f"{'/'.join(sorted(skewed_from))} but the runtime is "
+            f"{sklearn.__version__}; cross-version pickles can produce invalid "
+            f"results. Re-run train_and_persist() to rebuild it.",
+            stacklevel=2,
+        )
+
 
 def load_model(path=MODEL_PATH):
     """Return the persisted bundle, or None if it has not been trained yet."""
@@ -119,11 +184,16 @@ def load_model(path=MODEL_PATH):
         _MODEL_CACHE[key] = None
         return None
     try:
-        bundle = joblib.load(path)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            raw = joblib.load(path)
     except Exception:
         # A half-written or version-incompatible artifact must not brick the CLI;
         # callers fall back to the linear formula.
         bundle = None
+    else:
+        _replay_load_warnings(caught, path)
+        bundle = _validate_bundle(raw, path)
     _MODEL_CACHE[key] = bundle
     return bundle
 

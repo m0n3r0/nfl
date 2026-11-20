@@ -14,7 +14,7 @@ from typing import Any, Callable, Protocol
 from urllib.parse import urlencode, urlparse
 
 from .cdp import CdpError
-from .team import LEAGUE_ID, TEAM_ID, TEAM_PATH, TeamSnapshot, YahooTeamReader
+from .team import INJURED_RESERVE_SLOTS, LEAGUE_ID, TEAM_ID, TEAM_PATH, TeamSnapshot, YahooTeamReader
 
 BASE = "https://football.fantasysports.yahoo.com"
 ADD_PATH = f"/f1/{LEAGUE_ID}/addplayer"
@@ -64,9 +64,6 @@ class YahooWaiverOperator:
         self._snapshot = snapshot or YahooTeamReader(client).snapshot
         self.timeout = timeout
 
-    def _team(self):
-        return self._snapshot()
-
     def _restore_team(self) -> None:
         self.client.navigate(f"{BASE}{TEAM_PATH}", lambda url: urlparse(url).path.rstrip("/") == TEAM_PATH, self.timeout)
 
@@ -96,7 +93,7 @@ class YahooWaiverOperator:
         transaction, so the only authoritative signal is the roster itself:
         the add player present with the exact identity, the drop player gone.
         """
-        roster = {player.yahoo_id: player for player in self._team().roster}
+        roster = {player.yahoo_id: player for player in self._snapshot().roster}
         added = roster.get(claim.add_yahoo_id)
         if added is None or added.name != claim.add_name:
             return False
@@ -107,7 +104,7 @@ class YahooWaiverOperator:
     def _stage(self) -> Any:
         return self.client.evaluate(
             r'''/* yahoo-waiver-stage */ (() => {
-              const form = [...document.forms].find(form => new URL(form.action).pathname === '/f1/1329011/2/addplayer');
+              const form = [...document.forms].find(form => new URL(form.action).pathname === %r);
               if (!form) return null;
               const hidden = Object.fromEntries([...form.querySelectorAll('input[type=hidden][name]')].map(input => [input.name, input.value]));
               const drops = Object.fromEntries([...form.querySelectorAll('input[name=dpid]')].map(input => {
@@ -116,7 +113,7 @@ class YahooWaiverOperator:
                 return [input.value, link?.title || link?.innerText?.trim() || ''];
               }));
               return {path: location.pathname, action: new URL(form.action).pathname, hidden, drops};
-            })()'''
+            })()''' % TEAM_ADD_PATH
         )
 
     def _submit_stage_two(self, claim: WaiverClaim) -> None:
@@ -140,7 +137,13 @@ class YahooWaiverOperator:
     def _wait_stage_three(self, claim: WaiverClaim) -> None:
         deadline = time.monotonic() + self.timeout
         while time.monotonic() < deadline:
-            stage = self._stage()
+            try:
+                stage = self._stage()
+            except CdpError:
+                # The stage-two POST navigation tears down the old execution
+                # context; evaluate fails transiently. Keep polling until the
+                # deadline, like the post-confirm marker poll in apply().
+                stage = None
             hidden = stage.get("hidden", {}) if isinstance(stage, dict) else {}
             if stage and stage.get("path") == TEAM_ADD_PATH and hidden.get("stage") == "3":
                 if hidden.get("apid") != claim.add_yahoo_id:
@@ -154,14 +157,14 @@ class YahooWaiverOperator:
         raise WaiverError("waiver confirmation page did not load")
 
     def prepare(self, claim: WaiverClaim) -> WaiverReceipt:
-        snapshot = self._team()
+        snapshot = self._snapshot()
         roster = {player.yahoo_id: player for player in snapshot.roster}
         if claim.drop_yahoo_id:
             drop = roster.get(claim.drop_yahoo_id)
             if drop is None or drop.name != claim.drop_name:
                 raise WaiverError("drop-player precondition failed")
         else:
-            active = sum(1 for player in snapshot.roster if player.slot not in {"IR", "IL"})
+            active = sum(1 for player in snapshot.roster if player.slot not in INJURED_RESERVE_SLOTS)
             if active >= ACTIVE_ROSTER_SIZE:
                 raise WaiverError("roster is full; a free-agent add requires a drop player")
         if self._pending(claim):
@@ -190,10 +193,10 @@ class YahooWaiverOperator:
             return prepared
         submitted = self.client.evaluate(
             r'''/* yahoo-waiver-confirm-submit */ (() => {
-              const form = [...document.forms].find(form => new URL(form.action).pathname === '/f1/1329011/2/addplayer');
+              const form = [...document.forms].find(form => new URL(form.action).pathname === %r);
               if (!form || form.elements.namedItem('stage')?.value !== '3') return false;
               window.__yahooWaiverSubmission = 'in-flight'; form.submit(); return true;
-            })()'''
+            })()''' % TEAM_ADD_PATH
         )
         if submitted is not True:
             raise WaiverError("waiver confirmation was not submitted")

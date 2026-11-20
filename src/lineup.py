@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import pandas as pd
 
+from .scoring import _team_col
+
 # Standard starting lineup slot -> how many, and which positions may fill it.
 LINEUP_TEMPLATE = {
     "QB": {"n": 1, "positions": ["QB"]},
@@ -26,13 +28,6 @@ LINEUP_TEMPLATE = {
     "K": {"n": 1, "positions": ["K"]},
     "DEF": {"n": 1, "positions": ["DEF"]},
 }
-
-
-def _team_col(df: pd.DataFrame) -> str:
-    for candidate in ("recent_team", "team"):
-        if candidate in df.columns:
-            return candidate
-    return "recent_team"
 
 
 def optimize_lineup(

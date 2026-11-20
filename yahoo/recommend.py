@@ -103,12 +103,24 @@ def propose_lineup(snapshot: TeamSnapshot, projections: pd.DataFrame, week: int,
         note = ""
         value: float | None = None
         if mapping.actionable:
-            value = float(proj_week[mapping.internal_id])
-            if on_bye.get(mapping.internal_id):
-                value = 0.0
-                note = "bye"
-            elif injury.get(mapping.internal_id):
-                note = f"injury: {injury[mapping.internal_id]}"
+            raw = proj_week[mapping.internal_id]
+            if pd.isna(raw):
+                # A matched player whose projection is NaN is unevaluated, not
+                # zero: NaN comparisons sort arbitrarily (input-order dependent),
+                # so he would float or sink on garbage. Block his slot like any
+                # other player the model cannot price.
+                note = "no usable projection"
+                warnings.append(
+                    f"{player.name} ({player.position}) has no usable projection "
+                    f"for week {week}; kept in {player.slot}"
+                )
+            else:
+                value = float(raw)
+                if on_bye.get(mapping.internal_id):
+                    value = 0.0
+                    note = "bye"
+                elif injury.get(mapping.internal_id):
+                    note = f"injury: {injury[mapping.internal_id]}"
         elif player.position in {"K", "DEF"}:
             note = "no projection data; kept"
         else:

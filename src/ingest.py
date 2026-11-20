@@ -66,10 +66,11 @@ def _corpus_datasets() -> dict[str, tuple[str, str]]:
     return d
 
 
-def download_asset(tag: str, name: str, refresh: bool = False, timeout: int = 600) -> Path:
-    """Download an arbitrary release asset by (tag, filename) into data/raw/."""
-    url = f"{_RELEASE_BASE}/{tag}/{name}"
-    dest = RAW_DIR / name
+def _stream_to(url: str, dest: Path, refresh: bool, timeout: int) -> Path:
+    """Stream ``url`` to ``dest`` via a .part file (crash-safe, no partials).
+
+    Skips the download when a cached copy exists unless ``refresh`` is set.
+    """
     if dest.exists() and not refresh:
         return dest
     RAW_DIR.mkdir(parents=True, exist_ok=True)
@@ -86,15 +87,20 @@ def download_asset(tag: str, name: str, refresh: bool = False, timeout: int = 60
                     fh.write(chunk)
                     written += len(chunk)
             if total:
-                print(f"  downloaded {name}: {written/1e6:.1f}/{total/1e6:.1f} MB", flush=True)
+                print(f"  downloaded {dest.name}: {written/1e6:.1f}/{total/1e6:.1f} MB", flush=True)
             else:
-                print(f"  downloaded {name}: {written/1e6:.1f} MB", flush=True)
+                print(f"  downloaded {dest.name}: {written/1e6:.1f} MB", flush=True)
     except Exception:
         if tmp.exists():
             tmp.unlink()
         raise
     tmp.replace(dest)
     return dest
+
+
+def download_asset(tag: str, name: str, refresh: bool = False, timeout: int = 600) -> Path:
+    """Download an arbitrary release asset by (tag, filename) into data/raw/."""
+    return _stream_to(f"{_RELEASE_BASE}/{tag}/{name}", RAW_DIR / name, refresh, timeout)
 
 
 def load_pbp(season: int, refresh: bool = False) -> pd.DataFrame:
@@ -152,35 +158,8 @@ def download(name: str, refresh: bool = False, timeout: int = 240,
 
     Skips the download if a cached copy exists unless ``refresh`` is set.
     """
-    url = _url(name, stats_season)
-    dest = _dest_path(name, stats_season)
-    if dest.exists() and not refresh:
-        return dest
-
-    RAW_DIR.mkdir(parents=True, exist_ok=True)
-    tmp = dest.with_suffix(dest.suffix + ".part")
-    try:
-        with requests.get(url, stream=True, timeout=timeout) as resp:
-            resp.raise_for_status()
-            total = int(resp.headers.get("content-length", 0))
-            written = 0
-            with open(tmp, "wb") as fh:
-                for chunk in resp.iter_content(chunk_size=1 << 16):
-                    if not chunk:
-                        continue
-                    fh.write(chunk)
-                    written += len(chunk)
-            if total:
-                print(f"  downloaded {name}: {written/1e6:.1f}/{total/1e6:.1f} MB", flush=True)
-            else:
-                print(f"  downloaded {name}: {written/1e6:.1f} MB", flush=True)
-    except Exception:
-        if tmp.exists():
-            tmp.unlink()
-        raise
-
-    tmp.replace(dest)
-    return dest
+    return _stream_to(_url(name, stats_season), _dest_path(name, stats_season),
+                      refresh, timeout)
 
 
 def load(name: str, refresh: bool = False, stats_season: int = STATS_SEASON) -> pd.DataFrame:
@@ -233,7 +212,9 @@ def load_schedule(season: int = SCHEDULE_SEASON, refresh: bool = False) -> pd.Da
 
 
 def load_depth_charts(season: int = SCHEDULE_SEASON, refresh: bool = False) -> pd.DataFrame:
-    return load("depth_charts", refresh=refresh)
+    """Depth-chart snapshots for ``season`` (default: the SCHEDULE_SEASON file)."""
+    dest = download_asset("depth_charts", f"depth_charts_{season}.csv", refresh=refresh)
+    return pd.read_csv(dest, low_memory=False)
 
 
 def load_injuries(season: int = SCHEDULE_SEASON, refresh: bool = False) -> pd.DataFrame:

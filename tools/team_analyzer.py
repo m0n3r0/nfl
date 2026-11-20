@@ -135,13 +135,21 @@ def analyze(endpoint: str, with_wire: bool, light: bool = False) -> dict:
         league_eval = {tid: ls.evaluate_roster(roster, season, "proj_total", 1000 * int(tid))
                        for tid, roster in rosters.items() if roster}
         scores = {tid: ls.optimal_score(players) for tid, players in league_eval.items()}
-        ordered = sorted(scores.values(), reverse=True)
-        my_rank = sorted(scores, key=lambda t: -scores[t]).index(MY_TEAM_ID) + 1
-        strength = {"rank": my_rank, "of": len(scores), "score": scores[MY_TEAM_ID],
-                    "leader": ordered[0] if ordered else None,
-                    "playoff_line": ordered[3] if len(ordered) >= 4 else None}
-        my_season = league_eval[MY_TEAM_ID]
-        ranks = ls.position_ranks(league_eval, MY_TEAM_ID)
+        if MY_TEAM_ID in scores:
+            ordered = sorted(scores.values(), reverse=True)
+            my_rank = sorted(scores, key=lambda t: -scores[t]).index(MY_TEAM_ID) + 1
+            strength = {"rank": my_rank, "of": len(scores), "score": scores[MY_TEAM_ID],
+                        "leader": ordered[0] if ordered else None,
+                        "playoff_line": ordered[3] if len(ordered) >= 4 else None}
+            my_season = league_eval[MY_TEAM_ID]
+            ranks = ls.position_ranks(league_eval, MY_TEAM_ID)
+        else:
+            # Our own roster read came back empty (parse drift, transient
+            # page state): other teams' gaps degrade via teams_missing, ours
+            # must too — rank math on a missing team would crash the report.
+            strength = None
+            my_season = []
+            ranks = []
     my_week = ls.evaluate_roster(rosters[MY_TEAM_ID], weekly, "proj_week", 500000)
     byes = ls.bye_weeks(corp["schedule_2026"])
     concentration = ls.bye_concentration(my_season, byes, TEAM_ALIASES)
@@ -168,7 +176,9 @@ def analyze(endpoint: str, with_wire: bool, light: bool = False) -> dict:
         concentration=concentration,
         season_strength=(strength["rank"], strength["of"], strength["score"])
         if strength else (0, 0, 0.0))
-    if light:  # league-wide rules have no input data in light mode
+    if light or strength is None:
+        # league-wide rules have no input data in light mode, nor in a full
+        # run whose own-roster read came back empty (strength unknown)
         recs = [r for r in recs if r["kind"] not in {"weak_slot", "waiver", "standing"}]
 
     return {

@@ -3,7 +3,7 @@
 # (127.0.0.1:5000). Same method as jra-van-re: background the URL watcher,
 # then exec cloudflared so the watcher's $PPID is the tunnel process.
 # launchd (com.fdnation.cloudflared) keeps this alive; the web app itself
-# must be running separately (`python cli.py web`).
+# (nfl-webd, com.fdnation.web on 127.0.0.1:5000) must be running separately.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"

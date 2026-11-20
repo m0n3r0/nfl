@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 
 import pytest
 
+from yahoo.cdp import CdpJavaScriptError
 from yahoo.team import RosterPlayer, TeamSnapshot
 from yahoo.waivers import WaiverClaim, WaiverError, YahooWaiverOperator
 
@@ -99,6 +100,31 @@ def test_rejects_confirmation_id_drift():
     client.evaluate = drift
     with pytest.raises(WaiverError, match="confirmation IDs disagree"):
         YahooWaiverOperator(client, snapshot, timeout=0.01).prepare(claim())
+
+
+class FlakyStageClient(Client):
+    """Stage-three poll fails transiently, as during POST navigation teardown."""
+
+    def __init__(self, failures: int):
+        super().__init__()
+        self.failures = failures
+
+    def evaluate(self, expression):
+        if ("/* yahoo-waiver-stage */" in expression and self.page == "add3"
+                and self.failures):
+            self.failures -= 1
+            raise CdpJavaScriptError("Execution context was destroyed")
+        return super().evaluate(expression)
+
+
+def test_stage_three_poll_tolerates_transient_teardown():
+    # The stage-two submit navigates; Runtime.evaluate during the context
+    # teardown window throws. The poll must ride it out, not abort the claim.
+    client = FlakyStageClient(failures=2)
+    receipt = YahooWaiverOperator(client, snapshot, timeout=5).prepare(claim())
+
+    assert receipt.status == "prepared"
+    assert client.stage_two_submits == 1
 
 
 class AddOnlyClient(Client):

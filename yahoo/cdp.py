@@ -155,7 +155,8 @@ class CdpClient:
         )
         if result.get("exceptionDetails"):
             details = result["exceptionDetails"]
-            description = details.get("exception", {}).get("description") or details.get("text") or "JavaScript exception"
+            description = ((details.get("exception") or {}).get("description")
+                           or details.get("text") or "JavaScript exception")
             raise CdpJavaScriptError(description)
         return result.get("result", {}).get("value")
 
@@ -168,7 +169,12 @@ class CdpClient:
         self.call("Page.navigate", {"url": url})
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            state = self.evaluate("({url: location.href, ready: document.readyState})")
+            try:
+                state = self.evaluate("({url: location.href, ready: document.readyState})")
+            except CdpError:
+                # The old execution context is mid-teardown during navigation;
+                # evaluate fails transiently. Keep polling until the deadline.
+                state = None
             if state and state["ready"] in {"interactive", "complete"} and expected(state["url"]):
                 return state["url"]
             time.sleep(0.1)

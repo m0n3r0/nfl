@@ -222,8 +222,8 @@ command uses `SCHEDULE_SEASON`).
 ## 2026 projection engine
 
 `corpus.py` assembles a projection corpus from nflverse:
-- historical weekly player stats **2022-2026** (`player_week_stats_week_{y}`,
-  in-season 2026 weeks included as they publish),
+- historical weekly player stats **2022-2026** (nflverse `stats_player_week_{y}`
+  release assets, in-season 2026 weeks included as they publish),
 - the **2026 roster** (`players`) and **2026 depth charts** (`depth_charts_2026`)
   for role/starter status,
 - the **2026 schedule** (`games`) filtered to 2026,
@@ -680,5 +680,6 @@ See [docs/TEAM_OPERATOR.md](docs/TEAM_OPERATOR.md) for the full runbook.
 ### Honest limitations
 - Cannot guarantee wins (real NFL games decide outcomes).
 - The operators execute exact, pre-verified instructions; the strategy /
-  recommendation layer is tracked in the in-season epic (#80) and
-  [CODEBASE_REVIEW_INSEASON.md](CODEBASE_REVIEW_INSEASON.md).
+  recommendation layer shipped with the in-season epic (#80 — design map in
+  [CODEBASE_REVIEW_INSEASON.md](CODEBASE_REVIEW_INSEASON.md)) and stays
+  advisory: waiver claims and trades always wait for a human.

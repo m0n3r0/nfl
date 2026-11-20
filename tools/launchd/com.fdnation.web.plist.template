@@ -9,11 +9,12 @@
     and installs the result to ~/Library/LaunchAgents.
 
     nfl-webd (Rust/axum, the jra-van-re jv-webd method) binds 127.0.0.1:5000:
-    it serves the fantasy pages (/team, /league, /cron, pins) natively from
-    web/templates + local artifacts, and reverse-proxies the analytics pages
-    to the Python compute backend (com.fdnation.backend, loopback :5001).
-    Public exposure, when wanted, goes through the com.fdnation.cloudflared
-    quick tunnel, which still points at 127.0.0.1:5000.
+    ALL pages native — the fantasy pages (/team, /league, /cron, pins) from
+    web/templates + local artifacts, and the prediction-engine analytics
+    from data/web/*.json (built OFFLINE by com.fdnation.predreport; the
+    Flask backend and its reverse proxy are gone). Public exposure, when
+    wanted, goes through the com.fdnation.cloudflared quick tunnel, which
+    still points at 127.0.0.1:5000.
 
     Build the binary first: the rust/ crate, release profile.
   -->

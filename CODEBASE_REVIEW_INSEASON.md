@@ -6,6 +6,12 @@
 > `docs/TEAM_OPERATOR.md`). Keep this as the design rationale and issue map;
 > for the current state of the code, see README.md and the runbook. Historical
 > references below point into `docs/archive/`.
+>
+> **Superseded as a code reference (noted 2026-11-21).** The file/line/test-count
+> details below are the Sep-12 snapshot: the Flask web layer it critiques is
+> gone (all pages are served natively by the Rust `nfl-webd` from local
+> artifacts), `STATS_SEASON` is now 2026, and live points/weekly archives exist.
+> Read the body as history of the pivot, not as a description of today's code.
 
 **Date:** 2026-09-12 · **HEAD:** `3cc467c` · **Scope:** every tracked file (src, yahoo, tools incl. debug, driver, tests, web, docs, skills, CI) · Supersedes the draft-centric docs/archive/CODEBASE_REVIEW.md (2026-08-31) as the current-state reference.
 

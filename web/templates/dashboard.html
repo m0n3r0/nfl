@@ -4,6 +4,7 @@
 <h1>{{ season }} Fantasy &amp; Win-Prediction Dashboard</h1>
 <p class="muted">Stats season: {{ stats_season }}. Projections use 2022–{{ stats_season }} history + 2026 role + SOS. Model trained on play-by-play (2022–2025).</p>
 
+{% if backtest and backtest.model_no_spread and backtest.model_with_spread %}
 <div class="card">
   <h2 style="margin-top:0">Win-probability model — honest evaluation</h2>
   <p>Train 2022–23, test 2024–25 (n={{ backtest.n_test }}). Leakage-safe PBP features.</p>
@@ -18,6 +19,7 @@
   <p class="muted">EPA features alone beat a coin flip (~61%); the spread closes most of the rest of the gap.
   Beating the closing spread is genuinely hard — reported honestly, not overstated. Analytical tool, not betting.</p>
 </div>
+{% endif %}
 
 <h2>Top 2026 PPR projections</h2>
 <table>

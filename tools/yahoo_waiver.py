@@ -25,7 +25,7 @@ def main() -> int:
     parser.add_argument("--drop-id", required=True)
     parser.add_argument("--drop-name", required=True)
     parser.add_argument("--apply", action="store_true", help="create the claim; default stops at confirmation")
-    parser.add_argument("--audit", type=Path, default=Path("logs/yahoo-waiver-audit.jsonl"))
+    parser.add_argument("--audit", type=Path, default=ROOT / "logs" / "yahoo-waiver-audit.jsonl")
     parser.add_argument("--endpoint", default="http://127.0.0.1:9222")
     args = parser.parse_args()
     claim = WaiverClaim(args.add_id, args.add_name, args.drop_id, args.drop_name)

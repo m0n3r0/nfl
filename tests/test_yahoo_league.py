@@ -281,3 +281,28 @@ def test_wire_rank_targets_orders_and_skips():
     assert [r["name"] for r in ranked] == ["Wire Two", "Wire One"]
     assert ranked[0]["proj_week"] == 12.5
     assert skipped == {"unmapped": 1}
+
+
+def test_wire_rank_targets_skips_nan_projection():
+    # A matched player with a NaN proj_week must not be ranked: NaN comparisons
+    # are input-order dependent and could surface him above real projections.
+    import pandas as pd
+
+    from yahoo.players import AvailablePlayer
+    from yahoo.wire import rank_targets
+
+    available = {
+        "1": AvailablePlayer("1", "Wire One", "KC", "WR", "FA", "", "Sun"),
+        "2": AvailablePlayer("2", "Wire Two", "KC", "RB", "FA", "", "Sun"),
+    }
+    proj = pd.DataFrame([
+        {"player_id": "00-1", "player_display_name": "Wire One", "position": "WR",
+         "last_team": "KC", "proj_week": float("nan")},
+        {"player_id": "00-2", "player_display_name": "Wire Two", "position": "RB",
+         "last_team": "KC", "proj_week": 7.5},
+    ])
+
+    ranked, skipped = rank_targets(available, proj)
+
+    assert [r["name"] for r in ranked] == ["Wire Two"]
+    assert skipped == {"no_projection": 1}

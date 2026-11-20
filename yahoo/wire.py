@@ -102,11 +102,17 @@ def rank_targets(available: dict[str, AvailablePlayer], projections: pd.DataFram
         if not mapping.actionable:
             skipped[mapping.status] = skipped.get(mapping.status, 0) + 1
             continue
+        value = proj_week[mapping.internal_id]
+        if pd.isna(value):
+            # Matched but the model produced no number (rookies, new call-ups):
+            # NaN would sort arbitrarily against real projections — never rank it.
+            skipped["no_projection"] = skipped.get("no_projection", 0) + 1
+            continue
         ranked.append({
             "yahoo_id": player.yahoo_id, "name": player.name, "team": player.team,
             "position": player.position, "availability": player.availability,
             "injury_status": player.injury_status,
-            "proj_week": round(float(proj_week[mapping.internal_id]), 2),
+            "proj_week": round(float(value), 2),
         })
     ranked.sort(key=lambda row: row["proj_week"], reverse=True)
     return ranked, skipped

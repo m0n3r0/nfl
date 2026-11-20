@@ -107,6 +107,25 @@ def test_roster_waf_block_aborts_run_without_extra_requests(harness, monkeypatch
     assert harness.urls.count(team_url) == 1  # restore skipped: no requests into a block
 
 
+def test_empty_own_roster_degrades_instead_of_crashing(harness, monkeypatch):
+    # Full mode with an empty own-roster read (parse drift, transient page
+    # state): the rank math used to die on list.index(MY_TEAM_ID).
+    monkeypatch.setattr(team_analyzer, "opponent_roster",
+                        lambda client, tid: [{"name": f"Player {tid}", "team": "SF",
+                                              "position": "QB", "slot": "QB",
+                                              "injury_status": ""}])
+
+    report = team_analyzer.analyze("http://127.0.0.1:9222", with_wire=False, light=False)
+
+    assert report["status"] == "ok"
+    assert report["mode"] == "full"
+    assert report["season_strength"] is None  # same shape as light mode
+    assert report["position_ranks"] == []
+    assert team_analyzer.MY_TEAM_ID in report["teams_missing"]
+    # no league-wide recommendations from a run with no league data for us
+    assert {r["kind"] for r in report["recommendations"]} <= {"lineup", "hygiene", "bye"}
+
+
 def test_wire_block_alert_skips_restore_but_completes(harness, monkeypatch):
     from yahoo.wire import WireScanBlocked
 

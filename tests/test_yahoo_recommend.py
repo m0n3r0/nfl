@@ -97,7 +97,7 @@ def test_unmapped_starter_blocks_slot_no_swap():
     assert any("unmapped" in w for w in proposal.warnings)
 
 
-def test_questionable_starter_discounted_but_kept():
+def test_questionable_starter_flagged_but_kept():
     values = {name: 9.0 for name in NAMES[:-2]}
     values["Wr One"] = 9.35
     proj = projections(values, injuries={"Wr One": "Questionable"})
@@ -107,6 +107,23 @@ def test_questionable_starter_discounted_but_kept():
     assert proposal.moves == ()
     notes = {p.name: p.note for p in proposal.plan}
     assert notes["Wr One"] == "injury: Questionable"
+
+
+def test_nan_projection_counts_as_unevaluated_and_stays():
+    # A matched player whose proj_week is NaN is unevaluated: NaN comparisons
+    # sort arbitrarily (input-order dependent), so without fail-closed handling
+    # he can outrank a far better bench replacement with no warning at all.
+    values = dict(BASE, **{"Qb One": float("nan"), "Qb Bench": 20.0})
+    proposal = propose_lineup(snapshot(), projections(values), week=1)
+
+    assert proposed_slot(proposal, "1") == "QB"   # blocks his slot, never swapped on a guess
+    assert proposed_slot(proposal, "12") == "BN"
+    assert not any(m[0] in {"1", "12"} for m in moves_of(proposal))
+    assert any("Qb One" in w and "no usable projection" in w for w in proposal.warnings)
+    note = next(p.note for p in proposal.plan if p.yahoo_id == "1")
+    assert note == "no usable projection"
+    slots = Counter(p.proposed_slot for p in proposal.plan)
+    assert slots == EXPECTED_ACTIVE_SLOTS
 
 
 def test_already_optimal_produces_no_moves():

@@ -21,8 +21,10 @@ season starts only week 1 is available — later weeks need in-season play-by-pl
   <tr>
     <td>{{ g.week }}</td><td><b>{{ g.home_team }}</b></td><td>{{ g.away_team }}</td>
     <td>
+      {% if g.home_win_prob is not none %}
       <div class="bar" style="width:120px"><span style="width:{{ (g.home_win_prob*100)|round }}%"></span></div>
       {{ (g.home_win_prob*100)|round(1) }}%
+      {% else %}—{% endif %}
     </td>
     <td>{{ g.epa_diff }}</td>
     <td>{{ g.spread if g.spread is not none else "—" }}</td>

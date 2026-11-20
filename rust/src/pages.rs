@@ -256,13 +256,7 @@ fn team_row(standings: Option<&Value>, team_name: &str) -> Option<Value> {
         let f = match v {
             Value::Number(n) => n.as_f64().unwrap_or(0.0),
             Value::String(s) => s.trim().parse::<f64>().unwrap_or(0.0),
-            Value::Bool(b) => {
-                if *b {
-                    1.0
-                } else {
-                    0.0
-                }
-            }
+            Value::Bool(b) => f64::from(*b),
             _ => 0.0,
         };
         if f.is_finite() {
@@ -551,53 +545,53 @@ fn tv_game_info(games: &HashMap<String, TvGame>, team: &str, has_live: bool) -> 
     }
 }
 
-/// Live fan points maps, only when the artifact's week matches the page week.
-/// DEF points are keyed both by Yahoo roster name (def_named) and by ESPN
-/// abbr (def map) — historical weeks need the abbr path because def_named
-/// reflects the roster at capture time, not the historical one.
-fn tv_live_maps(
-    live: Option<&Value>,
-    week: &Value,
-) -> (
-    HashMap<String, f64>,
-    HashMap<String, f64>,
-    HashMap<String, f64>,
-    bool,
-) {
-    let mut players = HashMap::new();
-    let mut defs = HashMap::new();
-    let mut defs_abbr = HashMap::new();
+/// Live fan points maps, populated only when the artifact's week matches
+/// the page week (has_live=false otherwise). DEF points are keyed both by
+/// Yahoo roster name (def_named) and by ESPN abbr (def map) — historical
+/// weeks need the abbr path because def_named reflects the roster at
+/// capture time, not the historical one.
+#[derive(Default)]
+struct TvLiveMaps {
+    players: HashMap<String, f64>,
+    defs: HashMap<String, f64>,
+    defs_abbr: HashMap<String, f64>,
+    has_live: bool,
+}
+
+fn tv_live_maps(live: Option<&Value>, week: &Value) -> TvLiveMaps {
+    let mut out = TvLiveMaps::default();
     let live_week = live.and_then(|l| l.get("week"));
     let matches = match (live_week, week) {
         (Some(lw), w) if !w.is_null() => lw == w,
         _ => false,
     };
     if !matches {
-        return (players, defs, defs_abbr, false);
+        return out;
     }
     let l = live.unwrap();
     if let Some(obj) = l.get("players").and_then(Value::as_object) {
         for (key, p) in obj {
             if let Some(pts) = p.get("points").and_then(Value::as_f64) {
-                players.insert(key.clone(), pts);
+                out.players.insert(key.clone(), pts);
             }
         }
     }
     if let Some(obj) = l.get("def_named").and_then(Value::as_object) {
         for (key, v) in obj {
             if let Some(pts) = v.as_f64() {
-                defs.insert(key.clone(), pts);
+                out.defs.insert(key.clone(), pts);
             }
         }
     }
     if let Some(obj) = l.get("def").and_then(Value::as_object) {
         for (key, v) in obj {
             if let (Some(abbr), Some(pts)) = (key.strip_prefix("DEF:"), v.as_f64()) {
-                defs_abbr.insert(abbr.to_string(), pts);
+                out.defs_abbr.insert(abbr.to_string(), pts);
             }
         }
     }
-    (players, defs, defs_abbr, true)
+    out.has_live = true;
+    out
 }
 
 fn tv_side(
@@ -606,11 +600,8 @@ fn tv_side(
     plan: Option<&Vec<Value>>,
     rosters: Option<&Value>,
     fallback_rosters: Option<&Value>,
-    live_players: &HashMap<String, f64>,
-    live_defs: &HashMap<String, f64>,
-    live_defs_abbr: &HashMap<String, f64>,
+    live: &TvLiveMaps,
     games: &HashMap<String, TvGame>,
-    has_live: bool,
 ) -> Option<Vec<TvEntry>> {
     // roster lookup for NFL team/position (the operator plan lacks team)
     let roster_rows = rosters.and_then(|r| r.get(team)).and_then(Value::as_array);
@@ -640,13 +631,13 @@ fn tv_side(
     }
     let fan_pts = |name: &str, slot: &str, team_abbr: &str| -> Option<f64> {
         if slot == "DEF" {
-            live_defs
+            live.defs
                 .get(name)
-                .or_else(|| live_defs_abbr.get(&tv_canon_team(team_abbr)))
-                .or_else(|| tv_def_abbr(name).and_then(|a| live_defs_abbr.get(a)))
+                .or_else(|| live.defs_abbr.get(&tv_canon_team(team_abbr)))
+                .or_else(|| tv_def_abbr(name).and_then(|a| live.defs_abbr.get(a)))
                 .copied()
         } else {
-            live_players.get(&tv_norm_name(name)).copied()
+            live.players.get(&tv_norm_name(name)).copied()
         }
     };
     if Some(team) == my_name {
@@ -676,7 +667,7 @@ fn tv_side(
                         };
                         let fp = fan_pts(&name, &slot, &rteam);
                         TvEntry {
-                            game_info: tv_game_info(games, &rteam, has_live),
+                            game_info: tv_game_info(games, &rteam, live.has_live),
                             team: rteam,
                             position,
                             fan_pts: fp,
@@ -699,7 +690,7 @@ fn tv_side(
                 let slot = artifacts::as_display_string(p.get("slot"));
                 let fp = fan_pts(&name, &slot, &team_abbr);
                 TvEntry {
-                    game_info: tv_game_info(games, &team_abbr, has_live),
+                    game_info: tv_game_info(games, &team_abbr, live.has_live),
                     team: team_abbr,
                     position: artifacts::as_display_string(p.get("position")),
                     fan_pts: fp,
@@ -775,13 +766,16 @@ pub async fn teamview(
     Query(params): Query<HashMap<String, String>>,
 ) -> Response {
     let current = artifacts::read_league_report(&st.cfg.root);
-    let current_week = current
-        .as_ref()
-        .and_then(|r| r.get("matchup"))
-        .and_then(|m| m.get("week"))
-        .and_then(Value::as_i64)
-        .unwrap_or(0);
-    let requested: Option<i64> = params.get("week").and_then(|s| s.trim().parse().ok());
+    // The scoreboard's week is authoritative — the matchup page can lag
+    // across the week boundary (see snapshot_week).
+    let current_week = current.as_ref().and_then(snapshot_week).unwrap_or(0);
+    // NFL weeks are 1..=18 and only weeks <= current can have snapshots;
+    // anything else falls back to the current week. The bound also keeps
+    // the week-selector allocation below from being user-controlled.
+    let requested: Option<i64> = params
+        .get("week")
+        .and_then(|s| s.trim().parse().ok())
+        .filter(|&w| w >= 1 && w <= current_week.min(18));
     let is_past = requested.map(|w| w != current_week).unwrap_or(false);
     let (report, live, plan_week) = if is_past {
         let w = requested.unwrap();
@@ -898,11 +892,10 @@ pub async fn teamview(
     };
     let week = if is_past {
         json!(requested.unwrap())
+    } else if current_week > 0 {
+        json!(current_week)
     } else {
-        matchup
-            .and_then(|m| m.get("week"))
-            .cloned()
-            .unwrap_or(Value::Null)
+        Value::Null
     };
     let rosters = report.as_ref().and_then(|r| r.get("rosters"));
     let runs = artifacts::read_operator_runs(&st.cfg.root, 200);
@@ -919,7 +912,7 @@ pub async fn teamview(
         .and_then(|p| p.get("plan"))
         .and_then(Value::as_array)
         .cloned();
-    let (live_players, live_defs, live_defs_abbr, has_live) = tv_live_maps(live.as_ref(), &week);
+    let live_maps = tv_live_maps(live.as_ref(), &week);
     let games = tv_team_games(live.as_ref());
     let current_rosters = current.as_ref().and_then(|r| r.get("rosters"));
     let a = tv_side(
@@ -928,11 +921,8 @@ pub async fn teamview(
         plan.as_ref(),
         rosters,
         current_rosters,
-        &live_players,
-        &live_defs,
-        &live_defs_abbr,
+        &live_maps,
         &games,
-        has_live,
     );
     let b = tv_side(
         &b_name,
@@ -940,11 +930,8 @@ pub async fn teamview(
         plan.as_ref(),
         rosters,
         current_rosters,
-        &live_players,
-        &live_defs,
-        &live_defs_abbr,
+        &live_maps,
         &games,
-        has_live,
     );
     let missing = a.is_none() || b.is_none();
     let (starters, bench) = tv_rows(a.as_ref(), b.as_ref());
@@ -991,7 +978,7 @@ pub async fn teamview(
     let live_totals = live
         .as_ref()
         .and_then(|l| l.get("totals"))
-        .filter(|_| has_live && !is_past);
+        .filter(|_| live_maps.has_live && !is_past);
     let score_of = |name: &str| -> Value {
         live_totals
             .and_then(|t| t.get(name))
@@ -1017,7 +1004,7 @@ pub async fn teamview(
             .unwrap_or(Value::Null)
     };
     let remaining = |side: &Option<Vec<TvEntry>>| -> Value {
-        if !has_live {
+        if !live_maps.has_live {
             return Value::Null;
         }
         side.as_ref()
@@ -1052,7 +1039,7 @@ pub async fn teamview(
             })
             .unwrap_or(Value::Null)
     };
-    let max_week = current_week.max(requested.unwrap_or(0));
+    let max_week = current_week.clamp(0, 18);
     let weeks: Vec<i64> = (1..=max_week).collect();
     let teams: Vec<String> = report
         .as_ref()
@@ -1081,7 +1068,7 @@ pub async fn teamview(
         "a_proj": proj_sum(&a), "b_proj": proj_sum(&b),
         "a_fan_total": fan_sum(&a), "b_fan_total": fan_sum(&b),
         "a_remaining": remaining(&a), "b_remaining": remaining(&b),
-        "has_live": has_live, "is_past": is_past, "weeks": weeks,
+        "has_live": live_maps.has_live, "is_past": is_past, "weeks": weeks,
         "teams": teams,
     });
     render(&st, "teamview.html", ctx)

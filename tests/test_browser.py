@@ -122,6 +122,29 @@ def test_ensure_browser_refuses_install_when_disabled(monkeypatch):
         browser.ensure_browser(install=False)
 
 
+def test_launch_closes_parent_log_handle(monkeypatch, tmp_path):
+    captured = {}
+
+    class Proc:
+        pid = 9
+
+    def fake_popen(args, stdout, stderr, start_new_session):
+        captured.update(args=args, log=stdout, detached=start_new_session)
+        return Proc()
+
+    monkeypatch.setattr(browser.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(browser, "LAUNCH_LOG", str(tmp_path / "logs" / "chrome-launch.log"))
+
+    proc = browser.launch("/fake/chrome", profile=str(tmp_path / "profile"),
+                          url="https://example.test/", port=9223)
+
+    assert proc.pid == 9
+    assert captured["detached"] is True
+    assert captured["log"].closed  # child owns its dup; parent must not leak
+    assert captured["args"][0] == "/fake/chrome"
+    assert "--remote-debugging-port=9223" in captured["args"]
+
+
 def _fake_profile(root):
     profile = root / "edge-draft-profile"
     (profile / "Default" / "Network").mkdir(parents=True)

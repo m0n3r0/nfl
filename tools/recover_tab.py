@@ -1,6 +1,8 @@
 import json, urllib.request, websocket, random, time
 tabs = [t for t in json.loads(urllib.request.urlopen('http://127.0.0.1:9222/json', timeout=5).read()) if t.get('type') == 'page']
 tab = next((t for t in tabs if 'fantasysports.yahoo.com' in t.get('url', '')), None)
+if tab is None:
+    raise SystemExit('NO YAHOO TAB: nothing to recover; open the league page first')
 ws = websocket.create_connection(tab['webSocketDebuggerUrl'], timeout=20, header={'Origin': 'http://127.0.0.1:9222'})
 wid = random.randint(100, 99999)
 ws.send(json.dumps({'id': wid, 'method': 'Page.navigate', 'params': {'url': 'https://football.fantasysports.yahoo.com/f1/1329011'}}))

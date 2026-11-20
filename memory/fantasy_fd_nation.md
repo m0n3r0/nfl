@@ -614,7 +614,9 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
   pass). Docs: TEAM_OPERATOR "Manual pins", README web section.
 - Roster sanity error since Nov 18 20:24 JST: "expected 15-17 roster players
   including IR, found 14" — a drop without replacement blocks ALL operator
-  runs (even monitors) until the roster is back to 15+.
+  runs (even monitors) until the roster is back to 15+. **(RESOLVED Nov 20
+  ~01:00 JST: roster back to 15+, runs green since — last error was the
+  Nov 19 20:24 JST monitor.)**
 
 ## 2026-11-20 — HTTP engine swapped to Rust/axum (jra-van-re method)
 

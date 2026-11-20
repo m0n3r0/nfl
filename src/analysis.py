@@ -21,6 +21,9 @@ def consistency(corpus: dict, preset: str = "ppr", min_games: int = 8) -> pd.Dat
     above mean + 1 std) and bust rate (weeks at or below half the player's mean).
     Restricted to offensive skill positions; players with a near-zero mean are
     excluded because their CV is undefined/uninformative.
+
+    ``preset`` is accepted for caller compatibility but unused: scoring is
+    baked into the corpus at build time.
     """
     from .config import SKILL_POSITIONS
 

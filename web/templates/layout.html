@@ -84,8 +84,13 @@
   if (!targets.length) return;
   var statusEl = document.getElementById('live-status');
   function norm(s) {
-    return String(s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ')
-      .replace(/\b(sr|jr|ii|iii|iv|v)\b/g, '').replace(/\s+/g, ' ').trim();
+    // Same rule as src/live_scoring.py norm_name (and the Rust tv_norm_name):
+    // lowercase, punctuation to spaces, TRAILING suffix tokens dropped —
+    // stripping mid-name tokens would diverge from the artifact's keys.
+    var t = String(s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ')
+      .replace(/\s+/g, ' ').trim().split(' ');
+    while (t.length && /^(sr|jr|ii|iii|iv|v)$/.test(t[t.length - 1])) t.pop();
+    return t.join(' ');
   }
   function weekOk(el, d) {
     var box = el.closest('[data-week]');

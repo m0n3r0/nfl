@@ -146,9 +146,15 @@ class YahooLineupOperator:
 
         deadline = time.monotonic() + self.timeout
         while time.monotonic() < deadline:
-            state = self.client.evaluate(
-                "/* yahoo-lineup-post-state */ ({path: location.pathname, ready: document.readyState})"
-            )
+            try:
+                state = self.client.evaluate(
+                    "/* yahoo-lineup-post-state */ ({path: location.pathname, ready: document.readyState})"
+                )
+            except CdpError:
+                # The POST navigation tears down the old execution context;
+                # evaluate fails transiently. Keep polling until the deadline,
+                # like the read-back loop below and the waiver marker poll.
+                state = None
             if isinstance(state, dict) and state.get("path") == f"{TEAM_PATH}/editroster" and state.get("ready") == "complete":
                 break
             time.sleep(0.1)

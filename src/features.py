@@ -306,6 +306,9 @@ def strategy_breakdown(pbp: pd.DataFrame, team: str) -> dict:
     if p.empty:
         return {}
     def agg(df):
+        # Empty split → None (JSON null); NaN would make strategy.json invalid.
+        if df.empty:
+            return None
         return {
             "epa_per_play": round(df["epa"].mean(), 3),
             "success_rate": round(df["success"].mean(), 3),

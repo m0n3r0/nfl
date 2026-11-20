@@ -14,7 +14,7 @@
 <table>
   <tr><th>Situation</th><th>EPA/play</th><th>Success%</th><th>Plays</th></tr>
   {% for k in ["overall","red_zone","third_down","pass","rush"] %}
-  <tr><td><b>{{ k | replace("_", " ") }}</b></td><td>{{ breakdown[k].epa_per_play }}</td><td>{{ breakdown[k].success_rate }}</td><td>{{ breakdown[k].n }}</td></tr>
+  {% if breakdown[k] %}<tr><td><b>{{ k | replace("_", " ") }}</b></td><td>{{ breakdown[k].epa_per_play }}</td><td>{{ breakdown[k].success_rate }}</td><td>{{ breakdown[k].n }}</td></tr>{% endif %}
   {% endfor %}
 </table>
 <p>Pass rate: <b>{{ breakdown.pass_rate }}</b> · Shotgun rate: <b>{{ breakdown.shotgun_rate }}</b></p>

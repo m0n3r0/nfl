@@ -1,4 +1,4 @@
-"""Fantasy scoring, projections, and player rankings.
+"""Fantasy scoring and player rankings.
 
 We compute fantasy points from raw stat-line columns so the math is explicit and
 tunable. The nflverse tables also ship ``fantasy_points`` / ``fantasy_points_ppr``;
@@ -113,7 +113,14 @@ def validate_against_nflverse(
         "standard": "fantasy_points",
         "ppr": "fantasy_points_ppr",
         "half-ppr": "fantasy_points_ppr",
-    }[preset]
+    }.get(preset)
+    if nflverse_col is None:
+        # nflverse ships no column to validate league-specific presets (e.g.
+        # fd-nation) against; fail with a clear message, not a bare KeyError.
+        raise ValueError(
+            f"preset {preset!r} has no nflverse scoring column to validate "
+            f"against; use one of: standard, ppr, half-ppr"
+        )
 
     if nflverse_col not in df.columns:
         raise KeyError(f"nflverse column {nflverse_col!r} not present in data")

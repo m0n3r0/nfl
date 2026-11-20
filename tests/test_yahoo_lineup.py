@@ -7,6 +7,7 @@ from typing import Callable
 
 import pytest
 
+from yahoo.cdp import CdpJavaScriptError
 from yahoo.lineup import LineupError, LineupMove, YahooLineupOperator
 from yahoo.team import RosterPlayer, TeamSnapshot
 
@@ -116,3 +117,27 @@ def test_rejects_locked_or_disabled_target():
     with pytest.raises(LineupError, match="cannot move"):
         YahooLineupOperator(client, client.read_snapshot).apply(flex_swap())
     assert client.submissions == 0
+
+
+class FlakyPostStateClient(Client):
+    """Post-state poll fails transiently, as during POST navigation teardown."""
+
+    def __init__(self, current: TeamSnapshot, failures: int):
+        super().__init__(current)
+        self.failures = failures
+
+    def evaluate(self, expression):
+        if "yahoo-lineup-post-state" in expression and self.failures:
+            self.failures -= 1
+            raise CdpJavaScriptError("Execution context was destroyed")
+        return super().evaluate(expression)
+
+
+def test_post_submit_poll_tolerates_transient_teardown():
+    # form.submit() navigates; Runtime.evaluate during the context teardown
+    # window throws. The poll must ride it out, not fail the verified apply.
+    client = FlakyPostStateClient(snapshot(), failures=2)
+    receipt = YahooLineupOperator(client, client.read_snapshot, timeout=5).apply(flex_swap())
+
+    assert receipt.status == "applied"
+    assert client.submissions == 1

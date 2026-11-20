@@ -229,6 +229,7 @@ async fn logo(State(st): State<AppState>, Path(file): Path<String>) -> Response 
     let ok = !file.is_empty()
         && file.len() <= 64
         && !file.contains("..")
+        && !file.starts_with('.')
         && file
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || "._-".contains(c));

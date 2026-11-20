@@ -46,6 +46,18 @@ def test_ppr_equals_standard_plus_receptions():
     assert diff < 0.05, f"PPR != standard + receptions (max {diff})"
 
 
+def test_validate_rejects_presets_without_an_nflverse_column():
+    """League presets (fd-nation) have no nflverse column to compare against.
+
+    Used to die with a bare KeyError('fd-nation'); now it must say WHY the
+    preset cannot be validated. (Hermetic, but lives in this slow-marked
+    module next to the other validate_against_nflverse tests.)
+    """
+    df = pd.DataFrame({"player_display_name": ["A"], "position": ["RB"]})
+    with pytest.raises(ValueError, match="no nflverse scoring column"):
+        scoring.validate_against_nflverse(df, preset="fd-nation")
+
+
 def test_optimize_lineup_fills_skill_slots():
     """Greedy optimizer should fill QB/RB/WR/TE/FLEX from player stats."""
     df = ingest.load("player_week_stats", stats_season=STATS_SEASON)

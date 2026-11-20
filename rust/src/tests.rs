@@ -836,6 +836,62 @@ async fn teamview_query_override_and_missing_roster() {
     assert!(html.contains("roster for one of these teams"));
 }
 
+#[tokio::test]
+async fn teamview_current_week_follows_scoreboard_over_matchup() {
+    // Rollover window: the matchup page can lag a week behind while the
+    // scoreboard already shows the new week. snapshot_week() says the
+    // scoreboard is authoritative — the new week must be treated as the
+    // CURRENT week (not routed to the history/archive path).
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    teamview_fixtures(&root); // matchup week 2, scoreboard week 2, live week 2
+    let mut report: Value = serde_json::from_str(
+        &std::fs::read_to_string(root.join("logs/league-report.json")).unwrap(),
+    )
+    .unwrap();
+    report["scoreboard"][0]["week"] = json!(3);
+    std::fs::write(root.join("logs/league-report.json"), report.to_string()).unwrap();
+    let live = json!({"week": 3, "players": {}, "def_named": {}, "totals": {},
+                      "games": {}});
+    std::fs::write(root.join("logs/live-points.json"), live.to_string()).unwrap();
+    let app = router(cfg(&root));
+    let (status, html) = get_body(app.clone(), "/league/teamview").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("data-week=\"3\""), "{html}");
+    assert!(!html.contains("finals from the archive"), "{html}");
+    // Asking for the true current week must not take the past path.
+    let (_, html) = get_body(app.clone(), "/league/teamview?week=3").await;
+    assert!(!html.contains("finals from the archive"), "{html}");
+    // Week 2 is the past one now.
+    let (_, html) = get_body(app, "/league/teamview?week=2").await;
+    assert!(html.contains("finals from the archive"), "{html}");
+}
+
+#[tokio::test]
+async fn teamview_week_param_is_bounded() {
+    // The week selector allocates 1..=max_week — an unbounded week param
+    // would be a memory-exhaustion DoS. Out-of-range and future weeks (no
+    // snapshots can exist) fall back to the current week.
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    teamview_fixtures(&root); // current week 2
+    let app = router(cfg(&root));
+    for uri in [
+        "/league/teamview?week=999999999999",
+        "/league/teamview?week=-5",
+        "/league/teamview?week=0",
+        "/league/teamview?week=3", // future week
+    ] {
+        let (status, html) = get_body(app.clone(), uri).await;
+        assert_eq!(status, StatusCode::OK, "{uri}");
+        assert!(html.contains("Quarter Back"), "{uri}"); // current week rendered
+        assert!(!html.contains("finals from the archive"), "{uri}");
+    }
+    // Past weeks still work.
+    let (_, html) = get_body(app, "/league/teamview?week=1").await;
+    assert!(html.contains("finals from the archive"));
+}
+
 // --- prediction-engine analytics (native, data/web artifacts) ---
 
 fn web_fixtures(root: &Path) {
@@ -972,6 +1028,67 @@ async fn analytics_apis_and_missing_artifacts() {
     assert_eq!(status, StatusCode::NOT_FOUND);
     let (status, _) = get_body(app, "/no/such/route").await;
     assert_eq!(status, StatusCode::NOT_FOUND); // fallback, no upstream
+}
+
+#[tokio::test]
+async fn predictions_tolerate_null_probability() {
+    // records() = pandas to_json: NaN becomes null. A null home_win_prob must
+    // not 500 — minijinja cannot multiply none (same guard idiom as spread).
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    web_fixtures(&root);
+    let preds = json!({
+        "season": 2026, "weeks": [1],
+        "predictions": [{"week": 1, "home_team": "BUF", "away_team": "KC",
+                         "home_win_prob": null, "epa_diff": null,
+                         "spread": null, "model": "no_spread"}]
+    });
+    std::fs::write(root.join("data/web/predictions.json"), preds.to_string()).unwrap();
+    let (status, html) = get_body(router(cfg(&root)), "/predictions").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("BUF") && html.contains("—"), "{html}");
+}
+
+#[tokio::test]
+async fn dashboard_tolerates_partial_artifact() {
+    // Schema drift / a hand-truncated artifact: minijinja errors on attribute
+    // access OF an undefined `backtest` — the card must be skipped, not 500.
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    web_fixtures(&root);
+    let dash = json!({"season": 2026, "stats_season": 2026, "projections": []});
+    std::fs::write(root.join("data/web/dashboard.json"), dash.to_string()).unwrap();
+    let (status, html) = get_body(router(cfg(&root)), "/dashboard").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("2026"), "{html}");
+}
+
+#[tokio::test]
+async fn strategy_tolerates_partial_breakdown() {
+    // A breakdown missing situation keys must render what it has — indexing
+    // a missing key yields undefined, and .epa_per_play on undefined errors.
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    web_fixtures(&root);
+    let strategy = json!({"seasons": [2026], "strategy": {"2026": {"BUF": {
+        "overall": {"epa_per_play": 0.1, "success_rate": 0.45, "n": 100},
+        "pass_rate": 0.6, "shotgun_rate": 0.7}}}});
+    std::fs::write(root.join("data/web/strategy.json"), strategy.to_string()).unwrap();
+    let (status, html) = get_body(router(cfg(&root)), "/strategy?team=BUF").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("0.45"), "{html}");
+    assert!(!html.contains("red zone"), "{html}"); // missing row skipped
+}
+
+#[tokio::test]
+async fn logos_reject_hidden_files() {
+    // The /logos docstring promises "no hidden files" — hold it to that.
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    std::fs::create_dir_all(root.join("data/logos")).unwrap();
+    std::fs::write(root.join("data/logos/.secret"), b"nope").unwrap();
+    let (status, _) = get_body(router(cfg(&root)), "/logos/.secret").await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
 // --- helpers ---

@@ -113,8 +113,9 @@ Replacing dead weight with breakouts is how leagues are actually won.
   breakouts hit the wire.
 
 ### Who does what (human + robot)
-- **Wednesday cron** (`tools/team_operator.py --waiver-scan --refresh-data`)
-  refreshes the data, scans the wire, and proposes adds/drops.
+- **Wednesday cron** (`tools/team_operator.py --waiver-scan --refresh-data
+  --jev 5`) refreshes the data, scans the wire, and proposes adds/drops (with
+  an advisory Jev review of the top 5 targets).
 - **You approve or veto.** Nothing spends your priority without a human yes.
 - **Approved claims are executed** with `tools/yahoo_waiver.py --apply` — by
   default it shows the exact add/drop and stops for confirmation.
@@ -150,8 +151,8 @@ main slate locks Sunday 1:00 PM ET). This grind is what wins a season.
   stats under the exact Yahoo weights, reconciled against Yahoo's own
   totals; if they ever disagree, the UI shows Yahoo's number.
 - **You** can eyeball the reasoning any time with the league-strength report:
-  `tools/team_analyzer.py` (`--light` for a gentle check — just your roster
-  and standings). Full command list: [TEAM_OPERATOR.md](TEAM_OPERATOR.md).
+  `tools/team_analyzer.py` (`--light` for a gentle check — just your roster,
+  standings, and matchup). Full command list: [TEAM_OPERATOR.md](TEAM_OPERATOR.md).
 
 ### What the decisions are based on
 - **Projections** — our own multi-year + role + schedule numbers per player.
@@ -168,8 +169,8 @@ A small lever (~5%), but it can fix a roster hole mid-season.
   him for a more consistent producer — his price will never be higher.
 - **Buy low:** if a proven top-12 player underperforms for 2–3 weeks because
   of a tough schedule (not injury), offer a bench player for him.
-- Live tracker: **issue #103** — trade the RB surplus for a WR1 during the
-  **weeks 4–8** window (Part 8).
+- The RB-surplus → WR1 idea (ex-**#103**) ran its **weeks 4–8** window without
+  a deal — see Part 8; any trade stays manual and human-approved.
 
 ---
 
@@ -230,7 +231,7 @@ cd /Users/user/m0n3r0/nfl
 | `24 8,20 * * *` (twice daily) | Monitor: re-check team state, flag anything needing a human |
 | `47 23 * * 0` (Sun 23:47 = Sun ~10:47 ET) | Lineup safety net: `--apply` in case the 01:23 fire sleeps through |
 | `23 1 * * 1` (Mon 01:23 = Sun ~12:23 ET) | Set the week's lineup: `--apply` |
-| `11 20 * * 3` (Wed 20:11) | Waiver scan with fresh data: `--waiver-scan --refresh-data` |
+| `11 20 * * 3` (Wed 20:11) | Waiver scan with fresh data: `--waiver-scan --refresh-data --jev 5` |
 | `19 21 * * *` (nightly 21:19) | League snapshot + all teams' rosters for the web UI (`league_report.py --all-rosters --out` + `--audit`) |
 | `5,35 8-13 * * 5` / `5,35 2-13 * * 1` / `5,35 8-13 * * 2` (game windows) | Light score refresh during Thu/Sun/Mon games: standings + full week scoreboard + our matchup, no roster reads; merges into the snapshot — now the reconciliation backstop for the ~10s live-points feed (`league_report.py --light --out` + `--audit`) |
 | `37 9 * * 0` (Sun 09:37) | Weekly browser-profile backup (`tools/profile_backup.py`, local-only) |

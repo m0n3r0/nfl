@@ -136,8 +136,8 @@ def test_is_team_url_requires_exact_authorized_route():
 
 import yahoo.cdp as cdp_mod
 import yahoo.team as team_mod
-from yahoo.cdp import CdpError, CdpTimeout
-from yahoo.team import TEAM_PATH, TEAM_URL, find_team_target
+from yahoo.cdp import CdpError, CdpJavaScriptError, CdpTimeout
+from yahoo.team import TEAM_PATH, TEAM_URL, find_team_target, is_team_url
 
 HOST = "https://football.fantasysports.yahoo.com"
 
@@ -241,3 +241,46 @@ def test_navigation_failure_propagates(browser, monkeypatch):
 
     with pytest.raises(CdpTimeout):
         find_team_target()
+
+
+class _ScriptedNavClient(team_mod.CdpClient):
+    """A CdpClient with scripted evaluate outcomes (no real websocket)."""
+
+    def __init__(self, script):
+        self.script = list(script)
+        self.calls = []
+
+    def call(self, method, params=None, timeout=None):
+        self.calls.append(method)
+        return {}
+
+    def evaluate(self, expression, timeout=None):
+        outcome = self.script.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+
+def test_navigate_tolerates_transient_context_teardown():
+    # Page.navigate destroys the old execution context; a Runtime.evaluate
+    # issued in that window throws. navigate() must ride it out, not abort.
+    client = _ScriptedNavClient([
+        CdpJavaScriptError("Execution context was destroyed"),
+        {"url": f"{HOST}{TEAM_PATH}", "ready": "complete"},
+    ])
+
+    url = client.navigate(TEAM_URL, is_team_url, timeout=5)
+
+    assert url == f"{HOST}{TEAM_PATH}"
+    assert client.calls == ["Page.navigate"]
+
+
+def test_navigate_still_times_out_when_target_never_reached(monkeypatch):
+    clock = iter([0.0, 0.1, 100.0])
+    monkeypatch.setattr(cdp_mod.time, "monotonic", lambda: next(clock))
+    client = _ScriptedNavClient([
+        {"url": "about:blank", "ready": "complete"},
+    ])
+
+    with pytest.raises(CdpTimeout, match="did not reach the expected page"):
+        client.navigate(TEAM_URL, is_team_url, timeout=5)
