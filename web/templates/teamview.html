@@ -69,6 +69,7 @@
                     cursor: pointer; }
   .tv-pick button:hover { background: #3a5470; }
   .tv-vs { color: #7a8a99; font-size: 12px; }
+  .tv-locked { color: #e8eef4; font-size: 13px; font-weight: 600; }
   @media (max-width: 700px) {
     .tv .c-stats, .tv .c-proj { display: none; }
     .tv .c-player { width: 33%; }
@@ -111,7 +112,7 @@ our model (left) / Yahoo Proj Pts (right). “–” = no data yet.
 {% if is_past %} Viewing week {{ week }} finals from the archive.{% endif %}</p>
 {% if weeks %}
 <div class="tv-weeks">Week:
-  {% for w in weeks %}<a class="tv-week {{ 'on' if w == week else '' }}" href="/league/teamview?week={{ w }}&amp;a={{ a_name | urlencode }}&amp;b={{ b_name | urlencode }}">{{ w }}</a>{% endfor %}
+  {% for w in weeks %}<a class="tv-week {{ 'on' if w == week else '' }}" href="/league/teamview?week={{ w }}&amp;a={{ a_name | urlencode }}">{{ w }}</a>{% endfor %}
 </div>
 {% endif %}
 {% if teams %}
@@ -121,9 +122,13 @@ our model (left) / Yahoo Proj Pts (right). “–” = no data yet.
     {% for t in teams %}<option value="{{ t }}" {{ 'selected' if t == a_name else '' }}>{{ t }}</option>{% endfor %}
   </select>
   <span class="tv-vs">vs</span>
+  {% if is_past %}
+  <span class="tv-locked" title="Opponent is fixed by this week's schedule">{{ b_name }}</span>
+  {% else %}
   <select name="b" aria-label="Second team">
     {% for t in teams %}<option value="{{ t }}" {{ 'selected' if t == b_name else '' }}>{{ t }}</option>{% endfor %}
   </select>
+  {% endif %}
   <button type="submit">Go</button>
 </form>
 {% endif %}

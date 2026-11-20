@@ -366,8 +366,10 @@ team logos, live scores over WebSocket, Team View links), **team view**
 (`/league/teamview` — Yahoo-matchup-style aligned mirrored table, our
 model's projections vs Yahoo's captured Proj Pts, live Fan Pts column,
 JST game info; `?week=N` browses past weeks from the season history +
-weekly points archives; team dropdowns + `?a=&b=` pick any two teams,
-and the week links keep the selected pair),
+weekly points archives; a team dropdown + `?a=` pick the team, and its
+opponent for that week is FIXED by the schedule — past weeks show it as
+locked text, never a pickable dropdown; only the current week allows an
+ad-hoc `?b=` comparison),
 **my team** (latest operator report: matchup, lineup plan, monitor flags,
 📌 pin toggles), **cron** (operator run history + schedule), dashboard
 (projections + model card), players (search + per-player history/projection),

@@ -947,3 +947,15 @@ Parallel-lane audit of every doc against the current code/architecture:
   real wk5 opponent), rows sum exactly 134.32; Shiba wk10 143.76-104.02.
 - 31 Rust tests (3 new: other-team history, final-scoreboard merge,
   earlier picker/link regression).
+
+## 2026-11-20 — past-week opponent is schedule-locked (no dropdown)
+
+- User: past-week opponents are FIXED by the schedule; the b pulldown was
+  wrong — switching team a carried the stale b param, showing the
+  previous team's opponent. Fix: in past mode b is ALWAYS opponent_of(a)
+  from that week's scoreboard (explicit b param ignored); UI shows the
+  opponent as locked text (tv-locked), no b select; week links carry only
+  a. Current week keeps the b dropdown for ad-hoc comparison.
+- Verified: wk5 Browns + wrong b=Shiba -> still Neal Before Zod; switch
+  a to Shiba wk5 -> KNP Dripp (our real wk5 opponent); current week has
+  the b dropdown. 31 Rust tests pass.

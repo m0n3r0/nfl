@@ -828,18 +828,37 @@ pub async fn teamview(
             })
         })
     };
-    let b_name = params
-        .get("b")
-        .filter(|s| !s.trim().is_empty())
-        .cloned()
-        .or_else(|| opponent_of(&a_name))
-        .or_else(|| {
-            matchup
-                .and_then(|m| m.get("opponent"))
-                .and_then(Value::as_str)
-                .map(str::to_string)
-        })
-        .unwrap_or_default();
+    // Past weeks: the opponent is FIXED by that week's schedule — an
+    // arbitrary b param (e.g. left over from the team picker) must never
+    // override it. Current week: explicit b allowed for ad-hoc comparison,
+    // else team a's scheduled opponent.
+    let b_name = if is_past {
+        opponent_of(&a_name)
+            .or_else(|| {
+                if Some(a_name.as_str()) == my_name.as_deref() {
+                    matchup
+                        .and_then(|m| m.get("opponent"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_default()
+    } else {
+        params
+            .get("b")
+            .filter(|s| !s.trim().is_empty())
+            .cloned()
+            .or_else(|| opponent_of(&a_name))
+            .or_else(|| {
+                matchup
+                    .and_then(|m| m.get("opponent"))
+                    .and_then(Value::as_str)
+                    .map(str::to_string)
+            })
+            .unwrap_or_default()
+    };
     let week = if is_past {
         json!(requested.unwrap())
     } else {

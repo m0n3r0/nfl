@@ -672,10 +672,17 @@ async fn teamview_historical_week_from_archive() {
     assert_eq!(status, StatusCode::OK);
     assert!(html.contains("Old Qb")); // historical roster, not the current one
     assert!(html.contains("12.34")); // archived per-player finals
-    assert!(html.contains("99.00")); // Yahoo's official final for Team Beta
+                                     // b is FORCED to the scheduled opponent (Shiba Innu) even though the
+                                     // URL asked for b=Team Beta — past-week opponents are not pickable.
+    assert!(html.contains("Shiba Innu"));
+    assert!(html.contains("120.50")); // Shiba's official final on the b side
+    assert!(html.contains("Quarter Back")); // b side = our week-1 plan
+    assert!(html.contains("99.00")); // a side = Team Beta's own final
     assert!(html.contains("-3.00")); // DEF resolved via abbr, not def_named
     assert!(html.contains("finals from the archive"));
     assert!(html.contains("tv-week on")); // selector highlights week 1
+    assert!(html.contains("tv-locked")); // opponent shown as fixed text
+    assert!(!html.contains("<select name=\"b\"")); // no opponent dropdown
     assert!(!html.contains("players remaining")); // suppressed for past weeks
     let (_, html) = get_body(app, "/league/teamview").await;
     assert!(html.contains("Enemy Qb") && !html.contains("Old Qb"));
@@ -747,14 +754,28 @@ async fn teamview_other_team_history_keeps_selected_team() {
     assert!(html.contains("12.34")); // its archived points
     assert!(html.contains("Quarter Back")); // opponent side = our week-1 plan
     assert!(html.contains("25.10"));
-    // Week selector keeps the selected pair
-    assert!(html.contains("week=2&amp;a=Team%20Beta&amp;b=Shiba%20Innu"));
-    // Team picker preselects the current pair
+    // Week selector keeps the selected team; b is never carried (each
+    // week's opponent is fixed by the schedule).
+    assert!(html.contains("week=2&amp;a=Team%20Beta"));
+    assert!(!html.contains("week=2&amp;a=Team%20Beta&amp;b="));
+    // Team picker preselects the team; opponent is locked text, not a dropdown
     assert!(html.contains("<select name=\"a\""));
     assert!(html.contains("value=\"Team Beta\" selected"));
-    // Current week with a only: opponent from the current scoreboard
+    assert!(html.contains("tv-locked"));
+    assert!(!html.contains("<select name=\"b\""));
+    // A stale/wrong b param must NOT override the scheduled opponent
+    let (_, html) = get_body(
+        app.clone(),
+        "/league/teamview?week=1&a=Team%20Beta&b=No%20Such%20Team",
+    )
+    .await;
+    assert!(html.contains("Quarter Back")); // still Shiba Innu's week-1 plan
+    assert!(!html.contains("No Such Team"));
+    // Current week with a only: opponent from the current scoreboard,
+    // and the b dropdown IS available for ad-hoc comparison
     let (_, html) = get_body(app, "/league/teamview?a=Team%20Beta").await;
     assert!(html.contains("Enemy Qb") && html.contains("Quarter Back"));
+    assert!(html.contains("<select name=\"b\""));
 }
 
 #[tokio::test]
