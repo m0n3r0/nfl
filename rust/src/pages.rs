@@ -416,45 +416,60 @@ fn tv_norm_name(s: &str) -> String {
     tokens.join(" ")
 }
 
-/// NFL city nicknames -> ESPN abbrs. DEF roster names are the nickname
-/// ("Steelers D/ST"), and historical plan rows may carry no team at all —
-/// this resolves their points/game info from the name alone. Static league
-/// facts, not fantasy data.
-fn tv_def_abbr(name: &str) -> Option<&'static str> {
-    let first = name.split_whitespace().next()?.to_lowercase();
-    Some(match first.as_str() {
-        "cardinals" => "ARI",
-        "falcons" => "ATL",
-        "ravens" => "BAL",
-        "bills" => "BUF",
-        "panthers" => "CAR",
-        "bears" => "CHI",
-        "bengals" => "CIN",
-        "browns" => "CLE",
-        "cowboys" => "DAL",
-        "broncos" => "DEN",
-        "lions" => "DET",
-        "packers" => "GB",
-        "texans" => "HOU",
-        "colts" => "IND",
-        "jaguars" => "JAX",
-        "chiefs" => "KC",
-        "raiders" => "LV",
+/// NFL team identifiers -> ESPN abbrs. Yahoo shows a DEF as its nickname
+/// ("Bears"), its city/state ("Chicago", "Minnesota"), or a full "City
+/// Nickname" with a "D/ST" suffix — the capture page varies run to run, and
+/// historical plan rows may carry no team at all. This resolves their
+/// points/game info from the name alone. Static league facts, not fantasy
+/// data.
+pub(crate) fn tv_def_abbr(name: &str) -> Option<&'static str> {
+    let norm = name.trim().to_lowercase();
+    let norm = norm.strip_suffix("d/st").map(str::trim_end).unwrap_or(&norm);
+    // Shared-prefix cities resolve on the full name only — "New York"/"Los
+    // Angeles" host two teams each, so a first-token match would be a guess.
+    match norm {
+        "new england" | "new england patriots" => return Some("NE"),
+        "new orleans" | "new orleans saints" => return Some("NO"),
+        "new york giants" => return Some("NYG"),
+        "new york jets" => return Some("NYJ"),
+        "los angeles rams" => return Some("LAR"),
+        "los angeles chargers" => return Some("LAC"),
+        _ => {}
+    }
+    let first = norm.split_whitespace().next()?;
+    Some(match first {
+        "cardinals" | "arizona" => "ARI",
+        "falcons" | "atlanta" => "ATL",
+        "ravens" | "baltimore" => "BAL",
+        "bills" | "buffalo" => "BUF",
+        "panthers" | "carolina" => "CAR",
+        "bears" | "chicago" => "CHI",
+        "bengals" | "cincinnati" => "CIN",
+        "browns" | "cleveland" => "CLE",
+        "cowboys" | "dallas" => "DAL",
+        "broncos" | "denver" => "DEN",
+        "lions" | "detroit" => "DET",
+        "packers" | "green" => "GB",
+        "texans" | "houston" => "HOU",
+        "colts" | "indianapolis" => "IND",
+        "jaguars" | "jacksonville" => "JAX",
+        "chiefs" | "kansas" => "KC",
+        "raiders" | "las" => "LV",
         "chargers" => "LAC",
         "rams" => "LAR",
-        "dolphins" => "MIA",
-        "vikings" => "MIN",
+        "dolphins" | "miami" => "MIA",
+        "vikings" | "minnesota" => "MIN",
         "patriots" => "NE",
         "saints" => "NO",
         "giants" => "NYG",
         "jets" => "NYJ",
-        "eagles" => "PHI",
-        "steelers" => "PIT",
-        "49ers" => "SF",
-        "seahawks" => "SEA",
-        "buccaneers" => "TB",
-        "titans" => "TEN",
-        "commanders" => "WSH",
+        "eagles" | "philadelphia" => "PHI",
+        "steelers" | "pittsburgh" => "PIT",
+        "49ers" | "san" => "SF",
+        "seahawks" | "seattle" => "SEA",
+        "buccaneers" | "tampa" => "TB",
+        "titans" | "tennessee" => "TEN",
+        "commanders" | "washington" => "WSH",
         _ => return None,
     })
 }

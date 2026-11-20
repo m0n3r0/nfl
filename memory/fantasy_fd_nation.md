@@ -1027,3 +1027,21 @@ Parallel-lane audit of every doc against the current code/architecture:
 - Gotchas hit: XML comments cannot contain "--" (plist template);
   minijinja lacks Python str method calls; first artifact build ~1h
   cold (features cache fill), warm rebuilds minutes.
+
+## 2026-11-21 — DEF city/nickname flip broke past-week Fan Pts (fixed)
+
+- Symptom: /league/teamview?week=8 showed "–" for Shiba's DEF (Chicago)
+  even though the week-8 archive had the points (DEF:CHI = 6.0).
+- Root cause: Yahoo flips DEF display between NICKNAME ("Bears") and
+  CITY/STATE ("Chicago", "Minnesota", "Jacksonville") depending on the
+  capture page — the same player (yahoo_id 100003) is recorded both ways
+  across operator runs (weeks 3, 7, 8, 10). Historical plan rows carry no
+  team abbr, and tv_def_abbr() only knew nicknames, so all three lookup
+  paths (def_named / team abbr / name->abbr) missed.
+- Fix: tv_def_abbr (rust/src/pages.rs) now maps nicknames + cities/states,
+  strips a "D/ST" suffix, and resolves two-team cities (NY, LA) on the full
+  name only. Regression tests in rust/src/tests.rs; 37 cargo tests pass.
+- Verified live: weeks 3/7/8/10 all render DEF finals (5.00/4.00/6.00/-3.00).
+- Cosmetic leftover: the live-badge JS keys off def_named (nickname) — a
+  city-named plan row during a LIVE week can miss the badge flash; the
+  server-rendered value is still correct on every artifact refresh.

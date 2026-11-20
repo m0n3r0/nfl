@@ -722,6 +722,67 @@ async fn teamview_past_own_side_borrows_current_teampos() {
     assert!(html.contains("Enemy Qb")); // opponent from the historical roster
 }
 
+#[test]
+fn tv_def_abbr_resolves_city_and_nickname_forms() {
+    use crate::pages::tv_def_abbr;
+    // Yahoo flips DEF display between nickname and city/state run to run.
+    assert_eq!(tv_def_abbr("Bears"), Some("CHI"));
+    assert_eq!(tv_def_abbr("Chicago"), Some("CHI"));
+    assert_eq!(tv_def_abbr("Minnesota"), Some("MIN"));
+    assert_eq!(tv_def_abbr("Jacksonville"), Some("JAX"));
+    assert_eq!(tv_def_abbr("Steelers D/ST"), Some("PIT"));
+    assert_eq!(tv_def_abbr("Pittsburgh"), Some("PIT"));
+    // two-team cities resolve on the full name, never the first token
+    assert_eq!(tv_def_abbr("New York Giants"), Some("NYG"));
+    assert_eq!(tv_def_abbr("Los Angeles Rams"), Some("LAR"));
+    assert_eq!(tv_def_abbr("Los Angeles Chargers"), Some("LAC"));
+    assert_eq!(tv_def_abbr("New York"), None);
+    assert_eq!(tv_def_abbr("Los Angeles"), None);
+    assert_eq!(tv_def_abbr("Not A Team"), None);
+}
+
+#[tokio::test]
+async fn teamview_past_def_resolves_city_name_from_plan() {
+    // The week-8 production bug: the operator plan carries the DEF under
+    // its CITY name ("Chicago") with no team field, while the archive keys
+    // points by abbr/nickname — every lookup missed and Fan Pts showed "–".
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    teamview_fixtures(&root); // current week 2; Shiba roster has no DEF row
+    let mut run = operator_record("ok");
+    run["proposal"]["plan"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"current_slot": "DEF", "proposed_slot": "DEF",
+                     "name": "Chicago", "position": "DEF", "proj_week": null,
+                     "note": "no projection data; kept, locked",
+                     "yahoo_id": "100003"}));
+    write_runs(&root, &[run]);
+    let old = json!({
+        "captured_at": "2026-09-06T12:00:00+00:00",
+        "matchup": {"week": 1, "team": "Shiba Innu", "opponent": "Team Beta"},
+        "scoreboard": [{"week": 1, "team1": "Shiba Innu", "team2": "Team Beta",
+                        "score1": 120.5, "score2": 99.0}],
+        "rosters": {"Team Beta": [
+            {"name": "Enemy Qb", "team": "KC", "position": "QB", "slot": "QB",
+             "injury_status": "", "proj": 15.2}]}
+    });
+    std::fs::write(
+        root.join("logs/league-report.jsonl"),
+        old.to_string() + "\n",
+    )
+    .unwrap();
+    let arch = json!({"week": 1, "players": {},
+                    "def_named": {"Bears": 6.0}, "def": {"DEF:CHI": 6.0},
+                    "totals": {}, "games": {}});
+    std::fs::write(root.join("logs/live-points-week-1.json"), arch.to_string()).unwrap();
+    let app = router(cfg(&root));
+    let (status, html) = get_body(app, "/league/teamview?week=1").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("Chicago")); // the plan row renders
+    assert!(html.contains("6.00")); // city name -> CHI -> archived DEF points
+}
+
 #[tokio::test]
 async fn teamview_other_team_history_keeps_selected_team() {
     let tmp = tempfile_dir();
