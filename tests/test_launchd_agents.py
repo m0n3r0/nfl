@@ -57,3 +57,15 @@ def test_backend_template_renders_loopback_flask():
 def test_unknown_agent_rejected():
     with pytest.raises(ValueError, match="unknown agent"):
         install_launchd.render("nope")
+
+
+def test_livepoints_template_renders_loop_poller():
+    plist = install_launchd.render("livepoints")
+    assert plist["Label"] == "com.fdnation.livepoints"
+    assert plist["KeepAlive"] is True
+    python, script, flag = plist["ProgramArguments"]
+    assert python.endswith(".venv/bin/python")
+    assert script.endswith("tools/live_points.py")
+    assert flag == "--loop"
+    assert "@REPO_ROOT@" not in script
+    assert plist["StandardOutPath"].endswith("logs/live-points.log")

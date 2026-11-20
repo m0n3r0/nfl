@@ -70,7 +70,7 @@ recent healthy report once one lands.</div>
 {% endif %}
 
 {% if report.proposal and report.proposal.plan %}
-<div class="card">
+<div class="card" data-week="{{ report.week }}">
   <h2>Lineup plan ({{ report.proposal.moves | length }} move(s) recommended)</h2>
   <p class="muted">📌 pin a player to freeze his current slot — the operator's
   <code>--apply</code> runs will never move him, starter or bench.</p>
@@ -79,7 +79,7 @@ recent healthy report once one lands.</div>
     {% for p in report.proposal.plan %}
     <tr>
       <td>{{ p.current_slot }}{% if p.proposed_slot != p.current_slot %} → {{ p.proposed_slot }}{% endif %}</td>
-      <td>{{ p.name }}</td><td>{{ p.position }}</td><td>{{ p.proj_week }}</td>
+      <td {% if p.position == 'DEF' %}data-live-def="{{ p.name }}"{% else %}data-live-player="{{ p.name }}"{% endif %}>{{ p.name }}</td><td>{{ p.position }}</td><td>{{ p.proj_week }}</td>
       <td class="muted">{{ p.note }}</td>
       <td>
         <form method="post" action="{{ url_for('pin_toggle') }}">

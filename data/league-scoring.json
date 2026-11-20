@@ -1,0 +1,46 @@
+{
+ "source": "https://football.fantasysports.yahoo.com/f1/1329011/settings",
+ "captured_at": "2026-11-20T03:25:00+09:00",
+ "note": "Authoritative FD nation scoring, transcribed from the Yahoo league settings page (League Value column). This file is the single source of truth for live points — do not hand-edit weights; re-capture from Yahoo if settings change.",
+ "offense": {
+  "passing_yards_per_point": 25,
+  "passing_td": 4,
+  "interceptions": -1,
+  "rushing_yards_per_point": 10,
+  "rushing_td": 6,
+  "receptions": 0.5,
+  "receiving_yards_per_point": 10,
+  "receiving_td": 6,
+  "return_td": 6,
+  "two_point_conversions": 2,
+  "fumbles_lost": -2,
+  "offensive_fumble_return_td": 6
+ },
+ "kicker": {
+  "fg_0_19": 3,
+  "fg_20_29": 3,
+  "fg_30_39": 3,
+  "fg_40_49": 4,
+  "fg_50_plus": 5,
+  "xp_made": 1
+ },
+ "def": {
+  "sack": 1,
+  "interception": 2,
+  "fumble_recovery": 2,
+  "td": 6,
+  "safety": 2,
+  "block_kick": 2,
+  "return_td": 6,
+  "xp_returned": 2,
+  "points_allowed_tiers": [
+   [0, 0, 10],
+   [1, 6, 7],
+   [7, 13, 4],
+   [14, 20, 1],
+   [21, 27, 0],
+   [28, 34, -1],
+   [35, null, -4]
+  ]
+ }
+}

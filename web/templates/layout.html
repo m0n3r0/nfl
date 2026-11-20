@@ -51,5 +51,107 @@
 <div class="wrap">
 {% block body %}{% endblock %}
 </div>
+<style>
+  /* live points feed (nfl-webd /ws) */
+  .live-badge { font-size: 10px; font-weight: 700; letter-spacing: .06em;
+                padding: 2px 8px; border-radius: 8px; vertical-align: middle;
+                background: #243240; color: #7a8a99; }
+  .live-badge.on { background: #12351f; color: #4ade80; }
+  .live-badge.off { background: #3a2020; color: #f87171; }
+  .live-on { color: #4ade80; }
+  .live-drift { color: #fbbf24; }
+  .live-pts { display: inline-block; margin-left: 6px; font-size: 11px;
+              font-weight: 700; color: #4ade80; font-variant-numeric: tabular-nums; }
+  .live-pts::before { content: "● "; font-size: 8px; vertical-align: 1px; }
+</style>
+<script>
+/* Live points: WebSocket push from nfl-webd (/ws), fed by the ESPN poller
+   under exact Yahoo league weights. On drift vs a fresh Yahoo snapshot the
+   affected team shows Yahoo's verified number instead (amber). Falls back
+   to polling /live-points if the socket drops. Week-guarded: a payload for
+   a different week never touches the page. */
+(function () {
+  var targets = document.querySelectorAll('[data-live-team],[data-live-player],[data-live-def]');
+  if (!targets.length) return;
+  var statusEl = document.getElementById('live-status');
+  function norm(s) {
+    return String(s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ')
+      .replace(/\b(sr|jr|ii|iii|iv|v)\b/g, '').replace(/\s+/g, ' ').trim();
+  }
+  function weekOk(el, d) {
+    var box = el.closest('[data-week]');
+    if (!box || d.week == null) return true;
+    return String(d.week) === box.getAttribute('data-week');
+  }
+  function apply(d) {
+    if (!d || !d.players) return;
+    var recon = d.reconciliation || {};
+    document.querySelectorAll('[data-live-team]').forEach(function (el) {
+      if (!weekOk(el, d)) return;
+      var t = el.getAttribute('data-live-team');
+      if (recon.drift) {
+        var c = (recon.comparisons || []).filter(function (x) { return x.team === t; })[0];
+        if (c) {
+          el.textContent = Number(c.yahoo).toFixed(2);
+          el.classList.add('live-drift');
+          el.title = 'Yahoo-verified total (live estimate drifted)';
+        }
+        return;
+      }
+      var v = (d.totals || {})[t];
+      if (v == null) return;
+      el.textContent = Number(v).toFixed(2);
+      el.classList.add('live-on');
+      el.title = 'live total — Yahoo weights, ESPN stats';
+    });
+    document.querySelectorAll('[data-live-player]').forEach(function (el) {
+      if (!weekOk(el, d)) return;
+      var p = (d.players || {})[norm(el.getAttribute('data-live-player'))];
+      var badge = el.querySelector('.live-pts');
+      if (!p) { if (badge) badge.remove(); return; }
+      if (!badge) { badge = document.createElement('span'); badge.className = 'live-pts'; el.appendChild(badge); }
+      badge.textContent = Number(p.points).toFixed(2);
+      badge.title = 'live fantasy points (Yahoo weights)';
+    });
+    document.querySelectorAll('[data-live-def]').forEach(function (el) {
+      if (!weekOk(el, d)) return;
+      var v = (d.def_named || {})[el.getAttribute('data-live-def')];
+      var badge = el.querySelector('.live-pts');
+      if (v == null) { if (badge) badge.remove(); return; }
+      if (!badge) { badge = document.createElement('span'); badge.className = 'live-pts'; el.appendChild(badge); }
+      badge.textContent = Number(v).toFixed(2);
+      badge.title = 'live DEF points (Yahoo weights)';
+    });
+    if (statusEl) {
+      statusEl.textContent = 'LIVE';
+      statusEl.className = 'live-badge on';
+      statusEl.title = 'updated ' + (d.captured_at || '');
+    }
+  }
+  function fallback() {
+    fetch('/live-points').then(function (r) { return r.ok ? r.json() : null; })
+      .then(apply).catch(function () {});
+  }
+  var retry = 1000;
+  function connect() {
+    var ws;
+    try {
+      ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+    } catch (e) { fallback(); return; }
+    ws.onmessage = function (ev) { try { apply(JSON.parse(ev.data)); } catch (e) {} };
+    ws.onopen = function () { retry = 1000; };
+    ws.onclose = function () {
+      if (statusEl) { statusEl.textContent = 'OFFLINE'; statusEl.className = 'live-badge off'; }
+      fallback();
+      setTimeout(connect, retry);
+      retry = Math.min(retry * 2, 30000);
+    };
+    ws.onerror = function () { try { ws.close(); } catch (e) {} };
+  }
+  fallback();
+  connect();
+  setInterval(fallback, 60000);
+})();
+</script>
 </body>
 </html>

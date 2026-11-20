@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+ "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!--
+    FD nation live points poller template. Do NOT copy this file directly:
+    tools/install_launchd.py renders @REPO_ROOT@ to the actual repo location
+    and installs the result to ~/Library/LaunchAgents.
+
+    tools/live_points.py in loop mode: ESPN scoreboard/boxscores (free, no
+    auth, NOT Yahoo — zero WAF risk) -> exact Yahoo league weights
+    (data/league-scoring.json) -> logs/live-points.json. nfl-webd watches
+    that file and pushes updates to browsers over /ws. ~30s cadence during
+    games; sleeps between game windows. Reconciles against the Yahoo
+    light-cron snapshot and flags drift.
+  -->
+  <key>Label</key><string>com.fdnation.livepoints</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>@REPO_ROOT@/.venv/bin/python</string>
+    <string>@REPO_ROOT@/tools/live_points.py</string>
+    <string>--loop</string>
+  </array>
+  <key>WorkingDirectory</key><string>@REPO_ROOT@</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>10</integer>
+  <key>StandardOutPath</key><string>@REPO_ROOT@/logs/live-points.log</string>
+  <key>StandardErrorPath</key><string>@REPO_ROOT@/logs/live-points.log</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PYTHONIOENCODING</key><string>utf-8</string>
+  </dict>
+</dict>
+</plist>

@@ -774,3 +774,36 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
 - Plan: game-window poller (ESPN scoreboard -> live game ids -> summary
   boxscores -> score_row -> logs/live-points.json) + axum "ws" feature +
   /ws broadcast + vanilla JS score-cell updates. Latency ~1 min.
+
+## 2026-11-20 — Live points pipeline built (Yahoo-exact requirement)
+
+- REQUIREMENT (user): realtime points MUST match Yahoo, no drift.
+- data/league-scoring.json: authoritative weights transcribed from the
+  Yahoo settings page via CDP (pass 25yds/pt TD4 INT-1; rush/rec 10yds/pt
+  TD6; rec 0.5; 2pt 2; fum lost -2; return TD 6; FG 3/3/3/4/5 by distance,
+  XP 1, NO miss penalties; DEF sack1 INT2 fumrec2 TD6 safety2 block2
+  returnTD6 xpReturned2; points-allowed tiers 10/7/4/1/0/-1/-4; no
+  yards-allowed tiers, no milestone bonuses).
+- src/live_scoring.py: ESPN boxscore+scoringPlays -> points. Gotchas:
+  2pt conversions hide in the TD play's parenthetical "(X Pass to Y for
+  Two-Point Conversion)" (failed ones say Failed); FG distances only in
+  scoringPlays text; DEF TDs from play types (Interception Return TD,
+  Sack Opp Fumble Recovery, Fumble Return TD) to avoid double counting;
+  fum recoveries = opponent fumblesLost; return TDs count for DEF unit.
+- VALIDATION: 15/15 roster players exact vs Yahoo week-10 finals (Purdy
+  31.66, CMC 44.30, Deebo 24.40, Diggs 17.30, Sanders K 14.00, Steelers
+  DEF -3.00...). Frozen as tests/fixtures/live_scoring/ (~100KB, 8 games)
+  + tests/test_live_scoring.py. Full poller --week 10 backtest: 933
+  players, all spot checks exact.
+- tools/live_points.py --loop (launchd com.fdnation.livepoints, installed):
+  ESPN only (zero Yahoo WAF risk), 30s cadence in-game, sleeps to next
+  window; reconcile vs fresh (<=180s) Yahoo light snapshot, tolerance 0.5,
+  drift flag -> UI shows Yahoo's verified number; unmatched starters
+  reported (name-drift detector); atomic logs/live-points.json + audit.
+- nfl-webd: axum ws feature, /ws (initial artifact + broadcast on file
+  mtime change, 30s pings), /live-points JSON fallback. layout.html JS:
+  data-live-team/player/def updates, week-guarded, reconnect+poll fallback,
+  LIVE/OFFLINE badge, amber drift fallback.
+- Verified through tunnel: wss:// connect, initial payload, atomic-update
+  push received. 294 Python fast + 27 Rust tests pass. TNF 10:15 JST today
+  is the first live game window (poller wakes 2 min before kickoff).

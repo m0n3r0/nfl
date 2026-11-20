@@ -67,8 +67,8 @@ data may be incomplete. Live reads retry on the next cron run.</div>
 {% endif %}
 
 {% if scoreboard %}
-<div class="card">
-  <h2>Week {{ scoreboard[0].week }} matchups</h2>
+<div class="card" data-week="{{ scoreboard[0].week }}">
+  <h2>Week {{ scoreboard[0].week }} matchups <span id="live-status" class="live-badge" title="live points feed">…</span></h2>
   <p class="muted">GameChannel-style side-by-side layout. Green = current leader
   (score, or projection before kickoff). Your matchup is highlighted.</p>
   {% for e in scoreboard %}
@@ -89,9 +89,9 @@ data may be incomplete. Live reads retry on the next cron run.</div>
     </div>
     <div class="mu-center">
       <div class="mu-row">
-        <div class="mu-val mu-left-val"><span class="mu-score {{ 'mu-leading' if lead1 else '' }}">{{ e.score1 }}</span></div>
+        <div class="mu-val mu-left-val"><span class="mu-score {{ 'mu-leading' if lead1 else '' }}" data-live-team="{{ e.team1 }}">{{ e.score1 }}</span></div>
         <div class="mu-label"><span class="mu-vs">vs</span></div>
-        <div class="mu-val mu-right-val"><span class="mu-score {{ 'mu-leading' if lead2 else '' }}">{{ e.score2 }}</span></div>
+        <div class="mu-val mu-right-val"><span class="mu-score {{ 'mu-leading' if lead2 else '' }}" data-live-team="{{ e.team2 }}">{{ e.score2 }}</span></div>
       </div>
       <div class="mu-row mu-proj-row">
         <div class="mu-val mu-left-val"><span class="mu-proj">{{ e.proj1 }}</span></div>

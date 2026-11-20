@@ -48,7 +48,7 @@ it in. Rows show whichever side is available.</div>
 <div class="notice">No player rows to show yet.</div>
 {% else %}
 <div class="card">
-  <table class="tv">
+  <table class="tv" data-week="{{ week }}">
     <thead>
       <tr>
         <th class="tv-head-names">Player</th>
@@ -63,11 +63,11 @@ it in. Rows show whichever side is available.</div>
       <tr class="tv-section"><td colspan="5">Starters</td></tr>
       {% for row in starters %}
       <tr>
-        <td class="tv-player">{{ player(row.left) }}</td>
+        <td class="tv-player" {% if row.left and row.left.slot == 'DEF' %}data-live-def="{{ row.left.name }}"{% elif row.left %}data-live-player="{{ row.left.name }}"{% endif %}>{{ player(row.left) }}</td>
         <td class="tv-proj">{{ proj(row.left) }}</td>
         <td class="tv-pos">{{ row.slot }}</td>
         <td class="tv-proj">{{ proj(row.right) }}</td>
-        <td class="tv-player">{{ player(row.right) }}</td>
+        <td class="tv-player" {% if row.right and row.right.slot == 'DEF' %}data-live-def="{{ row.right.name }}"{% elif row.right %}data-live-player="{{ row.right.name }}"{% endif %}>{{ player(row.right) }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -77,11 +77,11 @@ it in. Rows show whichever side is available.</div>
       <tr class="tv-section"><td colspan="5">Bench / IR</td></tr>
       {% for row in bench %}
       <tr>
-        <td class="tv-player">{{ player(row.left) }}</td>
+        <td class="tv-player" {% if row.left and row.left.slot == 'DEF' %}data-live-def="{{ row.left.name }}"{% elif row.left %}data-live-player="{{ row.left.name }}"{% endif %}>{{ player(row.left) }}</td>
         <td class="tv-proj">{{ proj(row.left) }}</td>
         <td class="tv-pos">{{ row.slot }}</td>
         <td class="tv-proj">{{ proj(row.right) }}</td>
-        <td class="tv-player">{{ player(row.right) }}</td>
+        <td class="tv-player" {% if row.right and row.right.slot == 'DEF' %}data-live-def="{{ row.right.name }}"{% elif row.right %}data-live-player="{{ row.right.name }}"{% endif %}>{{ player(row.right) }}</td>
       </tr>
       {% endfor %}
     </tbody>

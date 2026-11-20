@@ -1,0 +1,133 @@
+{
+ "source": "yahoo team page /f1/1329011/2?week=10, captured 2026-11-20",
+ "rows": [
+  {
+   "name": "Brock Purdy",
+   "team": "SF",
+   "position": "QB",
+   "slot": "QB",
+   "fanPts": "31.66",
+   "colspan": 1
+  },
+  {
+   "name": "Christian McCaffrey",
+   "team": "SF",
+   "position": "RB",
+   "slot": "RB",
+   "fanPts": "44.30",
+   "colspan": 1
+  },
+  {
+   "name": "Alvin Kamara",
+   "team": "NO",
+   "position": "RB",
+   "slot": "RB",
+   "fanPts": "14.90",
+   "colspan": 1
+  },
+  {
+   "name": "Chris Olave",
+   "team": "NO",
+   "position": "WR",
+   "slot": "WR",
+   "fanPts": "4.50",
+   "colspan": 1
+  },
+  {
+   "name": "Christian Watson",
+   "team": "GB",
+   "position": "WR",
+   "slot": "WR",
+   "fanPts": "5.20",
+   "colspan": 1
+  },
+  {
+   "name": "Brenton Strange",
+   "team": "Jax",
+   "position": "TE",
+   "slot": "TE",
+   "fanPts": "7.90",
+   "colspan": 1
+  },
+  {
+   "name": "Chase Brown",
+   "team": "Cin",
+   "position": "RB",
+   "slot": "W/R/T",
+   "fanPts": "24.30",
+   "colspan": 1
+  },
+  {
+   "name": "Mike Gesicki",
+   "team": "Cin",
+   "position": "TE",
+   "slot": "BN",
+   "fanPts": "1.40",
+   "colspan": 1
+  },
+  {
+   "name": "Bhayshul Tuten",
+   "team": "Jax",
+   "position": "RB",
+   "slot": "BN",
+   "fanPts": "18.80",
+   "colspan": 1
+  },
+  {
+   "name": "Deebo Samuel Sr.",
+   "team": "SF",
+   "position": "WR",
+   "slot": "BN",
+   "fanPts": "24.40",
+   "colspan": 1
+  },
+  {
+   "name": "Demarcus Robinson",
+   "team": "SF",
+   "position": "WR",
+   "slot": "BN",
+   "fanPts": "0.00",
+   "colspan": 1
+  },
+  {
+   "name": "Stefon Diggs",
+   "team": "Was",
+   "position": "WR",
+   "slot": "BN",
+   "fanPts": "17.30",
+   "colspan": 1
+  },
+  {
+   "name": "Jason Sanders",
+   "team": "NYJ",
+   "position": "K",
+   "slot": "K",
+   "fanPts": "14.00",
+   "colspan": 1
+  },
+  {
+   "name": "Tyler Loop",
+   "team": "Bal",
+   "position": "K",
+   "slot": "IR",
+   "fanPts": "0.00",
+   "colspan": 1
+  },
+  {
+   "name": "Steelers",
+   "team": "Pit",
+   "position": "DEF",
+   "slot": "DEF",
+   "fanPts": "-3.00",
+   "colspan": 1
+  },
+  {
+   "name": "Bears",
+   "team": "Chi",
+   "position": "DEF",
+   "slot": "BN",
+   "fanPts": "Bye",
+   "colspan": 3
+  }
+ ]
+}

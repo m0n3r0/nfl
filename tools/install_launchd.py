@@ -26,7 +26,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-AGENTS = ("browser", "cloudflared", "web", "backend")
+AGENTS = ("browser", "cloudflared", "web", "backend", "livepoints")
 
 
 def template_path(agent: str, repo_root: Path = ROOT) -> Path:

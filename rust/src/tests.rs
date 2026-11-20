@@ -3,6 +3,7 @@
 //! (stub backend on an ephemeral loopback port).
 
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
@@ -455,6 +456,81 @@ fn teamview_fixtures(root: &Path) {
 }
 
 #[tokio::test]
+async fn live_points_route_serves_artifact_or_404() {
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    let app = router(cfg(&root));
+    let (status, body) = get_body(app.clone(), "/live-points").await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert!(body.contains("no live points yet"));
+    std::fs::write(
+        root.join("logs/live-points.json"),
+        r#"{"week":11,"totals":{"Team Alpha":42.5}}"#,
+    )
+    .unwrap();
+    let (status, body) = get_body(app, "/live-points").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body.contains("42.5"));
+}
+
+#[tokio::test]
+async fn ws_pushes_initial_artifact_and_live_updates() {
+    use futures_util::StreamExt;
+    use tokio_tungstenite::tungstenite::Message;
+
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    std::fs::write(
+        root.join("logs/live-points.json"),
+        r#"{"captured_at":"t0","totals":{"Team Alpha":10.0}}"#,
+    )
+    .unwrap();
+    // real server on an ephemeral port (WS needs a live socket, not oneshot)
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let app = router(cfg(&root));
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let (mut ws, _resp) = tokio_tungstenite::connect_async(format!("ws://{addr}/ws"))
+        .await
+        .expect("ws connect");
+    // initial payload = current artifact
+    let first = tokio::time::timeout(Duration::from_secs(5), ws.next())
+        .await
+        .expect("initial msg timeout")
+        .unwrap()
+        .unwrap();
+    assert!(first.into_text().unwrap().contains("\"t0\""));
+
+    // poller-style atomic update -> watcher broadcasts within ~2s
+    std::fs::write(
+        root.join("logs/live-points.json.tmp"),
+        r#"{"captured_at":"t1","totals":{"Team Alpha":17.5}}"#,
+    )
+    .unwrap();
+    std::fs::rename(
+        root.join("logs/live-points.json.tmp"),
+        root.join("logs/live-points.json"),
+    )
+    .unwrap();
+    let update = tokio::time::timeout(Duration::from_secs(8), async {
+        loop {
+            match ws.next().await {
+                Some(Ok(Message::Text(t))) if t.contains("\"t1\"") => break t,
+                Some(Ok(_)) => continue, // ping/pong
+                other => panic!("unexpected ws item: {other:?}"),
+            }
+        }
+    })
+    .await
+    .expect("broadcast update timeout");
+    assert!(update.contains("17.5"));
+    let _ = ws.close(None).await;
+}
+
+#[tokio::test]
 async fn logos_route_serves_local_files_only() {
     let tmp = tempfile_dir();
     let root = fixture_root(&tmp);
@@ -526,7 +602,7 @@ async fn teamview_query_override_and_missing_roster() {
     let (status, html) =
         get_body(app.clone(), "/league/teamview?a=Team%20Beta&b=Team%20Beta").await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(html.matches("Enemy Qb").count(), 2); // both sides same roster
+    assert_eq!(html.matches("tv-name\">Enemy Qb").count(), 2); // both sides same roster
     let (status, html) = get_body(app, "/league/teamview?a=No%20Such%20Team&b=Team%20Beta").await;
     assert_eq!(status, StatusCode::OK);
     assert!(html.contains("roster for one of these teams"));

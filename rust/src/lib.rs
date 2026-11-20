@@ -1,12 +1,18 @@
 //! nfl-webd: single local surface for the FD nation web UI — the jra-van-re
 //! jv-webd method applied to nfl:
 //!
-//!   /            -> 302 to /team (the public face is the fantasy team)
+//!   /            -> 302 to /league (the public face is the league)
 //!   /dashboard   -> backend / (Flask keeps the dashboard at its root)
 //!   /team, /team/pin, /league, /league/team/<name>, /cron
 //!       -> served NATIVELY by axum + minijinja from the same Jinja
 //!          templates Flask uses (web/templates/), reading the same local
 //!          artifacts (logs/*.json[l], data/pins.json). No Python involved.
+//!   /live-points -> the live points artifact as JSON (poll fallback)
+//!   /ws          -> WebSocket push of logs/live-points.json: a watcher
+//!          task broadcasts every file change; the poller (cron/launchd,
+//!          tools/live_points.py) owns the writes. Points are computed
+//!          from ESPN raw stats under the exact Yahoo league weights and
+//!          reconciled against Yahoo's own totals (drift flag).
 //!   everything else (/players, /player/<id>, /predictions, /sos,
 //!       /ratings, /strategy, /api/*)
 //!       -> reverse-proxied to the Python compute backend (Flask on
@@ -30,12 +36,17 @@ use std::time::Duration;
 
 use axum::{
     body::Body,
-    extract::{ConnectInfo, Path, Request, State},
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        ConnectInfo, Path, Request, State,
+    },
     http::{header, StatusCode},
     response::{IntoResponse, Response},
     routing::{any, get, post},
     Router,
 };
+use futures_util::{SinkExt, StreamExt};
+use tokio::sync::broadcast;
 
 #[derive(Clone)]
 pub struct Config {
@@ -80,6 +91,8 @@ pub struct AppState {
     pub cfg: Config,
     pub http: reqwest::Client,
     pub env: Arc<minijinja::Environment<'static>>,
+    /// Live points push: the file watcher broadcasts artifact changes here.
+    pub live_tx: broadcast::Sender<String>,
 }
 
 pub fn router(cfg: Config) -> Router {
@@ -91,7 +104,14 @@ pub fn router(cfg: Config) -> Router {
         .redirect(reqwest::redirect::Policy::none())
         .build()
         .expect("reqwest client");
-    let st = AppState { cfg, http, env };
+    let (live_tx, _) = broadcast::channel::<String>(64);
+    spawn_live_watcher(cfg.root.clone(), live_tx.clone());
+    let st = AppState {
+        cfg,
+        http,
+        env,
+        live_tx,
+    };
     Router::new()
         // The public face of the stack is the league, not the model card:
         // / lands on League; the dashboard lives at /dashboard.
@@ -106,9 +126,97 @@ pub fn router(cfg: Config) -> Router {
         .route("/league/team/{name}", get(pages::league_team))
         .route("/league/teamview", get(pages::teamview))
         .route("/logos/{file}", get(logo))
+        .route("/live-points", get(live_points))
+        .route("/ws", get(ws_upgrade))
         .route("/cron", get(pages::cron))
         .fallback(any(proxy))
         .with_state(st)
+}
+
+/// Watch logs/live-points.json (written by tools/live_points.py) and
+/// broadcast every change to /ws subscribers. mtime polling at 2s — no
+/// extra dependency, and the poller's atomic rename makes reads safe.
+fn spawn_live_watcher(root: PathBuf, tx: broadcast::Sender<String>) {
+    tokio::spawn(async move {
+        let path = root.join("logs/live-points.json");
+        let mut last: Option<std::time::SystemTime> = None;
+        let mut tick = tokio::time::interval(Duration::from_secs(2));
+        loop {
+            tick.tick().await;
+            if !root.exists() {
+                break; // fixture/tmp root removed — stop the task
+            }
+            let mtime = std::fs::metadata(&path).and_then(|m| m.modified()).ok();
+            if mtime.is_some() && mtime != last {
+                if let Ok(text) = std::fs::read_to_string(&path) {
+                    let _ = tx.send(text);
+                }
+                last = mtime;
+            }
+        }
+    });
+}
+
+/// /live-points — the artifact as JSON (initial load + polling fallback).
+async fn live_points(State(st): State<AppState>) -> Response {
+    match std::fs::read_to_string(st.cfg.root.join("logs/live-points.json")) {
+        Ok(text) => (
+            StatusCode::OK,
+            [
+                (header::CONTENT_TYPE, "application/json"),
+                (header::CACHE_CONTROL, "no-store"),
+            ],
+            text,
+        )
+            .into_response(),
+        Err(_) => (
+            StatusCode::NOT_FOUND,
+            [(header::CONTENT_TYPE, "application/json")],
+            "{\"error\":\"no live points yet\"}",
+        )
+            .into_response(),
+    }
+}
+
+/// /ws — push live points. Sends the current artifact on connect, then
+/// every watcher broadcast; 30s pings keep the cloudflared tunnel alive.
+async fn ws_upgrade(State(st): State<AppState>, ws: WebSocketUpgrade) -> Response {
+    ws.on_upgrade(move |socket| ws_conn(socket, st))
+}
+
+async fn ws_conn(socket: WebSocket, st: AppState) {
+    let (mut sender, mut receiver) = socket.split();
+    let mut rx = st.live_tx.subscribe();
+    if let Ok(text) = std::fs::read_to_string(st.cfg.root.join("logs/live-points.json")) {
+        if sender.send(Message::Text(text.into())).await.is_err() {
+            return;
+        }
+    }
+    let mut ping = tokio::time::interval(Duration::from_secs(30));
+    ping.tick().await; // consume the immediate first tick
+    loop {
+        tokio::select! {
+            msg = rx.recv() => match msg {
+                Ok(text) => {
+                    if sender.send(Message::Text(text.into())).await.is_err() {
+                        break;
+                    }
+                }
+                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(broadcast::error::RecvError::Closed) => break,
+            },
+            _ = ping.tick() => {
+                if sender.send(Message::Ping(Vec::new().into())).await.is_err() {
+                    break;
+                }
+            }
+            incoming = receiver.next() => match incoming {
+                Some(Ok(Message::Close(_))) | None => break,
+                Some(Ok(_)) => {} // client text/pong: nothing to do
+                Some(Err(_)) => break,
+            },
+        }
+    }
 }
 
 /// /dashboard -> the backend's / (Flask keeps the dashboard at its root).

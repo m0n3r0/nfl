@@ -279,6 +279,36 @@ show them, falling back to initials when a logo is absent. Both `data/logos/`
 and the manifest are gitignored — managers' custom logos can be personal
 photos. Manual retry: `python tools/logo_sync.py`.
 
+### Live points (realtime, Yahoo-exact)
+
+Requirement: live fantasy points must match Yahoo — no drift. The pipeline:
+
+1. **Authoritative weights**: `data/league-scoring.json` is transcribed from
+   the Yahoo league settings page (the single source of truth; re-capture
+   from Yahoo if settings change, never hand-tune).
+2. **Poller**: `tools/live_points.py` (launchd agent `com.fdnation.livepoints`,
+   `--loop`) polls ESPN's free public scoreboard/boxscore APIs — NOT Yahoo,
+   so zero WAF risk — every ~30s during games and sleeps between windows.
+   `src/live_scoring.py` converts raw stats under the Yahoo weights,
+   including the tricky bits: 2-point conversions (hidden in ESPN's TD-play
+   parentheticals), FG distance tiers from scoring plays, DEF points-allowed
+   tiers, safeties/blocks/return TDs, fumbles lost. Writes
+   `logs/live-points.json` atomically.
+3. **Accuracy gate**: `tests/test_live_scoring.py` freezes real ESPN week-10
+   fixtures against Yahoo's own finals for all 15 roster players — 15/15
+   exact to 0.01. At runtime the poller reconciles team totals against the
+   Yahoo light-cron snapshot; a FRESH snapshot (<= 3 min) differing by > 0.5
+   sets `drift=true` and the UI shows Yahoo's verified number instead.
+4. **Push**: nfl-webd enables axum's `ws` feature; a watcher broadcasts every
+   artifact change to `/ws` subscribers (30s pings keep the tunnel alive).
+   `/live-points` serves the artifact as JSON for initial load + fallback.
+5. **Browser**: vanilla JS in `layout.html` updates team scores
+   (`data-live-team`), per-player live badges (`data-live-player` /
+   `data-live-def`), week-guarded so a payload for another week never
+   touches the page; reconnect with backoff + 60s poll fallback.
+
+Backtest any week: `python tools/live_points.py --week N --out /tmp/x.json`.
+
 ## Scoring
 
 The generic preset weights were reverse-engineered from nflverse's own shipped `fantasy_points` /
