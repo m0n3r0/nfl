@@ -363,8 +363,10 @@ serves only the analytics backend.
 
 Pages: **league** (home — standings, GameChannel-style matchup cards with
 team logos, live scores over WebSocket, Team View links), **team view**
-(`/league/teamview` — Yahoo-style side-by-side player comparison, our
-model's projections vs Yahoo's captured Proj Pts, live point badges),
+(`/league/teamview` — Yahoo-matchup-style aligned mirrored table, our
+model's projections vs Yahoo's captured Proj Pts, live Fan Pts column,
+JST game info; `?week=N` browses past weeks from the season history +
+weekly points archives),
 **my team** (latest operator report: matchup, lineup plan, monitor flags,
 📌 pin toggles), **cron** (operator run history + schedule), dashboard
 (projections + model card), players (search + per-player history/projection),
@@ -372,9 +374,10 @@ win predictions by week, team **ratings**, game **strategy** breakdowns,
 and SOS ranking. API: `/api/modelcard`, `/api/predictions`.
 
 The fantasy pages read only local artifacts written by the cron/launchd
-operators — `logs/team-operator.jsonl`, `logs/league-report.json`,
-`logs/live-points.json`, `data/pins.json`, `data/logos.json` — the web
-processes never touch Yahoo or ESPN live.
+operators — `logs/team-operator.jsonl`, `logs/league-report.json` (+ the
+append-only `.jsonl` season history), `logs/live-points.json`, the weekly
+finals archives `logs/live-points-week-N.json`, `data/pins.json`,
+`data/logos.json` — the web processes never touch Yahoo or ESPN live.
 
 ### Team logos (cron-captured)
 
@@ -428,6 +431,14 @@ Requirement: live fantasy points must match Yahoo — no drift. The pipeline:
    touches the page; reconnect with backoff + 60s poll fallback.
 
 Backtest any week: `python tools/live_points.py --week N --out /tmp/x.json`.
+
+History: `live-points.json` is overwritten each cycle, but once every game
+of a week is final the poller archives it permanently to
+`logs/live-points-week-N.json` (rewritten only on stat corrections).
+Weeks 1–10 were backfilled from ESPN on 2026-11-20; Team View's week
+selector reads these archives, with Yahoo's official final scores in the
+header. Matchup scores, standings, rosters, and projections were already
+retained in the append-only `league-report.jsonl` / `team-operator.jsonl`.
 
 ## Scoring
 
