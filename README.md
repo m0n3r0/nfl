@@ -366,7 +366,8 @@ team logos, live scores over WebSocket, Team View links), **team view**
 (`/league/teamview` — Yahoo-matchup-style aligned mirrored table, our
 model's projections vs Yahoo's captured Proj Pts, live Fan Pts column,
 JST game info; `?week=N` browses past weeks from the season history +
-weekly points archives),
+weekly points archives; team dropdowns + `?a=&b=` pick any two teams,
+and the week links keep the selected pair),
 **my team** (latest operator report: matchup, lineup plan, monitor flags,
 📌 pin toggles), **cron** (operator run history + schedule), dashboard
 (projections + model card), players (search + per-player history/projection),
@@ -440,7 +441,11 @@ selector reads these archives, with Yahoo's official final scores in the
 header. Matchup scores, standings, rosters, and projections were already
 retained in the append-only `league-report.jsonl` / `team-operator.jsonl`.
 Past-week rosters come from the latest snapshot of that week that HAS
-rosters (the last snapshots are light runs without them). Caveat: an
+rosters (the last snapshots are light runs without them), merged with the
+overall latest snapshot's FINAL scoreboard/standings (the with-rosters
+one is captured before the late games). With only `?a=` given, `b`
+resolves to that team's opponent from the week's scoreboard — browsing
+another team's history never snaps back to our own matchup. Caveat: an
 opponent's starter/bench split reflects the last pre-game snapshot, so it
 can differ slightly from their final lineup (late Sunday swaps); the
 header always shows Yahoo's official total.

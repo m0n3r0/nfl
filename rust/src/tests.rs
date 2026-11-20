@@ -713,6 +713,91 @@ async fn teamview_past_own_side_borrows_current_teampos() {
 }
 
 #[tokio::test]
+async fn teamview_other_team_history_keeps_selected_team() {
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    teamview_fixtures(&root);
+    let old = json!({
+        "captured_at": "2026-09-06T12:00:00+00:00",
+        "matchup": {"week": 1, "team": "Shiba Innu", "opponent": "Team Beta"},
+        "scoreboard": [{"week": 1, "team1": "Shiba Innu", "team2": "Team Beta",
+                        "score1": 120.5, "score2": 99.0}],
+        "standings": [{"rank": 1, "team": "Shiba Innu", "record": "1-0-0"},
+                      {"rank": 2, "team": "Team Beta", "record": "0-1-0"}],
+        "rosters": {"Team Beta": [
+            {"name": "Old Qb", "team": "KC", "position": "QB", "slot": "QB",
+             "injury_status": "", "proj": 11.1}]}
+    });
+    std::fs::write(
+        root.join("logs/league-report.jsonl"),
+        old.to_string() + "\n",
+    )
+    .unwrap();
+    let arch = json!({"week": 1,
+                    "players": {"old qb": {"points": 12.34},
+                                "quarter back": {"points": 25.10}},
+                    "def_named": {}, "def": {}, "totals": {}, "games": {}});
+    std::fs::write(root.join("logs/live-points-week-1.json"), arch.to_string()).unwrap();
+    let app = router(cfg(&root));
+    // Only a given: b must resolve to Team Beta's week-1 OPPONENT from the
+    // historical scoreboard — not snap back to our own matchup.
+    let (status, html) = get_body(app.clone(), "/league/teamview?week=1&a=Team%20Beta").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("Old Qb")); // selected team's historical roster
+    assert!(html.contains("12.34")); // its archived points
+    assert!(html.contains("Quarter Back")); // opponent side = our week-1 plan
+    assert!(html.contains("25.10"));
+    // Week selector keeps the selected pair
+    assert!(html.contains("week=2&amp;a=Team%20Beta&amp;b=Shiba%20Innu"));
+    // Team picker preselects the current pair
+    assert!(html.contains("<select name=\"a\""));
+    assert!(html.contains("value=\"Team Beta\" selected"));
+    // Current week with a only: opponent from the current scoreboard
+    let (_, html) = get_body(app, "/league/teamview?a=Team%20Beta").await;
+    assert!(html.contains("Enemy Qb") && html.contains("Quarter Back"));
+}
+
+#[tokio::test]
+async fn teamview_past_header_uses_final_scoreboard() {
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    teamview_fixtures(&root);
+    // With-rosters snapshot carries MID-WEEK scores...
+    let mid = json!({
+        "captured_at": "2026-09-06T12:00:00+00:00",
+        "matchup": {"week": 1, "team": "Shiba Innu", "opponent": "Team Beta"},
+        "scoreboard": [{"week": 1, "team1": "Shiba Innu", "team2": "Team Beta",
+                        "score1": 80.0, "score2": 60.0}],
+        "standings": [{"rank": 1, "team": "Shiba Innu", "record": "0-0-0"},
+                      {"rank": 2, "team": "Team Beta", "record": "0-0-0"}],
+        "rosters": {"Team Beta": [
+            {"name": "Old Qb", "team": "KC", "position": "QB", "slot": "QB",
+             "injury_status": "", "proj": 11.1}]}
+    });
+    // ...the later light run carries the FINALS (no rosters).
+    let fin = json!({
+        "captured_at": "2026-09-08T12:00:00+00:00",
+        "matchup": {"week": 1, "team": "Shiba Innu", "opponent": "Team Beta"},
+        "scoreboard": [{"week": 1, "team1": "Shiba Innu", "team2": "Team Beta",
+                        "score1": 130.0, "score2": 105.5}],
+        "standings": [{"rank": 1, "team": "Shiba Innu", "record": "1-0-0"},
+                      {"rank": 2, "team": "Team Beta", "record": "0-1-0"}]
+    });
+    let text = format!("{}\n{}\n", mid, fin);
+    std::fs::write(root.join("logs/league-report.jsonl"), text).unwrap();
+    let arch = json!({"week": 1, "players": {"old qb": {"points": 12.34}},
+                    "def_named": {}, "def": {}, "totals": {}, "games": {}});
+    std::fs::write(root.join("logs/live-points-week-1.json"), arch.to_string()).unwrap();
+    let app = router(cfg(&root));
+    let (status, html) = get_body(app, "/league/teamview?week=1&a=Team%20Beta").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("Old Qb")); // rosters still from the mid snapshot
+    assert!(html.contains("105.50")); // header = FINAL score, not 60.00
+    assert!(!html.contains("60.00"));
+    assert!(html.contains("0-1-0")); // final record overlaid too
+}
+
+#[tokio::test]
 async fn teamview_query_override_and_missing_roster() {
     let tmp = tempfile_dir();
     let root = fixture_root(&tmp);

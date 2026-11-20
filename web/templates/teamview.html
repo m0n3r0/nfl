@@ -59,6 +59,16 @@
              color: #7fb3ff; text-decoration: none; background: #16202c; }
   .tv-week:hover { background: #1d2b3a; }
   .tv-week.on { background: #2c4055; color: #e8eef4; font-weight: 700; }
+  .tv-pick { margin: 0 0 12px; display: flex; gap: 8px; align-items: center;
+             flex-wrap: wrap; }
+  .tv-pick select { background: #16202c; color: #e8eef4; border: 1px solid #2c4055;
+                    border-radius: 6px; padding: 4px 8px; font-size: 13px;
+                    max-width: 240px; }
+  .tv-pick button { background: #2c4055; color: #e8eef4; border: 0;
+                    border-radius: 6px; padding: 5px 14px; font-size: 13px;
+                    cursor: pointer; }
+  .tv-pick button:hover { background: #3a5470; }
+  .tv-vs { color: #7a8a99; font-size: 12px; }
   @media (max-width: 700px) {
     .tv .c-stats, .tv .c-proj { display: none; }
     .tv .c-player { width: 33%; }
@@ -101,8 +111,21 @@ our model (left) / Yahoo Proj Pts (right). “–” = no data yet.
 {% if is_past %} Viewing week {{ week }} finals from the archive.{% endif %}</p>
 {% if weeks %}
 <div class="tv-weeks">Week:
-  {% for w in weeks %}<a class="tv-week {{ 'on' if w == week else '' }}" href="/league/teamview?week={{ w }}">{{ w }}</a>{% endfor %}
+  {% for w in weeks %}<a class="tv-week {{ 'on' if w == week else '' }}" href="/league/teamview?week={{ w }}&amp;a={{ a_name | urlencode }}&amp;b={{ b_name | urlencode }}">{{ w }}</a>{% endfor %}
 </div>
+{% endif %}
+{% if teams %}
+<form class="tv-pick" method="get" action="/league/teamview">
+  {% if week is not none %}<input type="hidden" name="week" value="{{ week }}">{% endif %}
+  <select name="a" aria-label="First team">
+    {% for t in teams %}<option value="{{ t }}" {{ 'selected' if t == a_name else '' }}>{{ t }}</option>{% endfor %}
+  </select>
+  <span class="tv-vs">vs</span>
+  <select name="b" aria-label="Second team">
+    {% for t in teams %}<option value="{{ t }}" {{ 'selected' if t == b_name else '' }}>{{ t }}</option>{% endfor %}
+  </select>
+  <button type="submit">Go</button>
+</form>
 {% endif %}
 
 {% if missing %}

@@ -929,3 +929,21 @@ Parallel-lane audit of every doc against the current code/architecture:
   header always shows Yahoo's official total. Not a scoring bug (week 10
   exact, accuracy gate frozen).
 - 29 Rust tests pass (2 new regression tests).
+
+## 2026-11-20 — Team View: other-team history + final-score merge
+
+- User: selecting another team's Team View then a past week snapped back
+  to OUR historical matchup. Two bugs: (1) week-selector links dropped
+  a/b params; (2) b defaulted to OUR matchup's opponent. Fixed: links
+  carry urlencoded a/b; b resolves via opponent_of(a) from the week's
+  scoreboard; added team dropdowns (GET form, hidden week) on the page.
+- Found while verifying: the with-rosters snapshot is captured Sunday
+  morning ET, so its scoreboard is MID-WEEK (week-5 Browns 107.0 vs
+  final 134.32; week-10 opponent header was stale 102.02 vs 104.02 —
+  earlier "exact" claim had conflated header with totals row). Fix:
+  past mode MERGES latest-with-rosters (rosters) + latest-any (final
+  scoreboard/standings overlay).
+- Verified: Browns wk5 header 134.32-95.52 vs Neal Before Zod (their
+  real wk5 opponent), rows sum exactly 134.32; Shiba wk10 143.76-104.02.
+- 31 Rust tests (3 new: other-team history, final-scoreboard merge,
+  earlier picker/link regression).

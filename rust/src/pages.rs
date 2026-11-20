@@ -748,27 +748,41 @@ pub async fn teamview(
     let (report, live, plan_week) = if is_past {
         let w = requested.unwrap();
         let hist = artifacts::read_league_history(&st.cfg.root);
-        // Prefer the latest snapshot that actually HAS rosters: the last
-        // snapshots of a week are light runs (standings/scoreboard only),
-        // and picking one of those leaves the opponent side empty.
-        let snap = hist
+        // Two snapshots, merged: the latest one WITH rosters supplies the
+        // rosters (the last snapshots of a week are light runs without
+        // them), while the overall latest snapshot supplies the FINAL
+        // scoreboard/standings — the with-rosters one is captured before
+        // the late games and carries mid-week scores.
+        let week_snaps: Vec<&Value> = hist
             .iter()
             .filter(|r| snapshot_week(r) == Some(w))
-            .max_by(|a, b| {
-                let key = |r: &Value| {
-                    let has_rosters = r
-                        .get("rosters")
-                        .and_then(Value::as_object)
-                        .map(|o| !o.is_empty())
-                        .unwrap_or(false);
-                    (
-                        has_rosters,
-                        artifacts::as_display_string(r.get("captured_at")),
-                    )
-                };
-                key(a).cmp(&key(b))
+            .collect();
+        let captured = |r: &Value| artifacts::as_display_string(r.get("captured_at"));
+        let latest_any = week_snaps.iter().max_by_key(|r| captured(r)).copied();
+        let latest_ro = week_snaps
+            .iter()
+            .filter(|r| {
+                r.get("rosters")
+                    .and_then(Value::as_object)
+                    .map(|o| !o.is_empty())
+                    .unwrap_or(false)
             })
-            .cloned();
+            .max_by_key(|r| captured(r))
+            .copied();
+        let snap = match (latest_ro, latest_any) {
+            (Some(base), Some(fin)) => {
+                let mut merged = base.clone();
+                for key in ["scoreboard", "standings"] {
+                    if let Some(v) = fin.get(key) {
+                        merged[key] = v.clone();
+                    }
+                }
+                Some(merged)
+            }
+            (Some(base), None) => Some(base.clone()),
+            (None, fin) => fin.cloned(),
+            (None, None) => None,
+        };
         (
             snap,
             artifacts::read_live_points_week(&st.cfg.root, w),
@@ -792,10 +806,33 @@ pub async fn teamview(
         .cloned()
         .or_else(|| my_name.clone())
         .unwrap_or_default();
+    // b defaults to team a's OPPONENT in this week's scoreboard — not to
+    // our own matchup's opponent (that would snap back to our team when
+    // browsing another team's history).
+    let sb_rows = report
+        .as_ref()
+        .and_then(|r| r.get("scoreboard"))
+        .and_then(Value::as_array);
+    let opponent_of = |name: &str| -> Option<String> {
+        sb_rows.and_then(|rows| {
+            rows.iter().find_map(|e| {
+                let t1 = e.get("team1").and_then(Value::as_str)?;
+                let t2 = e.get("team2").and_then(Value::as_str)?;
+                if t1 == name {
+                    Some(t2.to_string())
+                } else if t2 == name {
+                    Some(t1.to_string())
+                } else {
+                    None
+                }
+            })
+        })
+    };
     let b_name = params
         .get("b")
         .filter(|s| !s.trim().is_empty())
         .cloned()
+        .or_else(|| opponent_of(&a_name))
         .or_else(|| {
             matchup
                 .and_then(|m| m.get("opponent"))
@@ -961,6 +998,24 @@ pub async fn teamview(
     };
     let max_week = current_week.max(requested.unwrap_or(0));
     let weeks: Vec<i64> = (1..=max_week).collect();
+    let teams: Vec<String> = report
+        .as_ref()
+        .and_then(|r| r.get("standings"))
+        .and_then(Value::as_array)
+        .map(|rows| {
+            rows.iter()
+                .filter_map(|r| r.get("team").and_then(Value::as_str).map(str::to_string))
+                .collect::<Vec<String>>()
+        })
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| {
+            let mut names: Vec<String> = rosters
+                .and_then(Value::as_object)
+                .map(|o| o.keys().cloned().collect())
+                .unwrap_or_default();
+            names.sort();
+            names
+        });
     let ctx = json!({
         "a_name": a_name, "b_name": b_name, "week": week,
         "starters": starters, "bench": bench, "missing": missing,
@@ -971,6 +1026,7 @@ pub async fn teamview(
         "a_fan_total": fan_sum(&a), "b_fan_total": fan_sum(&b),
         "a_remaining": remaining(&a), "b_remaining": remaining(&b),
         "has_live": has_live, "is_past": is_past, "weeks": weeks,
+        "teams": teams,
     });
     render(&st, "teamview.html", ctx)
 }
