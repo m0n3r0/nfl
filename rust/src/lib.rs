@@ -3,7 +3,8 @@
 //!
 //!   /            -> 302 to /league (the public face is the league)
 //!   /dashboard   -> backend / (Flask keeps the dashboard at its root)
-//!   /team, /team/pin, /league, /league/team/<name>, /cron
+//!   /team, /team/pin, /league, /league/team/<name>, /league/teamview,
+//!   /logos/<file>, /cron
 //!       -> served NATIVELY by axum + minijinja from the same Jinja
 //!          templates Flask uses (web/templates/), reading the same local
 //!          artifacts (logs/*.json[l], data/pins.json). No Python involved.

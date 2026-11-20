@@ -14,8 +14,8 @@ use serde_json::{json, Map, Value};
 
 use crate::{artifacts, pins, AppState};
 
-/// The host crontab (docs/TEAM_OPERATOR.md is the authoritative runbook) —
-/// kept in sync with web/app.py CRON_SCHEDULE.
+/// The host crontab (docs/TEAM_OPERATOR.md is the authoritative runbook),
+/// mirrored here for the /cron page — update both when the crontab changes.
 const CRON_SCHEDULE: [(&str, &str, &str); 9] = [
     (
         "24 8,20 * * *",

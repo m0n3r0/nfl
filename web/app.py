@@ -1,9 +1,9 @@
 """Analytics compute backend for the FD nation web UI (pandas/sklearn).
 
 Behind nfl-webd (rust/, the jra-van-re jv-webd method): the axum front door
-on :5000 serves the fantasy pages (/team, /league, /cron, pins) natively and
-reverse-proxies the analytics routes here (loopback :5001 under
-com.fdnation.backend). This process never faces the tunnel directly.
+on :5000 serves the fantasy pages (/team, /league, /league/teamview, /cron,
+pins) natively and reverse-proxies the analytics routes here (loopback :5001
+under com.fdnation.backend). This process never faces the tunnel directly.
 
 Routes (all proxied by nfl-webd):
   /            dashboard (2026 projections + model card)

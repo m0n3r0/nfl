@@ -399,6 +399,7 @@ async fn league_page_and_team_detail_and_404() {
     assert_eq!(status, StatusCode::OK);
     assert!(html.contains("Beta Rb"));
     assert!(html.contains("Playing us this week")); // opponent matchup card
+    assert!(html.contains("/league/teamview?a=Team%20Beta")); // Team View link
     assert!(html.contains("50.4")); // PF-PA diff rounded: 90.1-140.5 = -50.4
     let (status, html) = get_body(app, "/league/team/No%20Such%20Team").await;
     assert_eq!(status, StatusCode::NOT_FOUND);

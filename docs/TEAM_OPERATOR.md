@@ -305,9 +305,11 @@ launchd agent (`tools/live_points.py --loop`); install with
   overnight waiver run, plus a data refresh for the new week's projections.
   If it still holds the flock at 20:24 the daily run simply skips — the
   waiver run already produces the full report.
-- nightly 21:19: league snapshot (standings + matchup + every other team's
-  roster **with Yahoo Proj Pts**, paced with the default 3s `--roster-delay`
-  plus each read's 2s settle ≈ 5s/team, ~60-90s total) persisted to
+- nightly 21:19: league snapshot (standings + matchup + **all 10 rosters
+  including our own**, with Yahoo Proj Pts; the 9 opponent reads are paced
+  with the default 3s `--roster-delay` plus each read's 2s settle ≈ 5s/team,
+  ~60-90s total; our own roster is evaluated on the team page we return to
+  anyway — zero extra navigation) persisted to
   `logs/league-report.json` and appended to the season history
   `logs/league-report.jsonl` — the local web UI's `/league` pages read these
   files; the web process itself never touches Yahoo. The same run syncs

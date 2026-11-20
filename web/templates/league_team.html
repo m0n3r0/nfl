@@ -6,6 +6,8 @@
              vertical-align: middle; margin-right: 8px; border: 1px solid #2c4055; }
 </style>
 <h1>{% if logo %}<img class="tv-logo" src="{{ logo }}" alt="">{% endif %}{{ name }}</h1>
+<p class="muted"><a href="/league/teamview?a={{ name | urlencode }}">Team View →</a>
+· <a href="/league">Back to standings</a></p>
 
 {% if not row and not trend %}
 <div class="notice">No team named "{{ name }}" in the league snapshots.

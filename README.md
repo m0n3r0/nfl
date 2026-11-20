@@ -47,7 +47,7 @@ flowchart TB
     subgraph ROBOTS["🤖 This Mac — cron + launchd"]
         CRON["crontab: 9 jobs<br/>operator 2×/day · lineup applies Sun/Mon<br/>nightly league snapshot · game-day light refresh<br/>Wed waiver scan · Sun profile backup"]
         OPER["team_operator.py<br/>preflight → roster → projections<br/>→ monitor + lineup proposal<br/>--apply submits via CDP"]
-        LEAG["league_report.py<br/>standings · scoreboard · all rosters<br/>+ opponent Proj Pts + logo sync"]
+        LEAG["league_report.py<br/>standings · scoreboard · all 10 rosters<br/>+ Yahoo Proj Pts + logo sync"]
         LIVE["live_points.py (launchd)<br/>10s change-gated ESPN poll<br/>exact Yahoo weights · drift check"]
         CHROME["Chrome CDP :9222<br/>logged-in Yahoo session<br/>loopback only"]
     end
@@ -56,6 +56,7 @@ flowchart TB
         OPJSON["logs/team-operator.jsonl<br/>run history + lineup plans"]
         LGJSON["logs/league-report.json<br/>+ season history .jsonl"]
         LPJSON["logs/live-points.json<br/>live player points + team totals"]
+        ARCH["logs/live-points-week-N.json<br/>permanent weekly finals archive"]
         PINS["data/pins.json 📌<br/>manual start/sit locks"]
         LOGOS["data/logos/ + logos.json"]
         SCORING["data/league-scoring.json<br/>authoritative Yahoo weights"]
@@ -63,7 +64,7 @@ flowchart TB
     end
 
     subgraph WEB["🦀 Web layer — loopback only"]
-        AXUM["nfl-webd · Rust/axum · :5000<br/>/league (home) · /team · /cron<br/>/league/teamview · /logos<br/>/live-points · /ws · pin toggles"]
+        AXUM["nfl-webd · Rust/axum · :5000<br/>/league (home) · /team · /cron<br/>/league/teamview · team pages · /logos<br/>/dashboard proxy · /live-points · /ws"]
         FLASK["Flask compute backend · :5001<br/>dashboard · players · predictions<br/>ratings · strategy · SOS · /api/*"]
     end
 
@@ -91,10 +92,12 @@ flowchart TB
     LEAG --> LOGOS
     CDN -->|images| LOGOS
     LIVE --> LPJSON
+    LIVE -->|every game final| ARCH
     LIVE -.->|reconcile vs fresh snapshot| LGJSON
     OPJSON --> AXUM
-    LGJSON --> AXUM
+    LGJSON -->|rosters + season history| AXUM
     LPJSON -->|watch + broadcast| AXUM
+    ARCH -->|past weeks| AXUM
     PINS --> AXUM
     LOGOS --> AXUM
     CORPUS --> FLASK
@@ -110,7 +113,7 @@ flowchart TB
     classDef human fill:#1e4a4a,stroke:#41d9d9,color:#ffffff
     class YAHOO,ESPN,NFLVERSE,CDN src
     class CRON,OPER,LEAG,LIVE,CHROME robot
-    class OPJSON,LGJSON,LPJSON,PINS,LOGOS,SCORING,CORPUS art
+    class OPJSON,LGJSON,LPJSON,ARCH,PINS,LOGOS,SCORING,CORPUS art
     class AXUM,FLASK web
     class TUNNEL edge
     class UI human
@@ -129,6 +132,9 @@ paths keep points honest: projections come from nflverse via our model,
 while **live** points come from ESPN raw stats converted under the exact
 Yahoo league weights (amber `league-scoring.json`), validated 15/15 against
 Yahoo's own finals and continuously reconciled against Yahoo's snapshot.
+Once every game of a week is final, the poller archives it permanently
+(`live-points-week-N.json`) — Team View's week selector reads those archives
+plus the season history to browse any past week's matchups.
 
 ## Contents
 
@@ -335,7 +341,7 @@ cd rust && cargo build --release                 # build the front door
 python tools/install_launchd.py --agent backend  # Flask analytics :5001
 python tools/install_launchd.py --agent web      # nfl-webd :5000
 # analytics backend standalone (fantasy pages need nfl-webd):
-python web/app.py            # PORT env, default 5000
+python web/app.py            # PORT env; launchd sets 5001 (standalone: 5000)
 ```
 
 ### Public tunnel (optional, ephemeral — same method as jra-van-re)
@@ -496,8 +502,8 @@ The suite (34 Python files, hermetic-first) includes:
 | `tests/test_backtest.py`, `tests/test_corpus.py`, `tests/test_features.py`, `tests/test_injuries.py` | data/model plumbing: backtest harness, corpus assembly, leakage guards, injury penalties |
 | `tests/test_bye_weeks.py`, `tests/test_schedule.py`, `tests/test_league_scoring.py`, `tests/test_browser.py` | bye weeks, schedule/kickoff locks, league scoring preset, browser launch/heal |
 
-The Rust front door has its own suite (27 tests: pages, pins parity, proxy,
-logos, WebSocket push, artifact readers):
+The Rust front door has its own suite (31 tests: pages, pins parity, proxy,
+logos, WebSocket push, artifact readers, Team View history):
 
 ```bash
 cd rust && cargo test --lib
@@ -576,7 +582,7 @@ and the operator runbook [docs/TEAM_OPERATOR.md](docs/TEAM_OPERATOR.md).
   by `tests/test_live_scoring.py` (15/15 vs Yahoo's week-10 finals).
 - `rust/` — **nfl-webd**, the axum front door (see [Web UI](#web-ui)):
   native fantasy pages, pin toggles, logo serving, WebSocket push, and the
-  reverse proxy to the Flask backend; 27-test suite (`cargo test --lib`).
+  reverse proxy to the Flask backend; 31-test suite (`cargo test --lib`).
 - `yahoo/wire.py` + `tools/waiver_targets.py` — paced available-player wire
   scan (WAF-aware) and target ranking; `--jev N` attaches an advisory Jev
   review to the top N targets.

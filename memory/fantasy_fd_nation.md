@@ -959,3 +959,25 @@ Parallel-lane audit of every doc against the current code/architecture:
 - Verified: wk5 Browns + wrong b=Shiba -> still Neal Before Zod; switch
   a to Shiba wk5 -> KNP Dripp (our real wk5 opponent); current week has
   the b dropdown. 31 Rust tests pass.
+
+## 2026-11-20 — five-reviewer system audit (orchestrated)
+
+- R1 web/Rust, R2 pipeline, R3 docs, R4 mermaid, R5 hygiene — independent
+  scoped passes (no subagent tool this session). Ledger:
+  ~/.hermes/cache/scratch/nfl-audit-20261120.md.
+- BUGS FOUND+FIXED: installed launchd plists for browser AND cloudflared
+  still pointed at pre-move /Users/user/nfl (browser exit 1 since Sep 15;
+  cloudflared a restart time bomb). Reinstalled both via
+  install_launchd.py; browser preflight green; tunnel URL rotated
+  (watcher published new one, 0600). LESSON: after a repo move, reinstall
+  ALL launchd agents, not just the ones that visibly break.
+- Docs fixed: README 27->31 Rust tests; mermaid gained the weekly-finals
+  archive node/edges (validated by actually rendering with mmdc + Chrome
+  for Testing — node v22 available at ~/.local/bin); lib.rs route doc,
+  CRON_SCHEDULE sync comment (app.py twin no longer exists), app.py
+  docstring, TEAM_OPERATOR nightly bullet (all 10 rosters incl. ours).
+- UX: league_team.html now has a Team View link (?a=<team>).
+- Clean bills: crontab 9 entries match Rust CRON_SCHEDULE + runbook;
+  gitignore/secrets/branches clean; GAME_PLAN/SKILL/BACKTEST docs current;
+  CODEBASE_REVIEW_INSEASON intentionally historical.
+- 31 Rust + 301 Python fast pass; all routes 200 via the new tunnel URL.
