@@ -1,6 +1,6 @@
 //! Hermetic tests: pin store parity with src/pins.py, artifact parsing,
-//! native page rendering through the real templates, and the proxy
-//! (stub backend on an ephemeral loopback port).
+//! native page rendering through the real templates — fantasy AND the
+//! prediction-engine analytics pages (data/web fixtures).
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -28,6 +28,14 @@ fn fixture_root(tmp: &Path) -> PathBuf {
         "league_team.html",
         "cron.html",
         "teamview.html",
+        "dashboard.html",
+        "players.html",
+        "player.html",
+        "predictions.html",
+        "ratings.html",
+        "strategy.html",
+        "sos.html",
+        "analytics_missing.html",
     ] {
         std::fs::copy(tpl_src.join(name), tpl_dst.join(name)).unwrap();
     }
@@ -62,7 +70,6 @@ fn write_runs(root: &Path, records: &[Value]) {
 fn cfg(root: &Path) -> Config {
     Config {
         bind: "127.0.0.1:0".into(),
-        backend: "http://127.0.0.1:1".into(), // unroutable: proxy tests override
         root: root.to_path_buf(),
     }
 }
@@ -225,18 +232,6 @@ async fn root_redirects_to_league() {
         .unwrap();
     assert_eq!(res.status(), StatusCode::FOUND);
     assert_eq!(res.headers()["location"], "/league");
-}
-
-#[tokio::test]
-async fn dashboard_proxies_to_backend_root() {
-    let tmp = tempfile_dir();
-    let root = fixture_root(&tmp);
-    let mut c = cfg(&root);
-    c.backend = spawn_backend().await;
-    let (status, body) = get_body(router(c), "/dashboard").await;
-    assert_eq!(status, StatusCode::OK);
-    let v: Value = serde_json::from_str(&body).unwrap();
-    assert_eq!(v["path"], "/"); // rewritten to the Flask dashboard root
 }
 
 #[tokio::test]
@@ -841,93 +836,142 @@ async fn teamview_query_override_and_missing_roster() {
     assert!(html.contains("roster for one of these teams"));
 }
 
-// --- proxy (jv-webd method) ---
+// --- prediction-engine analytics (native, data/web artifacts) ---
 
-/// Stub compute backend: echoes path + received XFF as JSON.
-async fn spawn_backend() -> String {
-    let app = axum::Router::new().fallback(|req: Request<Body>| async move {
-        let xff = req
-            .headers()
-            .get("x-forwarded-for")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
-        let host = req
-            .headers()
-            .get("host")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
-        axum::Json(json!({"path": req.uri().path(), "query": req.uri().query(),
-                          "xff": xff, "host": host}))
+fn web_fixtures(root: &Path) {
+    let web = root.join("data/web");
+    std::fs::create_dir_all(web.join("players")).unwrap();
+    let dash = json!({
+        "generated_at": "2026-11-20T00:00:00+00:00", "season": 2026, "stats_season": 2026,
+        "projections": [{"rank": 1, "player_id": "p1", "player_display_name": "Alpha QB",
+                         "position": "QB", "last_team": "BUF", "proj_ppg": 22.0,
+                         "proj_total": 374.0}],
+        "backtest": {"model_no_spread": {"accuracy": 0.612, "log_loss": 0.654, "brier": 0.231},
+                     "model_with_spread": {"accuracy": 0.68, "log_loss": 0.616, "brier": 0.214},
+                     "vegas": 0.684, "n_test": 544, "cv_mean": 0.663,
+                     "cv_folds": [{"test_season": 2024, "accuracy": 0.695}]}
     });
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr = listener.local_addr().unwrap();
-    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-    format!("http://{addr}")
+    std::fs::write(web.join("dashboard.json"), dash.to_string()).unwrap();
+    let players = json!({
+        "players": [
+            {"rank": 1, "player_id": "p1", "player_display_name": "Alpha QB",
+             "position": "QB", "last_team": "BUF", "games": 17, "baseline_ppg": 21.0,
+             "role_share": 0.6, "team_sos": 0.1, "proj_ppg": 22.0, "proj_total": 374.0},
+            {"rank": 2, "player_id": "p2", "player_display_name": "Beta RB",
+             "position": "RB", "last_team": "DET", "games": 17, "baseline_ppg": 12.0,
+             "role_share": 0.55, "team_sos": -0.2, "proj_ppg": 12.5, "proj_total": 212.5}],
+        "positions": ["QB", "RB", "WR", "TE"]
+    });
+    std::fs::write(web.join("players.json"), players.to_string()).unwrap();
+    let p1 = json!({"pid": "p1", "name": "Alpha QB", "pos": "QB",
+                  "history": [{"season": 2025, "games": 17, "ppg": 21.5}],
+                  "projection": {"proj_ppg": 22.0, "proj_total": 374.0,
+                                 "baseline_ppg": 21.0, "role_share": 0.6, "team_sos": 0.1}});
+    std::fs::write(web.join("players/p1.json"), p1.to_string()).unwrap();
+    let preds = json!({
+        "season": 2026, "weeks": [1, 2],
+        "predictions": [
+            {"week": 1, "home_team": "BUF", "away_team": "KC", "home_win_prob": 0.62,
+             "epa_diff": 0.08, "spread": null, "model": "no_spread"},
+            {"week": 2, "home_team": "DET", "away_team": "GB", "home_win_prob": 0.55,
+             "epa_diff": 0.02, "spread": -2.5, "model": "with_spread"}]
+    });
+    std::fs::write(web.join("predictions.json"), preds.to_string()).unwrap();
+    let ratings = json!({
+        "seasons": [2022, 2025, 2026],
+        "ratings": {"2022-1": [],
+                    "2026-1": [{"team": "BUF", "off_epa_per_play": 0.12,
+                                "def_epa_allowed_per_play": 0.01, "off_rz_td_rate": 0.6,
+                                "off_3d_epa_per_play": 0.05, "off_pass_epa_pp": 0.15,
+                                "off_rush_epa_pp": 0.02}]}
+    });
+    std::fs::write(web.join("ratings.json"), ratings.to_string()).unwrap();
+    let strategy = json!({
+        "seasons": [2025, 2026],
+        "strategy": {"2026": {"BUF": {"overall": {"epa_per_play": 0.1, "success_rate": 0.45, "n": 100},
+                                      "red_zone": {"epa_per_play": 0.2, "success_rate": 0.5, "n": 20},
+                                      "third_down": {"epa_per_play": 0.05, "success_rate": 0.4, "n": 30},
+                                      "pass": {"epa_per_play": 0.15, "success_rate": 0.44, "n": 60},
+                                      "rush": {"epa_per_play": 0.02, "success_rate": 0.46, "n": 40},
+                                      "pass_rate": 0.6, "shotgun_rate": 0.7}}}
+    });
+    std::fs::write(web.join("strategy.json"), strategy.to_string()).unwrap();
+    let sos = json!({"sos": [{"rank": 1, "team": "BUF", "sos": 0.3}]});
+    std::fs::write(web.join("sos.json"), sos.to_string()).unwrap();
+    let mc = json!({"evaluation": {"n_test": 544}, "cv": {"mean_accuracy": 0.663}});
+    std::fs::write(web.join("modelcard.json"), mc.to_string()).unwrap();
 }
 
 #[tokio::test]
-async fn proxy_forwards_path_query_and_replaces_spoofed_xff() {
+async fn analytics_pages_render_from_artifacts() {
     let tmp = tempfile_dir();
     let root = fixture_root(&tmp);
-    let mut c = cfg(&root);
-    c.backend = spawn_backend().await;
-    let res = router(c)
-        .oneshot(
-            Request::builder()
-                .uri("/players?q=RB&pos=RB")
-                .header("x-forwarded-for", "6.6.6.6") // spoofed: must be replaced
-                .header("x-real-ip", "6.6.6.6")
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(res.status(), StatusCode::OK);
-    let bytes = res.into_body().collect().await.unwrap().to_bytes();
-    let v: Value = serde_json::from_slice(&bytes).unwrap();
-    assert_eq!(v["path"], "/players");
-    assert_eq!(v["query"], "q=RB&pos=RB");
-    // oneshot has no ConnectInfo peer: prior chain is passed through only
-    // when there is no peer to assert; with a real socket the peer wins.
-    assert_eq!(v["xff"], "6.6.6.6");
+    web_fixtures(&root);
+    let app = router(cfg(&root));
+    let (status, html) = get_body(app.clone(), "/dashboard").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("Alpha QB") && html.contains("0.684"));
+    assert!(html.contains("2024=0.695")); // CV fold
+    let (_, html) = get_body(app.clone(), "/players").await;
+    assert!(html.contains("Alpha QB") && html.contains("Beta RB"));
+    let (_, html) = get_body(app.clone(), "/players?q=beta&pos=RB").await;
+    assert!(html.contains("Beta RB") && !html.contains("Alpha QB")); // filter
+    let (_, html) = get_body(app.clone(), "/player/p1").await;
+    assert!(html.contains("Alpha QB") && html.contains("21.5")); // history ppg
+    let (status, _) = get_body(app.clone(), "/player/nope").await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (status, _) = get_body(app.clone(), "/player/..%2f..%2fetc").await;
+    assert_eq!(status, StatusCode::NOT_FOUND); // traversal guard
+    let (_, html) = get_body(app.clone(), "/predictions").await;
+    assert!(html.contains("BUF") && html.contains("DET"));
+    let (_, html) = get_body(app.clone(), "/predictions?week=1").await;
+    assert!(html.contains("BUF") && !html.contains("DET")); // week filter
+    assert!(html.contains("—")); // null spread dash
+    let (_, html) = get_body(app.clone(), "/ratings").await;
+    assert!(html.contains("BUF") && html.contains("0.12")); // default = latest season
+    let (_, html) = get_body(app.clone(), "/ratings?season=2022&week=1").await;
+    assert!(html.contains("No ratings for 2022 week 1")); // honest empty notice
+    let (_, html) = get_body(app.clone(), "/strategy?team=BUF").await;
+    assert!(html.contains("0.45") && html.contains("Shotgun"), "{html}"); // breakdown + rates
+    let (_, html) = get_body(app.clone(), "/strategy?team=XXX").await;
+    assert!(html.contains("No plays found"));
+    let (_, html) = get_body(app, "/sos").await;
+    assert!(html.contains("BUF") && html.contains("0.3"));
 }
 
 #[tokio::test]
-async fn proxy_sets_xff_from_real_peer() {
+async fn analytics_apis_and_missing_artifacts() {
     let tmp = tempfile_dir();
     let root = fixture_root(&tmp);
-    let mut c = cfg(&root);
-    c.backend = spawn_backend().await;
-    // full socket path so ConnectInfo is present (loopback peer keeps chain)
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr = listener.local_addr().unwrap();
-    let app = router(c).into_make_service_with_connect_info::<std::net::SocketAddr>();
-    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-    let client = reqwest::Client::new();
-    let body = client
-        .get(format!("http://{addr}/predictions"))
-        .header("x-forwarded-for", "203.0.113.9")
-        .send()
-        .await
-        .unwrap()
-        .text()
-        .await
-        .unwrap();
+    web_fixtures(&root);
+    let app = router(cfg(&root));
+    let (status, body) = get_body(app.clone(), "/api/predictions?week=2").await;
+    assert_eq!(status, StatusCode::OK);
     let v: Value = serde_json::from_str(&body).unwrap();
-    assert_eq!(v["path"], "/predictions");
-    assert_eq!(v["xff"], "203.0.113.9, 127.0.0.1"); // loopback peer appends
-    assert_ne!(v["host"], format!("{addr}")); // host rewritten to upstream
-}
-
-#[tokio::test]
-async fn proxy_backend_down_is_502() {
-    let tmp = tempfile_dir();
-    let root = fixture_root(&tmp);
-    let (status, body) = get_body(router(cfg(&root)), "/predictions").await;
-    assert_eq!(status, StatusCode::BAD_GATEWAY);
-    assert!(body.contains("backend unreachable"));
+    assert_eq!(v.as_array().unwrap().len(), 1);
+    assert_eq!(v[0]["home_team"], "DET");
+    let (_, body) = get_body(app.clone(), "/api/modelcard").await;
+    let v: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(v["evaluation"]["n_test"], 544);
+    // No artifacts at all -> honest notice pages, 404 JSON APIs, no 500s.
+    let bare = fixture_root(&tempfile_dir());
+    let app = router(cfg(&bare));
+    for path in [
+        "/dashboard",
+        "/players",
+        "/predictions",
+        "/ratings",
+        "/strategy",
+        "/sos",
+    ] {
+        let (status, html) = get_body(app.clone(), path).await;
+        assert_eq!(status, StatusCode::OK, "{path}");
+        assert!(html.contains("tools/predictions_report.py"), "{path}");
+    }
+    let (status, _) = get_body(app.clone(), "/api/predictions").await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (status, _) = get_body(app, "/no/such/route").await;
+    assert_eq!(status, StatusCode::NOT_FOUND); // fallback, no upstream
 }
 
 // --- helpers ---

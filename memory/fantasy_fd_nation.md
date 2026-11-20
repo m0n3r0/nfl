@@ -997,3 +997,31 @@ Parallel-lane audit of every doc against the current code/architecture:
 - Verified live: /league 10 options; Victory Formation page preselects
   Victory Formation; /team preselects My Team: Shiba Innu; /players
   (Flask) has the picker too. 31 Rust + 301 Python fast pass.
+
+## 2026-11-20 — prediction engine moved to Rust (Flask removed)
+
+- User: analytics pages (Dashboard/Players/Win Predictions/Ratings/
+  Strategy/SOS) slow via Flask; refactor to the FD nation method, keep
+  the Python engine. Orchestrated as scoped passes (audit -> producer ->
+  Rust pages -> Flask removal -> verify); no subagent tool this session.
+- Audit: /dashboard 3.8s, /players 3.1s, /sos 3.0s — corpus.build +
+  project_players (+ model train/CV for dashboard) ran PER REQUEST.
+- New: tools/predictions_report.py computes everything OFFLINE into
+  data/web/*.json (dashboard, players + per-player files, predictions,
+  ratings all season-week combos, strategy all teams x seasons, sos,
+  modelcard). Fail-soft per section, atomic writes, JSON-safe via
+  df.to_json. com.fdnation.predreport launchd agent: daily 06:12 JST +
+  Wed 21:05 (after waiver --refresh-data), RunAtLoad.
+- Rust: analytics.rs native handlers (q/pos/week/team/season filtering
+  in Rust), same templates (one minijinja fix: k.replace -> |replace
+  filter), missing-artifact notice page, /api/* served from artifacts.
+- REMOVED: web/app.py, com.fdnation.backend (booted out + plist deleted),
+  the whole reverse proxy (reqwest dep gone, Config.backend gone,
+  fallback is a plain 404), flask in requirements.txt.
+- Results: dashboard 3.8s->3ms, players 3.1s->34ms, sos 3.0s->1.6ms;
+  via tunnel everything ~0.3s (network-bound). 308 Python fast + 29
+  Rust tests pass. Mermaid updated (PRED robot + DATAWEB artifact,
+  FLASK node gone) and re-rendered with mmdc.
+- Gotchas hit: XML comments cannot contain "--" (plist template);
+  minijinja lacks Python str method calls; first artifact build ~1h
+  cold (features cache fill), warm rebuilds minutes.

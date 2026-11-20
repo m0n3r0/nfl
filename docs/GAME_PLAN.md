@@ -237,9 +237,12 @@ cd /Users/user/m0n3r0/nfl
 
 Not cron: the **live-points agent** (`com.fdnation.livepoints` launchd,
 `tools/live_points.py --loop`) polls ESPN every ~10s during games and pushes
-Yahoo-exact points to the web UI over WebSocket; the **web stack** itself
-(`com.fdnation.web` = nfl-webd :5000, `com.fdnation.backend` = Flask :5001,
-`com.fdnation.cloudflared` = public tunnel) also runs under launchd.
+Yahoo-exact points to the web UI over WebSocket; the **predreport agent**
+(`com.fdnation.predreport`, `tools/predictions_report.py`) recomputes the
+prediction-engine artifacts daily (06:12 JST + Wed 21:05) so the analytics
+pages stay fast; the **web stack** itself (`com.fdnation.web` = nfl-webd
+:5000 serving ALL pages natively, `com.fdnation.cloudflared` = public
+tunnel) also runs under launchd.
 
 ### The tools you'll touch by hand
 

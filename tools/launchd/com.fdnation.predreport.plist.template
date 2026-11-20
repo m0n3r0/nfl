@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+ "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!--
+    FD nation prediction-engine artifact producer template. Do NOT copy this
+    file directly: tools/install_launchd.py renders @REPO_ROOT@ to the actual
+    repo location and installs the result to ~/Library/LaunchAgents.
+
+    The Python engine computes OFFLINE (FD nation method): nfl-webd serves
+    the analytics pages natively from data/web/*.json. Daily 06:12 JST keeps
+    projections/ratings current with nflverse publishes; Wed 21:05 follows
+    the waiver run's data refresh (20:11). RunAtLoad builds on install.
+  -->
+  <key>Label</key><string>com.fdnation.predreport</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>@REPO_ROOT@/.venv/bin/python</string>
+    <string>@REPO_ROOT@/tools/predictions_report.py</string>
+  </array>
+  <key>WorkingDirectory</key><string>@REPO_ROOT@</string>
+  <key>RunAtLoad</key><true/>
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>12</integer></dict>
+    <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>21</integer><key>Minute</key><integer>5</integer></dict>
+  </array>
+  <key>StandardOutPath</key><string>@REPO_ROOT@/logs/predictions-report.log</string>
+  <key>StandardErrorPath</key><string>@REPO_ROOT@/logs/predictions-report.log</string>
+  <key>EnvironmentVariables</key>
+  <dict><key>PYTHONIOENCODING</key><string>utf-8</string></dict>
+</dict>
+</plist>

@@ -1,6 +1,7 @@
-//! minijinja environment over the SAME templates Flask renders
-//! (web/templates/). Jinja2-compatible: extends/blocks, filters, tests.
-//! Two Flask-isms are bridged here so the templates stay single-sourced:
+//! minijinja environment over web/templates/ — the single template source
+//! for every page (the Flask renderer is gone). Jinja2-compatible syntax:
+//! extends/blocks, filters, tests. Two Flask-isms are bridged here so the
+//! templates stay portable:
 //!   url_for(endpoint)  -> global function mapping endpoint names to paths
 //!   tojson(indent=N)   -> filter with Flask's HTML-safe escaping
 

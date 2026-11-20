@@ -1,6 +1,7 @@
-//! Native fantasy pages — port of web/app.py's /team, /team/pin, /league,
-//! /league/team/<name>, /cron routes. Same artifacts, same templates, same
-//! fallback semantics (newest ok report, history roster fallback, 404).
+//! Native fantasy pages (originally ported from the retired Flask backend's
+//! /team, /team/pin, /league, /league/team/<name>, /cron routes). Same
+//! artifacts, same templates, same fallback semantics (newest ok report,
+//! history roster fallback, 404).
 
 use std::collections::HashMap;
 
@@ -64,10 +65,9 @@ const CRON_SCHEDULE: [(&str, &str, &str); 9] = [
     ),
 ];
 
-fn render(st: &AppState, template: &str, mut ctx: Value) -> Response {
+pub(crate) fn render(st: &AppState, template: &str, mut ctx: Value) -> Response {
     // Global nav: the "My Team" menu is a team picker fed by the latest
-    // league snapshot. Flask injects the same variables via a context
-    // processor so the shared layout works under both renderers.
+    // league snapshot, injected into every page context here.
     if let Some(obj) = ctx.as_object_mut() {
         if !obj.contains_key("nav_teams") {
             let report = artifacts::read_league_report(&st.cfg.root);
@@ -819,7 +819,6 @@ pub async fn teamview(
             }
             (Some(base), None) => Some(base.clone()),
             (None, fin) => fin.cloned(),
-            (None, None) => None,
         };
         (
             snap,

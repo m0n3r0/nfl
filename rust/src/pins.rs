@@ -1,7 +1,7 @@
 //! Manual pin store — exact port of src/pins.py (same file, same shape,
 //! same fail-closed contract). The Python operator reads data/pins.json;
-//! both writers (this daemon and the Flask backend) serialize toggles with
-//! an flock on data/pins.json.lock and persist atomically (tmp + rename).
+//! both writers (this daemon and the Python operator) serialize toggles
+//! with an flock on data/pins.json.lock and persist atomically (tmp + rename).
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};

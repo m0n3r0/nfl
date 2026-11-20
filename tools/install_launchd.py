@@ -10,11 +10,13 @@ Agents:
   cloudflared  quick tunnel exposing the local web UI (127.0.0.1:5000) on an
                ephemeral *.trycloudflare.com URL — unauthenticated; the live
                URL lands in logs/cloudflared-url.txt (mode 0600)
-  web          nfl-webd (Rust/axum front door, jra-van-re method) on
-               127.0.0.1:5000: native fantasy pages + proxy to the backend.
-               Build first: cd rust, then cargo build --release
-  backend      the Flask compute backend (analytics) on loopback :5001,
-               proxied by nfl-webd; never exposed directly
+  web          nfl-webd (Rust/axum, jra-van-re method) on 127.0.0.1:5000:
+               ALL pages native — fantasy + prediction-engine analytics
+               from local artifacts. Build first: cd rust && cargo build --release
+  livepoints   ESPN live-points poller (tools/live_points.py --loop)
+  predreport   prediction-engine artifact producer (tools/predictions_report.py):
+               daily 06:12 JST + Wed 21:05, writes data/web/*.json that the
+               analytics pages read. Replaces the old Flask web backend.
 """
 
 from __future__ import annotations
@@ -26,7 +28,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-AGENTS = ("browser", "cloudflared", "web", "backend", "livepoints")
+AGENTS = ("browser", "cloudflared", "web", "livepoints", "predreport")
 
 
 def template_path(agent: str, repo_root: Path = ROOT) -> Path:

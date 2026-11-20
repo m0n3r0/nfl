@@ -1,5 +1,6 @@
-//! nfl-webd binary: fantasy-page front door + reverse proxy to the Python
-//! compute backend (the jra-van-re jv-webd method).
+//! nfl-webd binary: the single web surface — fantasy pages AND the
+//! prediction-engine analytics, all native axum (the jra-van-re jv-webd
+//! method; the Flask backend and reverse proxy are gone).
 
 use nfl_webd::{router, Config};
 
@@ -36,18 +37,10 @@ async fn main() {
             std::process::exit(1);
         }
     };
-    tracing::info!(
-        "nfl-webd on {} — backend={} root={}",
-        cfg.bind,
-        cfg.backend,
-        cfg.root.display()
-    );
-    // ConnectInfo so the proxy can set X-Forwarded-For from the real peer.
-    axum::serve(
-        listener,
-        router(cfg).into_make_service_with_connect_info::<std::net::SocketAddr>(),
-    )
-    .with_graceful_shutdown(shutdown_signal())
-    .await
-    .expect("serve");
+    tracing::info!("nfl-webd on {} — root={}", cfg.bind, cfg.root.display());
+    // ConnectInfo no longer needed: there is no upstream proxy.
+    axum::serve(listener, router(cfg).into_make_service())
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .expect("serve");
 }

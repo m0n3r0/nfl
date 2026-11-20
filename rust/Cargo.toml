@@ -2,13 +2,12 @@
 name = "nfl-webd"
 version = "0.1.0"
 edition = "2021"
-description = "FD nation web front door: axum native fantasy pages + reverse proxy to the Python compute backend (jra-van-re jv-webd method)"
+description = "FD nation web front door: all pages native axum — fantasy + prediction-engine analytics from local artifacts (jra-van-re jv-webd method)"
 license = "MIT"
 
 [dependencies]
 axum = { version = "0.8", features = ["ws"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal", "fs", "sync", "time"] }
-reqwest = { version = "0.12", default-features = false, features = ["stream"] }
 minijinja = { version = "2", features = ["urlencode"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

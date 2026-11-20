@@ -23,6 +23,7 @@ env/
 # --- Data (large or derived artifacts) ---
 data/raw/
 data/processed/
+data/web/
 *.parquet
 *.csv.bz
 

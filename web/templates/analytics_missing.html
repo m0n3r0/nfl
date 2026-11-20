@@ -1,0 +1,10 @@
+{% extends "layout.html" %}
+{% block title %}{{ page }} — no artifacts yet{% endblock %}
+{% block body %}
+<h1>{{ page }}</h1>
+<div class="notice"><b>No data yet:</b> the prediction-engine artifacts have not
+been built. Run <code>python tools/predictions_report.py</code> — the
+<code>com.fdnation.predreport</code> launchd agent also refreshes them daily
+(06:12 JST) and after the Wednesday waiver/data refresh (21:05 JST).</div>
+<p class="muted"><a href="/league">← Back to league</a></p>
+{% endblock %}

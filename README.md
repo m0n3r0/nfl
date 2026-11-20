@@ -32,7 +32,7 @@ system and it places no wagers. See the honesty notes under
 
 One picture, six colors: **blue** = external data sources, **green** = the
 robots on this Mac (cron + launchd), **amber** = local artifacts (the only
-thing the web layer reads), **pink** = the web processes, **purple** = the
+thing the web layer reads), **pink** = the web process, **purple** = the
 public edge, **teal** = you.
 
 ```mermaid
@@ -49,6 +49,7 @@ flowchart TB
         OPER["team_operator.py<br/>preflight → roster → projections<br/>→ monitor + lineup proposal<br/>--apply submits via CDP"]
         LEAG["league_report.py<br/>standings · scoreboard · all 10 rosters<br/>+ Yahoo Proj Pts + logo sync"]
         LIVE["live_points.py (launchd)<br/>10s change-gated ESPN poll<br/>exact Yahoo weights · drift check"]
+        PRED["predictions_report.py (launchd)<br/>offline Python engine: projections ·<br/>win model · ratings · strategy · SOS"]
         CHROME["Chrome CDP :9222<br/>logged-in Yahoo session<br/>loopback only"]
     end
 
@@ -61,11 +62,11 @@ flowchart TB
         LOGOS["data/logos/ + logos.json"]
         SCORING["data/league-scoring.json<br/>authoritative Yahoo weights"]
         CORPUS["data/raw + data/processed<br/>nflverse corpus · trained models"]
+        DATAWEB["data/web/*.json<br/>prediction-engine page data<br/>(dashboard · players · predictions ·<br/>ratings · strategy · SOS · modelcard)"]
     end
 
     subgraph WEB["🦀 Web layer — loopback only"]
-        AXUM["nfl-webd · Rust/axum · :5000<br/>/league (home) · /team · /cron<br/>/league/teamview · team pages · /logos<br/>/dashboard proxy · /live-points · /ws"]
-        FLASK["Flask compute backend · :5001<br/>dashboard · players · predictions<br/>ratings · strategy · SOS · /api/*"]
+        AXUM["nfl-webd · Rust/axum · :5000<br/>ALL pages native: /league (home) · /team<br/>/cron · teamview · dashboard · players<br/>predictions · ratings · strategy · SOS<br/>/live-points · /ws · /api/*"]
     end
 
     subgraph EDGE["☁️ Public edge"]
@@ -100,8 +101,9 @@ flowchart TB
     ARCH -->|past weeks| AXUM
     PINS --> AXUM
     LOGOS --> AXUM
-    CORPUS --> FLASK
-    AXUM -->|reverse-proxy analytics| FLASK
+    CORPUS -->|projections + features| PRED
+    PRED -->|daily 06:12 + Wed 21:05| DATAWEB
+    DATAWEB -->|analytics pages| AXUM
     TUNNEL -->|forwards to :5000 only| AXUM
     UI <-->|HTTPS + WSS| TUNNEL
 
@@ -112,26 +114,30 @@ flowchart TB
     classDef edge fill:#3b1e4a,stroke:#9b41d9,color:#ffffff
     classDef human fill:#1e4a4a,stroke:#41d9d9,color:#ffffff
     class YAHOO,ESPN,NFLVERSE,CDN src
-    class CRON,OPER,LEAG,LIVE,CHROME robot
-    class OPJSON,LGJSON,LPJSON,ARCH,PINS,LOGOS,SCORING,CORPUS art
-    class AXUM,FLASK web
+    class CRON,OPER,LEAG,LIVE,PRED,CHROME robot
+    class OPJSON,LGJSON,LPJSON,ARCH,PINS,LOGOS,SCORING,CORPUS,DATAWEB art
+    class AXUM web
     class TUNNEL edge
     class UI human
 ```
 
 How to read it, in one paragraph: the **robots** (green) are the only
 processes that ever talk to Yahoo — slowly, through one logged-in Chrome
-tab, on cron schedules. Everything they learn lands in **local artifacts**
-(amber). The **web layer** (pink) never touches Yahoo or ESPN: nfl-webd
-serves the fantasy pages straight from those files and pushes live points
-to your browser over a WebSocket the moment the poller writes a new
-artifact; the Flask backend only computes the analytics pages (pandas /
-sklearn stay in Python). The **purple tunnel** is the sole public door,
-forwarding to :5000 — the backend is never exposed. Two independent data
-paths keep points honest: projections come from nflverse via our model,
-while **live** points come from ESPN raw stats converted under the exact
-Yahoo league weights (amber `league-scoring.json`), validated 15/15 against
-Yahoo's own finals and continuously reconciled against Yahoo's snapshot.
+tab, on cron schedules — or compute the analytics. Everything they learn
+lands in **local artifacts** (amber). The **web layer** (pink) is a single
+Rust process that never touches Yahoo or ESPN and never computes: it
+serves EVERY page — fantasy and prediction-engine alike — straight from
+those files, and pushes live points to your browser over a WebSocket the
+moment the poller writes a new artifact. The Python engine (pandas /
+sklearn) still does the thinking, but OFFLINE: the `predreport` agent
+writes `data/web/*.json` daily, so analytics pages are millisecond
+artifact reads instead of multi-second Flask request-time computation.
+The **purple tunnel** is the sole public door, forwarding to :5000. Two
+independent data paths keep points honest: projections come from nflverse
+via our model, while **live** points come from ESPN raw stats converted
+under the exact Yahoo league weights (amber `league-scoring.json`),
+validated 15/15 against Yahoo's own finals and continuously reconciled
+against Yahoo's snapshot.
 Once every game of a week is final, the poller archives it permanently
 (`live-points-week-N.json`) — Team View's week selector reads those archives
 plus the season history to browse any past week's matchups.
@@ -319,20 +325,26 @@ rush EPA/play, success rate, and pass/shotgun tendency.
 
 ## Web UI
 
-Two loopback processes (the jra-van-re method): **nfl-webd** (Rust/axum,
-`rust/`) is the front door on 127.0.0.1:5000 — it serves the fantasy pages
-natively with minijinja over the same `web/templates/`: `/league` (home),
-`/team`, `/team/pin`, `/league/team/<name>`, `/league/teamview`, `/cron`,
-`/logos/<file>`, `/live-points`, and the `/ws` WebSocket push. Everything
-else (the analytics pages) is reverse-proxied to the **Flask compute
-backend** on 127.0.0.1:5001 (pandas/sklearn stay in Python).
+ONE loopback process (the jra-van-re method, applied to everything):
+**nfl-webd** (Rust/axum, `rust/`) on 127.0.0.1:5000 serves EVERY page
+natively with minijinja over `web/templates/` — the fantasy pages
+(`/league` home, `/team`, `/team/pin`, `/league/team/<name>`,
+`/league/teamview`, `/cron`, `/logos/<file>`, `/live-points`, `/ws`) AND
+the prediction-engine pages (`/dashboard`, `/players`, `/player/<id>`,
+`/predictions`, `/ratings`, `/strategy`, `/sos`, `/api/predictions`,
+`/api/modelcard`). There is no Flask and no reverse proxy anymore: the
+Python engine computes OFFLINE via `tools/predictions_report.py` into
+`data/web/*.json` (the `com.fdnation.predreport` launchd agent: daily
+06:12 JST + Wed 21:05 after the waiver/data refresh), and the analytics
+handlers are pure artifact reads — milliseconds, never request-time
+corpus builds or model training. Missing artifacts render an honest
+notice telling you to run the producer.
 `/` redirects to `/league` (League is the default page; menu order
 League · My Team · Cron). "My Team" is a dropdown of all 10 league teams:
 our own team opens the operator view (`/team`), any other team opens its
 league page (`/league/team/<name>`); the current team stays preselected.
-Both renderers feed it (Rust render + Flask context processor). The
-model-card dashboard lives at `/dashboard`.
-The public tunnel points at :5000 only; the backend is never exposed.
+The model-card dashboard lives at `/dashboard`.
+The public tunnel points at :5000 only.
 
 On `/team` you can pin players (📌) to freeze their current slot: the
 operator's `--apply` cron runs never move a pinned player, so manual
@@ -341,11 +353,10 @@ start/sit choices survive the automated lineup set. Pins live in
 (`pins_error`). See `docs/TEAM_OPERATOR.md` → "Manual pins".
 
 ```bash
-cd rust && cargo build --release                 # build the front door
-python tools/install_launchd.py --agent backend  # Flask analytics :5001
-python tools/install_launchd.py --agent web      # nfl-webd :5000
-# analytics backend standalone (fantasy pages need nfl-webd):
-python web/app.py            # PORT env; launchd sets 5001 (standalone: 5000)
+cd rust && cargo build --release                  # build the web daemon
+python tools/install_launchd.py --agent web       # nfl-webd :5000 (all pages)
+python tools/install_launchd.py --agent predreport # offline analytics producer
+python tools/predictions_report.py                # manual artifact refresh
 ```
 
 ### Public tunnel (optional, ephemeral — same method as jra-van-re)
@@ -367,9 +378,10 @@ bookmarkable), **unauthenticated** (anyone with the URL can read every page —
 treat the URL file like a password), and the tunnel only forwards to
 127.0.0.1:5000 — nfl-webd must be running too: install it persistently via
 `python tools/install_launchd.py --agent web` (`com.fdnation.web`,
-KeepAlive, logs in `logs/web.log`). The old `cli.py web` subcommand was
-removed when the fantasy pages moved to Rust; `python web/app.py` alone
-serves only the analytics backend.
+KeepAlive, logs in `logs/web.log`). The old `cli.py web` subcommand and
+the Flask web backend (`web/app.py`, `com.fdnation.backend`) were removed
+when all pages moved to Rust; the Python engine lives on in `src/` +
+`tools/predictions_report.py`.
 
 Pages: **league** (home — standings, GameChannel-style matchup cards with
 team logos, live scores over WebSocket, Team View links), **team view**
@@ -390,7 +402,9 @@ The fantasy pages read only local artifacts written by the cron/launchd
 operators — `logs/team-operator.jsonl`, `logs/league-report.json` (+ the
 append-only `.jsonl` season history), `logs/live-points.json`, the weekly
 finals archives `logs/live-points-week-N.json`, `data/pins.json`,
-`data/logos.json` — the web processes never touch Yahoo or ESPN live.
+`data/logos.json` — and the analytics pages read only `data/web/*.json`
+written by `tools/predictions_report.py`. The web process never touches
+Yahoo or ESPN live and never computes.
 
 ### Team logos (cron-captured)
 
@@ -490,7 +504,7 @@ captured settings for realtime.
 python -m pytest tests/ -q
 ```
 
-The suite (34 Python files, hermetic-first) includes:
+The suite (35 Python files, hermetic-first) includes:
 
 | Area | Covers |
 |---|---|
@@ -503,11 +517,13 @@ The suite (34 Python files, hermetic-first) includes:
 | `tests/test_team_operator.py`, `tests/test_team_analyzer.py`, `tests/test_league_report.py`, `tests/test_preflight.py` | in-season tools: preflight + `waf_blocked`, operator audit/lock/restore/pins fail-closed, analyzer light mode, report writers/merges |
 | `tests/test_pins.py`, `tests/test_logo_sync.py`, `tests/test_launchd_agents.py` | pin store parity (Python/Rust), logo download/cache/sniffing, launchd agent templates |
 | `tests/test_live_scoring.py`, `tests/test_live_points.py` | **Yahoo-exact accuracy gate** (15/15 week-10 finals on real fixtures), 2pt/FG-tier/DEF edge cases, poller signature gating + reconciliation |
+| `tests/test_predictions_report.py` | offline analytics producer: artifact shapes, per-player files, fail-soft sections, JSON-safe records |
 | `tests/test_backtest.py`, `tests/test_corpus.py`, `tests/test_features.py`, `tests/test_injuries.py` | data/model plumbing: backtest harness, corpus assembly, leakage guards, injury penalties |
 | `tests/test_bye_weeks.py`, `tests/test_schedule.py`, `tests/test_league_scoring.py`, `tests/test_browser.py` | bye weeks, schedule/kickoff locks, league scoring preset, browser launch/heal |
 
-The Rust front door has its own suite (31 tests: pages, pins parity, proxy,
-logos, WebSocket push, artifact readers, Team View history):
+The Rust web daemon has its own suite (29 tests: pages, pins parity,
+logos, WebSocket push, artifact readers, Team View history, native
+analytics pages):
 
 ```bash
 cd rust && cargo test --lib
@@ -584,9 +600,15 @@ and the operator runbook [docs/TEAM_OPERATOR.md](docs/TEAM_OPERATOR.md).
   `com.fdnation.livepoints` launchd agent, drift reconciliation against the
   Yahoo snapshot; nfl-webd pushes the artifact over `/ws`. Accuracy frozen
   by `tests/test_live_scoring.py` (15/15 vs Yahoo's week-10 finals).
-- `rust/` — **nfl-webd**, the axum front door (see [Web UI](#web-ui)):
-  native fantasy pages, pin toggles, logo serving, WebSocket push, and the
-  reverse proxy to the Flask backend; 31-test suite (`cargo test --lib`).
+- `rust/` — **nfl-webd**, the axum web daemon (see [Web UI](#web-ui)):
+  ALL pages native — fantasy pages, pin toggles, logo serving, WebSocket
+  push, and the prediction-engine analytics from `data/web/` artifacts;
+  29-test suite (`cargo test --lib`).
+- `tools/predictions_report.py` — the offline prediction-engine producer:
+  corpus + projections + model evaluation + as-of ratings + strategy
+  splits + SOS → `data/web/*.json` (fail-soft per section, atomic writes).
+  Runs as `com.fdnation.predreport` (daily 06:12 JST + Wed 21:05) or
+  manually; the analytics pages are pure reads of its output.
 - `yahoo/wire.py` + `tools/waiver_targets.py` — paced available-player wire
   scan (WAF-aware) and target ranking; `--jev N` attaches an advisory Jev
   review to the top N targets.
@@ -613,7 +635,7 @@ and the operator runbook [docs/TEAM_OPERATOR.md](docs/TEAM_OPERATOR.md).
   `backtest_projections.py` (projection backtest harness),
   `profile_backup.py` (profile snapshots) / `install_launchd.py` (renders +
   installs the five launchd agents: `browser`, `cloudflared`, `web`,
-  `backend`, `livepoints`).
+  `livepoints`, `predreport`).
 - `scripts/yahoo_oauth.py` — Yahoo Fantasy API OAuth2 helper (token refresh;
   not yet consumed by the operators).
 - `skills/fantasy-read/` — read-only Yahoo endpoint inventory (agent skill doc).

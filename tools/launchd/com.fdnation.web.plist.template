@@ -31,7 +31,6 @@
   <key>EnvironmentVariables</key>
   <dict>
     <key>NFL_WEBD_BIND</key><string>127.0.0.1:5000</string>
-    <key>NFL_WEBD_BACKEND</key><string>http://127.0.0.1:5001</string>
     <key>NFL_WEBD_ROOT</key><string>@REPO_ROOT@</string>
     <key>RUST_LOG</key><string>info</string>
   </dict>

@@ -37,21 +37,23 @@ def test_web_template_renders_axum_front_door():
     assert "@REPO_ROOT@" not in program
     env = plist["EnvironmentVariables"]
     assert env["NFL_WEBD_BIND"] == "127.0.0.1:5000"
-    assert env["NFL_WEBD_BACKEND"] == "http://127.0.0.1:5001"
+    assert "NFL_WEBD_BACKEND" not in env  # no upstream anymore
     assert "@REPO_ROOT@" not in env["NFL_WEBD_ROOT"]
     assert plist["StandardOutPath"].endswith("logs/web.log")
 
 
-def test_backend_template_renders_loopback_flask():
-    plist = install_launchd.render("backend")
-    assert plist["Label"] == "com.fdnation.backend"
-    assert plist["KeepAlive"] is True
+def test_predreport_template_renders_calendar_producer():
+    plist = install_launchd.render("predreport")
+    assert plist["Label"] == "com.fdnation.predreport"
+    assert plist["RunAtLoad"] is True
     python, script = plist["ProgramArguments"]
     assert python.endswith(".venv/bin/python")
-    assert script.endswith("web/app.py")
+    assert script.endswith("tools/predictions_report.py")
     assert "@REPO_ROOT@" not in script
-    assert plist["EnvironmentVariables"]["PORT"] == "5001"
-    assert plist["StandardOutPath"].endswith("logs/backend.log")
+    cal = plist["StartCalendarInterval"]
+    assert {"Hour": 6, "Minute": 12} in cal          # daily
+    assert {"Weekday": 3, "Hour": 21, "Minute": 5} in cal  # post-refresh Wed
+    assert plist["StandardOutPath"].endswith("logs/predictions-report.log")
 
 
 def test_unknown_agent_rejected():

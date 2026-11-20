@@ -1,6 +1,7 @@
-//! Local artifact readers — port of web/app.py's _read_operator_runs /
-//! _read_league_report / _read_league_history. The web layer reads LOCAL
-//! artifacts only; live Yahoo reads belong to the WAF-aware cron jobs.
+//! Local artifact readers (originally ported from the retired Flask
+//! backend's _read_operator_runs / _read_league_report / _read_league_history).
+//! The web layer reads LOCAL artifacts only; live Yahoo reads belong to the
+//! WAF-aware cron jobs.
 
 use std::path::Path;
 
@@ -84,6 +85,13 @@ pub fn read_live_points(root: &Path) -> Option<Value> {
 pub fn read_live_points_week(root: &Path, week: i64) -> Option<Value> {
     let path = root.join(format!("logs/live-points-week-{week}.json"));
     let text = std::fs::read_to_string(path).ok()?;
+    serde_json::from_str(&text).ok()
+}
+
+/// Prediction-engine web artifact (data/web/<name>, written OFFLINE by
+/// tools/predictions_report.py — the FD nation method for analytics).
+pub fn read_web_artifact(root: &Path, name: &str) -> Option<Value> {
+    let text = std::fs::read_to_string(root.join("data/web").join(name)).ok()?;
     serde_json::from_str(&text).ok()
 }
 
