@@ -288,7 +288,14 @@ Requirement: live fantasy points must match Yahoo — no drift. The pipeline:
    from Yahoo if settings change, never hand-tune).
 2. **Poller**: `tools/live_points.py` (launchd agent `com.fdnation.livepoints`,
    `--loop`) polls ESPN's free public scoreboard/boxscore APIs — NOT Yahoo,
-   so zero WAF risk — every ~30s during games and sleeps between windows.
+   so zero WAF risk — on a ~10s cycle during games, sleeping between
+   windows. Polite by construction: one scoreboard request per cycle, and
+   a game's summary is re-fetched only when its scoreboard signature
+   changed (period, clock, scores, `situation.lastPlay.id`) — stopped
+   clocks cost zero summary requests; a forced sweep every ~60s catches
+   stat corrections; requests are staggered >= 0.25s apart with jittered
+   sleeps; final games are fetched once and cached. `--interval` tunes the
+   cycle (floor 5s — faster is spam, not freshness).
    `src/live_scoring.py` converts raw stats under the Yahoo weights,
    including the tricky bits: 2-point conversions (hidden in ESPN's TD-play
    parentheticals), FG distance tiers from scoring plays, DEF points-allowed

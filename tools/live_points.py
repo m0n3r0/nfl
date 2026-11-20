@@ -16,7 +16,16 @@ drift=true and the web falls back to Yahoo's verified numbers.
 Modes:
   --once          one pass over the current week (live + recent finals)
   --week N        compute a finished week (backtest / re-verification)
-  --loop          daemon: ~30s cadence during games, sleeps between windows
+  --loop          daemon: ~10s cadence during games, sleeps between windows
+
+Politeness (free API — don't spam):
+  * one scoreboard request per cycle (ESPN caches it ~8s)
+  * a game's summary is re-fetched ONLY when its scoreboard signature
+    changed (period, clock, scores, situation.lastPlay.id) — a new play is
+    the only thing that can change a boxscore; stopped clocks cost nothing
+  * a forced full sweep every 6th cycle (~60s) catches stat corrections
+  * >= 0.25s between requests, +/-10% jitter on the cycle sleep
+  * final games are fetched once, then served from cache
 """
 
 from __future__ import annotations
@@ -47,6 +56,10 @@ LEAGUE_REPORT = ROOT / "logs" / "league-report.json"
 UA = {"User-Agent": "Mozilla/5.0 (nfl-live-points; personal fantasy tracker)"}
 DRIFT_TOLERANCE = 0.5
 FRESH_SNAPSHOT_SECONDS = 180
+POLL_SECONDS = 10.0      # cycle during live games (ESPN UI polls similarly)
+MIN_POLL_SECONDS = 5.0   # floor: faster than this is spam, not freshness
+REQUEST_GAP = 0.25       # min seconds between any two HTTP requests
+SWEEP_EVERY = 6          # force-refresh all games every N cycles (~60s)
 
 
 def fetch_json(url: str) -> dict:
@@ -70,13 +83,28 @@ def event_meta(event: dict) -> dict:
             "display": t.get("displayName", ""),
             "score": side.get("score", "0"),
         }
+    last_play = (comp.get("situation") or {}).get("lastPlay") or {}
     return {"id": event.get("id"), "name": event.get("name"),
             "date": event.get("date"),
             "state": status.get("type", {}).get("state", "pre"),
             "detail": status.get("type", {}).get("shortDetail", ""),
             "period": status.get("period", 0),
             "clock": status.get("displayClock", ""),
+            "clock_seconds": status.get("clock"),
+            "last_play_id": last_play.get("id"),
             "teams": teams}
+
+
+def game_signature(meta: dict) -> tuple:
+    """Everything that can signal a boxscore change, from the scoreboard.
+
+    A new play (lastPlay.id), a scoring change, or the clock/period moving
+    are the only ways stats change; identical signature -> identical
+    boxscore (modulo rare corrections, covered by the periodic sweep).
+    """
+    scores = tuple(sorted((a, t.get("score")) for a, t in meta["teams"].items()))
+    return (meta.get("period"), meta.get("clock_seconds"), scores,
+            meta.get("last_play_id"))
 
 
 def load_rosters() -> tuple[dict, str | None]:
@@ -172,37 +200,64 @@ def reconcile(totals: dict) -> dict:
     return out
 
 
-def compute_week(week: int | None = None) -> dict:
+def compute_week(week: int | None = None, cache: dict | None = None,
+                 force: bool = False) -> dict:
     board = scoreboard(week)
     events = [event_meta(e) for e in board.get("events", [])]
     wk = (board.get("week") or {}).get("number") or week
     scoring = load_scoring()
+    cache = cache if cache is not None else {}
+    sigs = cache.setdefault("sigs", {})
+    gdata = cache.setdefault("gdata", {})
     players: dict[str, dict] = {}
     defs: dict[str, float] = {}
     game_teams: dict[str, dict] = {}
     games: dict[str, dict] = {}
+    fresh = cached = 0
     for meta in events:
-        games[meta["id"]] = meta
+        eid = meta["id"]
+        games[eid] = meta
         if meta["state"] not in ("in", "post"):
             continue  # scheduled: no stats yet
-        try:
-            summary = fetch_json(f"{ESPN}/summary?event={meta['id']}")
-        except Exception as exc:  # noqa: BLE001 - keep the loop alive
-            print(f"warning: summary {meta['id']} failed: {exc}", file=sys.stderr)
-            meta["error"] = str(exc)
-            continue
-        parsed = parse_game(summary)
-        game_teams[meta["id"]] = parsed["teams"]
-        for key, pts in compute_game(summary, scoring).items():
+        sig = game_signature(meta)
+        entry = gdata.get(eid)
+        if not force and entry is not None and sigs.get(eid) == sig:
+            cached += 1
+            meta["fetch"] = "cached"
+        else:
+            try:
+                summary = fetch_json(f"{ESPN}/summary?event={eid}")
+                parsed = parse_game(summary)
+                entry = {"points": compute_game(summary, scoring),
+                         "players": parsed["players"], "teams": parsed["teams"]}
+                gdata[eid] = entry
+                sigs[eid] = sig
+                fresh += 1
+                meta["fetch"] = "fresh"
+                time.sleep(REQUEST_GAP)  # stagger; never burst the free API
+            except Exception as exc:  # noqa: BLE001 - keep the loop alive
+                print(f"warning: summary {eid} failed: {exc}", file=sys.stderr)
+                meta["error"] = str(exc)
+                if entry is None:
+                    continue
+                cached += 1
+                meta["fetch"] = "stale"  # serve the last good data
+        game_teams[eid] = entry["teams"]
+        for key, pts in entry["points"].items():
             if key.startswith("DEF:"):
                 defs[key] = pts
             else:
-                p = parsed["players"].get(key, {})
+                p = entry["players"].get(key, {})
                 players[key] = {"display": p.get("display", key),
                                 "team": p.get("team", ""),
-                                "points": pts, "game_id": meta["id"],
+                                "points": pts, "game_id": eid,
                                 "state": meta["state"]}
-        time.sleep(0.3)  # be a polite client even on a public API
+    # prune caches for games no longer on the board (week rollover)
+    live_ids = set(games)
+    for store in (sigs, gdata):
+        for eid in list(store):
+            if eid not in live_ids:
+                del store[eid]
     rosters, my_name = load_rosters()
     totals, unmatched, def_named = team_totals(rosters, players, defs, game_teams)
     recon = reconcile(totals)
@@ -216,6 +271,7 @@ def compute_week(week: int | None = None) -> dict:
         "def_named": def_named,
         "totals": totals, "unmatched": unmatched,
         "reconciliation": recon,
+        "fetch_stats": {"fresh": fresh, "cached": cached},
     }
     return artifact
 
@@ -251,17 +307,31 @@ def _next_window(events: list[dict]) -> float:
     return max(60.0, min(min(starts) - 120.0, 900.0))
 
 
-def loop() -> int:
-    print("live-points loop started (ESPN -> Yahoo-weighted points)", flush=True)
+def clamp_interval(seconds: float) -> float:
+    """Freshness floor: faster than MIN_POLL_SECONDS is spam, not signal."""
+    return max(MIN_POLL_SECONDS, float(seconds))
+
+
+def loop(interval: float = POLL_SECONDS) -> int:
+    import random
+    interval = clamp_interval(interval)
+    cache: dict = {}
+    cycle = 0
+    print(f"live-points loop started (ESPN -> Yahoo-weighted points, "
+          f"{interval:.0f}s cadence, change-gated fetches)", flush=True)
     while True:
         try:
-            artifact = compute_week()
+            force = cycle % SWEEP_EVERY == 0  # periodic correction sweep
+            artifact = compute_week(cache=cache, force=force)
             write_artifact(artifact)
             live = [g for g in artifact["games"].values() if g["state"] == "in"]
+            cycle += 1
             if live:
+                fs = artifact["fetch_stats"]
                 print(f"{artifact['captured_at']} live={len(live)} "
+                      f"fresh={fs['fresh']} cached={fs['cached']} "
                       f"drift={artifact['reconciliation']['drift']}", flush=True)
-                time.sleep(30)
+                time.sleep(interval * random.uniform(0.9, 1.1))
             else:
                 delay = _next_window(list(artifact["games"].values()))
                 print(f"{artifact['captured_at']} no live games; "
@@ -279,10 +349,12 @@ def main() -> int:
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--week", type=int)
     parser.add_argument("--loop", action="store_true")
+    parser.add_argument("--interval", type=float, default=POLL_SECONDS,
+                        help=f"live-game cycle seconds (floor {MIN_POLL_SECONDS:.0f})")
     parser.add_argument("--out", default=str(ARTIFACT))
     args = parser.parse_args()
     if args.loop:
-        return loop()
+        return loop(args.interval)
     artifact = compute_week(args.week)
     write_artifact(artifact, Path(args.out))
     print(json.dumps({k: artifact[k] for k in

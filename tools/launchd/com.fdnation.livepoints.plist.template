@@ -11,9 +11,9 @@
     tools/live_points.py in loop mode: ESPN scoreboard/boxscores (free, no
     auth, NOT Yahoo — zero WAF risk) -> exact Yahoo league weights
     (data/league-scoring.json) -> logs/live-points.json. nfl-webd watches
-    that file and pushes updates to browsers over /ws. ~30s cadence during
-    games; sleeps between game windows. Reconciles against the Yahoo
-    light-cron snapshot and flags drift.
+    that file and pushes updates to browsers over /ws. ~10s change-gated
+    cadence during games; sleeps between game windows. Reconciles against
+    the Yahoo light-cron snapshot and flags drift.
   -->
   <key>Label</key><string>com.fdnation.livepoints</string>
   <key>ProgramArguments</key>

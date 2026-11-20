@@ -91,3 +91,92 @@ def test_next_window_caps_and_floors():
     assert live_points._next_window([soon]) == pytest.approx(180.0, abs=1)
     assert live_points._next_window([far]) == 900.0  # capped
     assert live_points._next_window([]) == 900.0
+
+
+def test_clamp_interval_floor():
+    assert live_points.clamp_interval(10) == 10.0
+    assert live_points.clamp_interval(1) == live_points.MIN_POLL_SECONDS
+    assert live_points.clamp_interval(0.1) == live_points.MIN_POLL_SECONDS
+
+
+def _board(play_id, clock=700.0, score="7"):
+    return {"week": {"number": 11}, "events": [{
+        "id": "g1", "name": "A at B", "date": "2026-11-20T01:15Z",
+        "competitions": [{
+            "status": {"type": {"state": "in", "shortDetail": "1st"},
+                       "period": 1, "displayClock": "11:40", "clock": clock},
+            "situation": {"lastPlay": {"id": play_id}},
+            "competitors": [
+                {"team": {"abbreviation": "A", "displayName": "Team A"},
+                 "score": score},
+                {"team": {"abbreviation": "B", "displayName": "Team B"},
+                 "score": "0"}]}]}]}
+
+
+_MIN_SUMMARY = {
+    "boxscore": {"players": [], "teams": []},
+    "header": {"competitions": [{"competitors": [
+        {"team": {"abbreviation": "A", "displayName": "Team A"}, "score": "7"},
+        {"team": {"abbreviation": "B", "displayName": "Team B"}, "score": "0"}]}]},
+    "scoringPlays": [],
+}
+
+
+def test_signature_gating_skips_unchanged_games(monkeypatch):
+    calls = []
+    monkeypatch.setattr(live_points, "fetch_json",
+                        lambda url: calls.append(url) or dict(_MIN_SUMMARY))
+    monkeypatch.setattr(live_points.time, "sleep", lambda s: None)
+    board = _board("play1")
+    monkeypatch.setattr(live_points, "scoreboard", lambda week=None: board)
+    monkeypatch.setattr(live_points, "load_rosters", lambda: ({}, None))
+
+    cache = {}
+    a1 = live_points.compute_week(cache=cache)
+    assert a1["fetch_stats"] == {"fresh": 1, "cached": 0}
+    a2 = live_points.compute_week(cache=cache)          # same signature
+    assert a2["fetch_stats"] == {"fresh": 0, "cached": 1}
+    assert len(calls) == 1                               # NO second request
+    assert a2["games"]["g1"]["fetch"] == "cached"
+
+    board2 = _board("play2")                             # new play -> fetch
+    monkeypatch.setattr(live_points, "scoreboard", lambda week=None: board2)
+    a3 = live_points.compute_week(cache=cache)
+    assert a3["fetch_stats"]["fresh"] == 1 and len(calls) == 2
+
+    a4 = live_points.compute_week(cache=cache, force=True)  # sweep -> fetch
+    assert a4["fetch_stats"]["fresh"] == 1 and len(calls) == 3
+
+
+def test_signature_gating_score_change_triggers_fetch(monkeypatch):
+    calls = []
+    monkeypatch.setattr(live_points, "fetch_json",
+                        lambda url: calls.append(url) or dict(_MIN_SUMMARY))
+    monkeypatch.setattr(live_points.time, "sleep", lambda s: None)
+    monkeypatch.setattr(live_points, "load_rosters", lambda: ({}, None))
+    cache = {}
+    monkeypatch.setattr(live_points, "scoreboard", lambda week=None: _board("p1"))
+    live_points.compute_week(cache=cache)
+    # same play id and clock, but the score moved (e.g. correction) -> fetch
+    monkeypatch.setattr(live_points, "scoreboard",
+                        lambda week=None: _board("p1", score="10"))
+    a = live_points.compute_week(cache=cache)
+    assert a["fetch_stats"]["fresh"] == 1 and len(calls) == 2
+
+
+def test_fetch_failure_serves_last_good_cache(monkeypatch):
+    monkeypatch.setattr(live_points.time, "sleep", lambda s: None)
+    monkeypatch.setattr(live_points, "load_rosters", lambda: ({}, None))
+    cache = {}
+    monkeypatch.setattr(live_points, "scoreboard", lambda week=None: _board("p1"))
+    monkeypatch.setattr(live_points, "fetch_json", lambda url: dict(_MIN_SUMMARY))
+    live_points.compute_week(cache=cache)
+
+    def boom(url):
+        raise OSError("network blip")
+    monkeypatch.setattr(live_points, "fetch_json", boom)
+    monkeypatch.setattr(live_points, "scoreboard",
+                        lambda week=None: _board("p2"))
+    a = live_points.compute_week(cache=cache)
+    assert a["games"]["g1"]["fetch"] == "stale"
+    assert "DEF:A" in a["def"]  # last good points still served

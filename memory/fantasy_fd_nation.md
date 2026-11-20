@@ -807,3 +807,19 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
 - Verified through tunnel: wss:// connect, initial payload, atomic-update
   push received. 294 Python fast + 27 Rust tests pass. TNF 10:15 JST today
   is the first live game window (poller wakes 2 min before kickoff).
+
+## 2026-11-20 — Live cadence 30s -> 10s, change-gated (polite to free API)
+
+- User: 30s too slow, shorter without spamming. ESPN headers: no ETag;
+  cache-control max-age=2 (summary) / 8 (scoreboard) — their freshness
+  contract. `enable=` trimming param: ignored (no payload reduction).
+- Design: 10s cycle (+/-10% jitter, --interval flag, floor 5s). One
+  scoreboard req/cycle; summary re-fetched ONLY when game signature
+  changes (period, clock_seconds, scores, situation.lastPlay.id — the
+  scoreboard carries all of it). Stopped clock = zero summary requests.
+  Forced sweep every 6 cycles (~60s) for stat corrections. >=0.25s between
+  requests. Final games fetched once, cached. Fetch failure serves last
+  good cache (fetch=stale). fetch_stats {fresh,cached} in artifact + log.
+- Verified LIVE during TNF (Colts@Texans): 10s cycles, fresh=1 on active
+  drives, fresh=0 cached=1 on stopped clock; points flowing (Nico Collins
+  10.7, Stroud 5.72...). 298 Python fast tests pass (4 new gating tests).
