@@ -53,6 +53,12 @@
                  font-variant-numeric: tabular-nums; }
   .tv-logo { width: 32px; height: 32px; border-radius: 50%; object-fit: cover;
              vertical-align: middle; margin-right: 8px; border: 1px solid #2c4055; }
+  .tv-weeks { font-size: 12px; color: #7a8a99; margin: 0 0 10px; }
+  .tv-week { display: inline-block; min-width: 22px; text-align: center;
+             padding: 2px 6px; margin-right: 3px; border-radius: 6px;
+             color: #7fb3ff; text-decoration: none; background: #16202c; }
+  .tv-week:hover { background: #1d2b3a; }
+  .tv-week.on { background: #2c4055; color: #e8eef4; font-weight: 700; }
   @media (max-width: 700px) {
     .tv .c-stats, .tv .c-proj { display: none; }
     .tv .c-player { width: 33%; }
@@ -72,7 +78,7 @@
     <div>
       <div class="tv-tname">{{ a_name }}</div>
       {% if a_record %}<div class="tv-trec">{{ a_record }}</div>{% endif %}
-      {% if a_remaining is not none %}<div class="tv-remaining">{{ a_remaining }} players remaining</div>{% endif %}
+      {% if a_remaining is not none and not is_past %}<div class="tv-remaining">{{ a_remaining }} players remaining</div>{% endif %}
     </div>
   </div>
   <div class="tv-center">
@@ -85,13 +91,19 @@
     <div>
       <div class="tv-tname">{{ b_name }}</div>
       {% if b_record %}<div class="tv-trec">{{ b_record }}</div>{% endif %}
-      {% if b_remaining is not none %}<div class="tv-remaining">{{ b_remaining }} players remaining</div>{% endif %}
+      {% if b_remaining is not none and not is_past %}<div class="tv-remaining">{{ b_remaining }} players remaining</div>{% endif %}
     </div>
   </div>
 </div>
 <p class="muted"><a href="/league">← Back to league</a> · layout copied from
 Yahoo’s matchup page. Fan Pts = live points (Yahoo-exact weights); Proj =
-our model (left) / Yahoo Proj Pts (right). “–” = no data yet.</p>
+our model (left) / Yahoo Proj Pts (right). “–” = no data yet.
+{% if is_past %} Viewing week {{ week }} finals from the archive.{% endif %}</p>
+{% if weeks %}
+<div class="tv-weeks">Week:
+  {% for w in weeks %}<a class="tv-week {{ 'on' if w == week else '' }}" href="/league/teamview?week={{ w }}">{{ w }}</a>{% endfor %}
+</div>
+{% endif %}
 
 {% if missing %}
 <div class="notice">A roster for one of these teams is not in the latest league

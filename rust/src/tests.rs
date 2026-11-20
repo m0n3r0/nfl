@@ -629,6 +629,50 @@ async fn teamview_pairs_players_by_slot() {
 }
 
 #[tokio::test]
+async fn teamview_historical_week_from_archive() {
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    teamview_fixtures(&root); // current week 2; operator run for week 1 exists
+    let old = json!({
+        "captured_at": "2026-09-06T12:00:00+00:00",
+        "matchup": {"week": 1, "team": "Shiba Innu", "opponent": "Team Beta"},
+        "scoreboard": [{"week": 1, "team1": "Shiba Innu", "team2": "Team Beta",
+                        "score1": 120.5, "score2": 99.0}],
+        "standings": [{"rank": 1, "team": "Shiba Innu", "record": "1-0-0"}],
+        "rosters": {"Team Beta": [
+            {"name": "Old Qb", "team": "KC", "position": "QB", "slot": "QB",
+             "injury_status": "", "proj": 11.1},
+            {"name": "Steelers D/ST", "team": "", "position": "DEF", "slot": "DEF",
+             "injury_status": "", "proj": null}]}
+    });
+    std::fs::write(
+        root.join("logs/league-report.jsonl"),
+        old.to_string() + "\n",
+    )
+    .unwrap();
+    let arch = json!({"week": 1, "players": {"old qb": {"points": 12.34}},
+                    "def_named": {}, "def": {"DEF:PIT": -3.0},
+                    "totals": {"Team Beta": 12.34}, "games": {}});
+    std::fs::write(root.join("logs/live-points-week-1.json"), arch.to_string()).unwrap();
+    let app = router(cfg(&root));
+    let (status, html) = get_body(
+        app.clone(),
+        "/league/teamview?week=1&a=Team%20Beta&b=Team%20Beta",
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("Old Qb")); // historical roster, not the current one
+    assert!(html.contains("12.34")); // archived per-player finals
+    assert!(html.contains("99.00")); // Yahoo's official final for Team Beta
+    assert!(html.contains("-3.00")); // DEF resolved via abbr, not def_named
+    assert!(html.contains("finals from the archive"));
+    assert!(html.contains("tv-week on")); // selector highlights week 1
+    assert!(!html.contains("players remaining")); // suppressed for past weeks
+    let (_, html) = get_body(app, "/league/teamview").await;
+    assert!(html.contains("Enemy Qb") && !html.contains("Old Qb"));
+}
+
+#[tokio::test]
 async fn teamview_query_override_and_missing_roster() {
     let tmp = tempfile_dir();
     let root = fixture_root(&tmp);

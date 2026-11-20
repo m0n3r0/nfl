@@ -180,3 +180,35 @@ def test_fetch_failure_serves_last_good_cache(monkeypatch):
     a = live_points.compute_week(cache=cache)
     assert a["games"]["g1"]["fetch"] == "stale"
     assert "DEF:A" in a["def"]  # last good points still served
+
+
+def _final_artifact(week=10, points=21.35):
+    return {"week": week, "scoring_sha": "abc",
+            "players": {"qb": {"points": points}}, "def": {}, "def_named": {},
+            "totals": {"Us": points},
+            "games": {"g1": {"state": "post"}, "g2": {"state": "post"}}}
+
+
+def test_archive_written_only_when_week_final(tmp_path):
+    art = _final_artifact()
+    art["games"]["g2"]["state"] = "in"  # one game still live
+    assert live_points.archive_if_final(art, tmp_path) is None
+    assert not list(tmp_path.glob("live-points-week-*.json"))
+
+    art["games"]["g2"]["state"] = "post"
+    path = live_points.archive_if_final(art, tmp_path)
+    assert path is not None and path.name == "live-points-week-10.json"
+    saved = json.loads(path.read_text())
+    assert saved["players"]["qb"]["points"] == 21.35
+    assert saved["archived_at"]
+
+
+def test_archive_rewritten_only_on_content_change(tmp_path):
+    art = _final_artifact()
+    p1 = live_points.archive_if_final(art, tmp_path)
+    mtime1 = p1.stat().st_mtime_ns
+    live_points.archive_if_final(art, tmp_path)          # identical -> skip
+    assert p1.stat().st_mtime_ns == mtime1
+    art["players"]["qb"]["points"] = 22.0                # correction -> rewrite
+    live_points.archive_if_final(art, tmp_path)
+    assert json.loads(p1.read_text())["players"]["qb"]["points"] == 22.0

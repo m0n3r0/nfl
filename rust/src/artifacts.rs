@@ -79,6 +79,14 @@ pub fn read_live_points(root: &Path) -> Option<Value> {
     serde_json::from_str(&text).ok()
 }
 
+/// A completed week's archived finals (logs/live-points-week-<N>.json,
+/// written by the poller once every game of the week is final).
+pub fn read_live_points_week(root: &Path, week: i64) -> Option<Value> {
+    let path = root.join(format!("logs/live-points-week-{week}.json"));
+    let text = std::fs::read_to_string(path).ok()?;
+    serde_json::from_str(&text).ok()
+}
+
 /// JSON value -> display string the way Python str() would for the artifact
 /// fields we slice (captured_at): strings verbatim, null -> "", else JSON.
 pub fn as_display_string(v: Option<&Value>) -> String {

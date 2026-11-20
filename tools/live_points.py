@@ -308,6 +308,39 @@ def _next_window(events: list[dict]) -> float:
     return max(60.0, min(min(starts) - 120.0, 900.0))
 
 
+def archive_if_final(artifact: dict, dirpath: Path = ROOT / "logs") -> Path | None:
+    """Persist a completed week's points to logs/live-points-week-<N>.json.
+
+    live-points.json itself is overwritten every cycle; this archive is the
+    permanent per-player record once every game of the week is final.
+    Re-written only when the stable content changes (late stat corrections).
+    """
+    games = artifact.get("games") or {}
+    week = artifact.get("week")
+    if not games or not week:
+        return None
+    if not all(g.get("state") == "post" for g in games.values()):
+        return None
+    path = dirpath / f"live-points-week-{week}.json"
+    payload = {k: artifact.get(k) for k in
+               ("week", "players", "def", "def_named", "totals", "games",
+                "scoring_sha")}
+    try:
+        existing = json.loads(path.read_text(encoding="utf-8"))
+        if all(existing.get(k) == v for k, v in payload.items()):
+            return path  # unchanged — don't touch the archive
+    except (OSError, ValueError):
+        pass
+    payload["archived_at"] = datetime.now(timezone.utc).isoformat()
+    dirpath.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + f".tmp.{int(time.time() * 1000)}")
+    tmp.write_text(json.dumps(payload, separators=(",", ":")) + "\n",
+                   encoding="utf-8")
+    tmp.replace(path)
+    print(f"archived week {week} finals -> {path.name}", flush=True)
+    return path
+
+
 def clamp_interval(seconds: float) -> float:
     """Freshness floor: faster than MIN_POLL_SECONDS is spam, not signal."""
     return max(MIN_POLL_SECONDS, float(seconds))
@@ -325,6 +358,7 @@ def loop(interval: float = POLL_SECONDS) -> int:
             force = cycle % SWEEP_EVERY == 0  # periodic correction sweep
             artifact = compute_week(cache=cache, force=force)
             write_artifact(artifact)
+            archive_if_final(artifact)
             live = [g for g in artifact["games"].values() if g["state"] == "in"]
             cycle += 1
             if live:
@@ -358,6 +392,7 @@ def main() -> int:
         return loop(args.interval)
     artifact = compute_week(args.week)
     write_artifact(artifact, Path(args.out))
+    archive_if_final(artifact)
     print(json.dumps({k: artifact[k] for k in
                       ("captured_at", "week", "scoring_sha")}, indent=2))
     print(f"players={len(artifact['players'])} teams={len(artifact['totals'])} "

@@ -881,3 +881,30 @@ Parallel-lane audit of every doc against the current code/architecture:
   (doubles as the tab restore). Verified live: 15 rows merged, Team View
   shows SF - QB etc + JST game lines + 9/7 remaining + Taylor 4.70 live.
 - 299 Python fast + 27 Rust tests pass.
+
+## 2026-11-20 — weekly points archives + Team View week selector
+
+- User asked whether previous weeks' fantasy points survive. Answer was:
+  matchup scores/standings/rosters/projections YES (append-only jsonl,
+  weeks 1-11), per-player points NO (live-points.json overwritten) but
+  recomputable from ESPN. Closed the gap:
+- tools/live_points.py archive_if_final(): once all games of a week are
+  "post", writes logs/live-points-week-N.json (players/def/def_named/
+  totals/games/scoring_sha + archived_at); rewrites only on content
+  change (late corrections). Called from loop() and --once/--week.
+- Backfilled weeks 1-10 from ESPN (900-1045 players/week, drift=False).
+- Team View ?week=N: historical rosters/matchup from the latest
+  league-report.jsonl snapshot of that week (scoreboard week is the
+  authoritative marker — matchup.week lags at boundaries), finals from
+  the archive, plan from that week's operator runs. Week selector 1..N.
+  Past-week header shows Yahoo's OFFICIAL final (snapshot outranks our
+  recomputed sum); "players remaining" suppressed for past weeks.
+- DEF resolution for history: def_named reflects the CURRENT roster, so
+  historical DEFs resolve via the archive's def map keyed by ESPN abbr
+  (tv_live_maps third map) + tv_def_abbr nickname map ("Steelers"->PIT)
+  for plan rows whose team is missing (week-10 snapshot was captured
+  AFTER the user dropped Steelers DEF mid-week).
+- Verified: week-10 page shows all 9 starters exact vs Yahoo golden
+  (Purdy 31.66, CMC 44.30, Kamara 14.90, Olave 4.50, Watson 5.20,
+  Strange 7.90, Brown 24.30, Sanders 14.00, Steelers -3.00); header
+  143.76-104.02 == Yahoo official final. 301 Python fast + 28 Rust pass.
