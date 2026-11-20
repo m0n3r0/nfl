@@ -325,7 +325,7 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
 - Repo pivot to in-season maintenance: epic #80 (operator, manual+cron);
   data gaps #83 (week/kickoff), #84 (byes), #85 (injuries), #86 (2026 stats);
   lineup recommender #87; live read/write gaps #88; keepalive #81; cleanup #82.
-  Full review: CODEBASE_REVIEW_INSEASON.md.
+  Full review: docs/CODEBASE_REVIEW_INSEASON.md.
 - Draft-era code REMOVED in the 2026-09-12 cleanup: driver/, yahoo/real_draft +
   mock_draft + draft_report, 14 draft-only tools (incl. deploy.ps1, mock
   harnesses, gen_cheat_sheet, simulate_draft), tools/debug/, validation/, 8
@@ -854,7 +854,7 @@ Parallel-lane audit of every doc against the current code/architecture:
   re-verified (settings scoring table, ?week=N finals, td.pts/Proj DOM).
 - memory league facts: opposing team names re-verified (renames happened).
 - Left as-is (correctly historical): docs/archive/* (all banner-marked),
-  CODEBASE_REVIEW_INSEASON.md (DELIVERED banner), PROJECTION_BACKTEST.md
+  docs/CODEBASE_REVIEW_INSEASON.md (DELIVERED banner), PROJECTION_BACKTEST.md
   (measurement record), drafts/2026-09-02 (draft record), memory journal
   entries (history is never rewritten).
 

@@ -554,7 +554,7 @@ maintaining the roster through the season.
 provenance in [docs/drafts/2026-09-02-fd-nation.md](docs/drafts/2026-09-02-fd-nation.md)).
 The draft-era driver, mock operators, and one-shot probes were removed after the
 draft (recoverable from git history). Current focus: **in-season team
-maintenance** — see [CODEBASE_REVIEW_INSEASON.md](CODEBASE_REVIEW_INSEASON.md)
+maintenance** — see [CODEBASE_REVIEW_INSEASON.md](docs/CODEBASE_REVIEW_INSEASON.md)
 and the operator runbook [docs/TEAM_OPERATOR.md](docs/TEAM_OPERATOR.md).
 
 ### Layout
@@ -681,5 +681,5 @@ See [docs/TEAM_OPERATOR.md](docs/TEAM_OPERATOR.md) for the full runbook.
 - Cannot guarantee wins (real NFL games decide outcomes).
 - The operators execute exact, pre-verified instructions; the strategy /
   recommendation layer shipped with the in-season epic (#80 — design map in
-  [CODEBASE_REVIEW_INSEASON.md](CODEBASE_REVIEW_INSEASON.md)) and stays
+  [CODEBASE_REVIEW_INSEASON.md](docs/CODEBASE_REVIEW_INSEASON.md)) and stays
   advisory: waiver claims and trades always wait for a human.
