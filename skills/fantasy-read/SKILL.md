@@ -1,10 +1,10 @@
 ---
 name: fantasy-read
-description: "Read-only operations on a user's Yahoo Fantasy Football league/tab via Edge CDP: roster, standings, matchups, waivers, draft board/ADP. No changes made. Use to report league state, build a draft board, or prep lineup decisions."
-version: 1.0.0
+description: "Read-only operations on a user's Yahoo Fantasy Football league/tab via Chrome/Edge CDP: roster, standings, matchups, waivers, settings/scoring. No changes made. Use to report league state or prep lineup decisions."
+version: 1.1.0
 author: Hermes Agent
 license: MIT
-platforms: [windows]
+platforms: [macos, windows]
 metadata:
   hermes:
     tags: [Fantasy-Football, Yahoo, Read-Only, Scraping, CDP]
@@ -13,20 +13,38 @@ metadata:
 
 # Fantasy Read (Yahoo) — read-only
 
-Read state from the user's open Yahoo Fantasy tab (league 1329011, team 2 "Doge").
-All operations are READ-ONLY. Drives Edge via the `edge-cdp` skill.
+Read state from the user's Yahoo Fantasy league (1329011, team 2 "Shiba
+Innu", manager Doge). All operations are READ-ONLY.
 
-## Quick start
+> **Current platform (2026-11-20):** macOS, Chrome for Testing with CDP on
+> `127.0.0.1:9222` (loopback only), profile `~/edge-draft-profile`. Use the
+> repo's shared transport `yahoo/cdp.py` (`CdpClient`, `find_team_target`)
+> instead of hand-rolled websocket code — it enforces loopback-only
+> endpoints, deadlines, and WAF fail-fast. The Windows/Edge + py.exe +
+> base64/WSL pattern below is the draft-era origin, kept for reference.
+
+## Quick start (macOS, current)
+```bash
+cd /Users/user/m0n3r0/nfl
+.venv/bin/python tools/edge_alive.py      # CDP liveness
+.venv/bin/python tools/check_login.py     # session health
+.venv/bin/python tools/yahoo_team.py      # read-only roster snapshot
+```
+
+## Quick start (Windows draft-era, historical)
 - Edge must be open on 9222 with --remote-allow-origins=*.
 - Run scripts on Windows via `py.exe` (stdin). Output base64 to round-trip to WSL.
 
-## Endpoints that work
+## Endpoints that work (re-verified 2026-11-20)
 - League home:  https://football.fantasysports.yahoo.com/f1/1329011
-- Your team:    https://football.fantasysports.yahoo.com/f1/1329011/2   (team id 2 = Doge)
-- Settings:     .../1329011/settings   (scoring format, roster, draft time)
-- Draft board:  .../1329011/draftanalysis  (ADP per player; top ~30 reliable,
-  deeper rows virtualized — scroll to load more)
-- Draft Central:.../1329011/draft
+  (standings table carries team logo URLs; scoreboard reads free here)
+- Your team:    https://football.fantasysports.yahoo.com/f1/1329011/2
+  (?week=N shows past weeks' final Fan Pts; td.pts = Fan Pts, next td = Proj Pts)
+- Opponent team: .../1329011/<team_id>  (same roster DOM; Proj Pts column)
+- Settings:     .../1329011/settings   (authoritative scoring table —
+  captured to data/league-scoring.json for the live-points engine)
+- Draft board:  .../1329011/draftanalysis  (DRAFT-ERA, historical below)
+- Draft Central:.../1329011/draft  (DRAFT-ERA, historical below)
 
 ## Reading the roster/standings (pattern)
 ```python
@@ -51,7 +69,7 @@ import time; time.sleep(4)
 print(ev(ws,"document.body.innerText.slice(0,2500)"))
 ```
 
-## Extracting the draft board (verified)
+## Extracting the draft board (DRAFT-ERA, historical — draft completed Sep 1-2)
 The board is a single `<table>`; rows are `<tbody><tr>` with cells:
 name (player link), team-pos ("Det - RB"), and a numeric ADP cell. Parse with:
 ```python

@@ -15,6 +15,10 @@ the user mentions fantasy football, their league, the draft, lineup, waivers, or
 - Platform: Yahoo Fantasy Football, league ID **1329011**, name **"FD nation"**.
 - Manager: user is **"Doge"**, team **#2** (URL team id = 2). **10 teams** (verified 2026-08-28 via live Edge CDP — the FD nation Teams page listed exactly 10 teams; Yahoo Settings confirms "Max Teams: 10"; the earlier "12 teams" claim was incorrect).
 - Known opposing team names (10 observed 08-28, 7 named): "Goal Line D. (commish)", "Game Plan buy", "Take it in the Browns", "K.'s Wins", "QB Sneak C.", "Otto-matic Win!", "N. Before Zod".
+  **Team names re-verified 2026-11-20** (managers rename mid-season; current
+  standings/logos capture): Namaste, Shiba Innu (us), Take it in the Browns,
+  KNP Dripp, Gateway Guardians, Otto-matic Win!, Neal Before Zod, Game of
+  Throws, Victory Formation, "My other team is a Ferrari.".
   *Manager first names are deliberately REDUCED TO INITIALS here. This repo is public
   (it was made public on 2026-08-31), and these are other people's real names — don't
   restore them. The bot picks best-player-available and is slot-agnostic, so it never
@@ -823,3 +827,31 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
 - Verified LIVE during TNF (Colts@Texans): 10s cycles, fresh=1 on active
   drives, fresh=0 cached=1 on stopped clock; points flowing (Nico Collins
   10.7, Stroud 5.72...). 298 Python fast tests pass (4 new gating tests).
+
+## 2026-11-20 — Documentation swarm audit (all docs vs code)
+
+Parallel-lane audit of every doc against the current code/architecture:
+- README: added colored mermaid architecture flowchart (6 layers: sources
+  blue / robots green / artifacts amber / web pink / edge purple / human
+  teal) + plain-language walkthrough; fixed stale `cli.py web` reference
+  (removed in f778bcc), completed native route list (/league/teamview,
+  /logos, /live-points, /ws), pages + artifact lists, test table (34 Python
+  files + 27 Rust tests, new pins/logos/live/launchd rows), layout entries
+  (src/pins.py, src/live_scoring.py, rust/, logo_sync, live_points, 5
+  launchd agents), scoring section now distinguishes presets (planning)
+  vs data/league-scoring.json (realtime authority).
+- docs/TEAM_OPERATOR.md: crontab block marked installed at the new path;
+  nightly snapshot now documents Proj Pts + logo sync; "~30 min from live"
+  replaced with the ~10s live-points feed + reconciliation-backstop role.
+- docs/GAME_PLAN.md: stale /Users/user/nfl path fixed (repo moved); Part 8
+  trackers #102/#103 marked historical (issues gone, windows passed, now
+  week 11); pins + live points added to the human/robot division; cheat
+  sheet notes launchd agents (livepoints/web/backend/cloudflared).
+- skills/fantasy-read/SKILL.md: v1.1.0 — macOS/Chrome current quick start
+  via yahoo/cdp.py, Windows/Edge pattern marked draft-era, endpoints
+  re-verified (settings scoring table, ?week=N finals, td.pts/Proj DOM).
+- memory league facts: opposing team names re-verified (renames happened).
+- Left as-is (correctly historical): docs/archive/* (all banner-marked),
+  CODEBASE_REVIEW_INSEASON.md (DELIVERED banner), PROJECTION_BACKTEST.md
+  (measurement record), drafts/2026-09-02 (draft record), memory journal
+  entries (history is never rewritten).

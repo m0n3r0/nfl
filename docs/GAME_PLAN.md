@@ -19,8 +19,11 @@ touchdowns, catches, field goals. Every week you go head-to-head against one
 other manager; the higher score wins. Finish top 4, then win the playoff final.
 
 **The season runs from this Mac:** a robot watches the team twice a day, sets
-the lineup just before Sunday kickoff, and scans the waiver wire mid-week. You
-make the judgment calls (claims, trades); the machine does the clicking.
+the lineup just before Sunday kickoff, and scans the waiver wire mid-week.
+During games, a second robot updates live fantasy points every ~10 seconds
+(ESPN stats under our exact Yahoo weights) and pushes them to the web UI.
+You make the judgment calls (claims, trades, start/sit pins 📌); the machine
+does the clicking.
 
 **Your league at a glance (FD nation):**
 
@@ -137,8 +140,15 @@ main slate locks Sunday 1:00 PM ET). This grind is what wins a season.
 ### Who does what
 - **Monday cron** (`tools/team_operator.py --apply`, 01:23 JST = Sunday
   ~12:23 ET, just before the 1 PM kickoffs) applies the best legal lineup.
+- **Your pins outrank the robot.** On the web UI's `/team` page, 📌 pin any
+  player to freeze his current slot — `--apply` runs never move a pinned
+  player, starter or bench. Manual start/sit calls survive automation.
 - **Twice-daily monitor** (08:24 and 20:24 JST) re-checks team state and flags
   anything that needs a human.
+- **During games:** the live-points agent updates scores every ~10s on the
+  web UI (`/league` home page, Team View, My Team) — computed from ESPN
+  stats under the exact Yahoo weights, reconciled against Yahoo's own
+  totals; if they ever disagree, the UI shows Yahoo's number.
 - **You** can eyeball the reasoning any time with the league-strength report:
   `tools/team_analyzer.py` (`--light` for a gentle check — just your roster
   and standings). Full command list: [TEAM_OPERATOR.md](TEAM_OPERATOR.md).
@@ -187,26 +197,29 @@ Bottom line: the edge is *currency and fit to this league*, not omniscience — 
 
 ---
 
-## Part 8 — Current season trackers
+## Part 8 — Season trackers (historical)
 
-Live strategy items, tracked as GitHub issues:
+The mid-season strategy items lived here as GitHub issues; both windows
+have passed (we are in week 11 now) and the issues are closed/removed:
 
-- **#102 — Week-8 bye concentration.** Purdy, McCaffrey, Kittle, and Olave are
-  ALL on bye in week 8. Start preparing ~week 5 — line up fill-ins early
-  rather than scrambling in week 7. The one real hole is TE: plan a **TE
-  streamer** (a cheap one-week rental off the wire) behind Kittle.
-- **#103 — Midseason trade.** Convert the RB surplus into a WR1. Window:
-  **weeks 4–8** (tactics in Part 6).
+- **#102 — Week-8 bye concentration** (Purdy, McCaffrey, Kittle, Olave all
+  on bye): handled — the week-8 lineup survived it.
+- **#103 — Midseason trade** (RB surplus → WR1, weeks 4–8 window): window
+  elapsed; trades remain a manual, human-approved lever (Part 6).
+
+Current state lives on the web UI (`/league` standings + matchup, `/team`
+lineup plan) and in `memory/fantasy_fd_nation.md` — not in this doc.
 
 ---
 
 ## Part 9 — Operations cheat-sheet
 
-Everything runs on **this Mac** from `/Users/user/nfl` with the project
-virtualenv — no activation needed, call it directly:
+Everything runs on **this Mac** from `/Users/user/m0n3r0/nfl` (moved there
+2026-11-20) with the project virtualenv — no activation needed, call it
+directly:
 
 ```bash
-cd /Users/user/nfl
+cd /Users/user/m0n3r0/nfl
 .venv/bin/python tools/team_operator.py
 ```
 
@@ -219,8 +232,14 @@ cd /Users/user/nfl
 | `23 1 * * 1` (Mon 01:23 = Sun ~12:23 ET) | Set the week's lineup: `--apply` |
 | `11 20 * * 3` (Wed 20:11) | Waiver scan with fresh data: `--waiver-scan --refresh-data` |
 | `19 21 * * *` (nightly 21:19) | League snapshot + all teams' rosters for the web UI (`league_report.py --all-rosters --out` + `--audit`) |
-| `5,35 8-13 * * 5` / `5,35 2-13 * * 1` / `5,35 8-13 * * 2` (game windows) | Light score refresh during Thu/Sun/Mon games: standings + full week scoreboard + our matchup, no roster reads; merges into the snapshot so the web UI stays ~30 min from live (`league_report.py --light --out` + `--audit`) |
+| `5,35 8-13 * * 5` / `5,35 2-13 * * 1` / `5,35 8-13 * * 2` (game windows) | Light score refresh during Thu/Sun/Mon games: standings + full week scoreboard + our matchup, no roster reads; merges into the snapshot — now the reconciliation backstop for the ~10s live-points feed (`league_report.py --light --out` + `--audit`) |
 | `37 9 * * 0` (Sun 09:37) | Weekly browser-profile backup (`tools/profile_backup.py`, local-only) |
+
+Not cron: the **live-points agent** (`com.fdnation.livepoints` launchd,
+`tools/live_points.py --loop`) polls ESPN every ~10s during games and pushes
+Yahoo-exact points to the web UI over WebSocket; the **web stack** itself
+(`com.fdnation.web` = nfl-webd :5000, `com.fdnation.backend` = Flask :5001,
+`com.fdnation.cloudflared` = public tunnel) also runs under launchd.
 
 ### The tools you'll touch by hand
 

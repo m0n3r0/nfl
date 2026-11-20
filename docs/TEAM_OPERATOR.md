@@ -274,9 +274,13 @@ Bureau) publishes midweek stat corrections, typically by Thursday US — a
 Yahoo's corrected numbers (see README "Data source" for the full provenance
 chain).
 
-Suggested crontab (times are JST, the host's local zone). Replace
-`/path/to/nfl` with the local clone path — the launchd installer
-(`tools/install_launchd.py`) renders repo paths the same way:
+Suggested crontab (times are JST, the host's local zone). This block is
+**installed and live** on the host at `/Users/user/m0n3r0/nfl` (the repo
+moved there 2026-11-20; all 9 entries point at the new path). The launchd
+installer (`tools/install_launchd.py`) renders repo paths the same way.
+Realtime points are NOT a cron job — they run as the `com.fdnation.livepoints`
+launchd agent (`tools/live_points.py --loop`); install with
+`python tools/install_launchd.py --agent livepoints`:
 
 ```cron
 24 8,20 * * *  cd /path/to/nfl && .venv/bin/python tools/team_operator.py >> logs/team-operator-cron.log 2>&1
@@ -302,18 +306,24 @@ Suggested crontab (times are JST, the host's local zone). Replace
   If it still holds the flock at 20:24 the daily run simply skips — the
   waiver run already produces the full report.
 - nightly 21:19: league snapshot (standings + matchup + every other team's
-  roster, paced with the default 3s `--roster-delay` plus each read's 2s
-  settle ≈ 5s/team, ~60-90s total) persisted to `logs/league-report.json`
-  and appended to the season history `logs/league-report.jsonl` — the local
-  web UI's `/league` pages read these files; the web process itself never
-  touches Yahoo.
+  roster **with Yahoo Proj Pts**, paced with the default 3s `--roster-delay`
+  plus each read's 2s settle ≈ 5s/team, ~60-90s total) persisted to
+  `logs/league-report.json` and appended to the season history
+  `logs/league-report.jsonl` — the local web UI's `/league` pages read these
+  files; the web process itself never touches Yahoo. The same run syncs
+  team logos from the public CDNs (`tools/logo_sync.py`, URL-cached).
 - game days at :05/:35 past the hour, Fri 08-13 / Mon 02-13 / Tue 08-13 JST
   (= Thu/Sun/Mon NFL windows ET): light score refresh — standings, the full
   week scoreboard (every matchup's live score, read off the league home page
   at no extra request cost), and our matchup. No roster reads, so each run is
   ~3 page loads; `--out` merges into the snapshot so the nightly rosters
-  survive, and the `/league` scoreboard stays within ~30 min of live during
-  games.
+  survive. These snapshots are now the **reconciliation backstop** for
+  realtime points: the `com.fdnation.livepoints` launchd agent
+  (`tools/live_points.py --loop`, ESPN-only, zero Yahoo requests) updates
+  `logs/live-points.json` every ~10s during games and nfl-webd pushes it to
+  the browser over `/ws`, so the `/league` scoreboard is ~10-15s from live;
+  a fresh light snapshot (<= 3 min) that disagrees by > 0.5 flags drift and
+  the UI falls back to Yahoo's verified number. See README → "Live points".
 - Sunday 09:37: weekly profile backup (local-only file copy — no Yahoo
   requests), keeping rung 2 of the recovery ladder fresh as cookies rotate.
 
