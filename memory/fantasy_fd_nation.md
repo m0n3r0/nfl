@@ -1045,3 +1045,26 @@ Parallel-lane audit of every doc against the current code/architecture:
 - Cosmetic leftover: the live-badge JS keys off def_named (nickname) — a
   city-named plan row during a LIVE week can miss the badge flash; the
   server-rendered value is still correct on every artifact refresh.
+
+## 2026-11-21 — independent re-review + per-file code guide
+
+- User had Kimi review the code; asked for another independent review +
+  new docs explaining every file with colored mermaid charts.
+- Independent review findings (both FIXED):
+  1. src/features.py docstring said cache was "parquet" — actually
+     gzipped CSV (team_ratings_{season}_w{week}.csv.gz). Corrected.
+  2. Persisted win_prob_model.joblib was pickled under sklearn 1.6.1 but
+     runtime is 1.9.1 (load_model emitted InconsistentVersionWarning).
+     Retrained via model.train_and_persist() (n_train 1086) and rebuilt
+     data/web artifacts — bundle + runtime now both 1.9.1, skew gone.
+     Lesson: retrain the model after any sklearn upgrade.
+- Yahoo-layer invariants re-verified intact: loopback-only CDP, identity
+  fail-closed, locked-row parsing, WAF signature, pins-before-navigation,
+  flock. No new bugs there.
+- NEW docs (all mermaid validated with mmdc, 39/39 render):
+  docs/CODE_GUIDE.md (index + whole-codebase map + color legend) and
+  docs/code/{SRC_ENGINE,YAHOO_LAYER,TOOLS,RUST_WEB,TESTS_INFRA}.md —
+  every file's functions + invariants + colored function flowcharts.
+  README links the guide from the intro.
+- Test counts grew via intervening commits (swarm audit 819579e + DEF fix
+  99af36a added regression tests): now 324 Python fast + 37 Rust, green.

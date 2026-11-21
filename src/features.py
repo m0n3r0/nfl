@@ -7,8 +7,8 @@ This is the rigor layer that separates a toy model from a real one:
 * Ratings are computed **as-of** a (season, week) window using only PRIOR games
   in that season (no future leakage). A game in week W uses team ratings built
   from weeks 1..W-1 of the same season; week 1 uses the prior completed season.
-* Results are cached to data/processed/ as parquet so the web UI and model are
-  fast and fully reproducible.
+* Results are cached to data/processed/ as gzipped CSV so the web UI and model
+  are fast and fully reproducible.
 
 Outputs:
   * team_ratings(season, week) -> DataFrame of per-team offensive/defensive

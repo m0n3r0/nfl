@@ -8,6 +8,10 @@ players, and builds a weekly lineup.
 > 2. **FD nation Yahoo operation** — a self-contained module that reads and
 >    maintains a specific Yahoo league's roster through the browser. See
 >    [FD nation Yahoo operation (module)](#fd-nation--yahoo-league-operation-module).
+>
+> **New here? Read the [Code Guide](docs/CODE_GUIDE.md)** — every file
+> explained in detail, with colored mermaid charts of what each function
+> does, organized by layer (engine · Yahoo · tools · Rust web · tests).
 
 ## What is fantasy football? (ELI5)
 
