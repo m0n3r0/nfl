@@ -56,7 +56,11 @@ Dependency order: **#79 → #81 → (#83, #84, #85, #86) → #87 → #88**, with
 - **Writes (verified, dry-run default, fail-closed):** `YahooLineupOperator.apply` (form-identity, exact-ID preconditions, disabled-option lock check `lineup.py:79-80`, legal-slot invariant, read-back confirm, idempotent `already_applied`) and `YahooWaiverOperator` (add+drop one transaction, stage-3 ID re-verification, in-flight no-replay marker, pending read-back, audit JSONL in `tools/yahoo_waiver.py:42-45`). Lineup CLI lacks the audit writer — add it.
 - **Projection bridge:** `yahoo/identity.py` `reconcile_identities` (unique full-name+position+team match; ambiguous/unmapped fail closed).
 - **Cron scaffolding to copy:** date gate + `fcntl` lock + reconnect loop from `tools/yahoo_real_draft.py:43-83` (removed in #82; recoverable from git history); launchd plist pattern in `docs/archive/MAC_SETUP.md:140-183`.
-- **Official API option:** `scripts/yahoo_oauth.py` (OAuth2, token refresh) — unused today; an API read path would remove most DOM fragility. Worth evaluating under #88.
+- **Official API option (removed 2026-11-24):** `scripts/yahoo_oauth.py`
+  (OAuth2, token refresh) was deleted — never consumed by any operator, and
+  the stack deliberately uses WAF-gentle CDP reads through one logged-in
+  tab instead of the official API. Re-add from git history only if an API
+  read path is ever adopted.
 
 ### Dead in-season (archive candidates, not blocking)
 

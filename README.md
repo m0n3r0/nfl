@@ -642,8 +642,6 @@ and the operator runbook [docs/TEAM_OPERATOR.md](docs/TEAM_OPERATOR.md).
   `profile_backup.py` (profile snapshots) / `install_launchd.py` (renders +
   installs the five launchd agents: `browser`, `cloudflared`, `web`,
   `livepoints`, `predreport`).
-- `scripts/yahoo_oauth.py` — Yahoo Fantasy API OAuth2 helper (token refresh;
-  not yet consumed by the operators).
 - `skills/fantasy-read/` — read-only Yahoo endpoint inventory (agent skill doc).
 - `memory/fantasy_fd_nation.md` — persistent league context for the agent.
 - `docs/archive/REMEDIATION.md` — phase-by-phase log of the 2026-08-31 review.
