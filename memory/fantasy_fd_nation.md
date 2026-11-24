@@ -1090,3 +1090,20 @@ Parallel-lane audit of every doc against the current code/architecture:
   reconciliation delta 0.0, web page shows 0.00. Restarted livepoints
   agent (it cached the old module) — its own poll now holds the fix.
 - 325 Python fast + 37 Rust tests pass.
+
+## 2026-11-24 — Team View current-week picker auto-syncs opponent
+
+- User: current-week Team View team dropdown changed team A but kept the
+  old team's opponent as B (e.g. selecting Namaste paired it with Take it
+  in the Browns instead of Victory Formation), because both selects submit
+  their current values and the handler honors explicit b in current week
+  (ad-hoc comparison).
+- Fix: rust/src/pages.rs builds an opponents map (team -> scheduled
+  opponent, both directions) from the week's scoreboard, passes to the
+  template. teamview.html embeds it as TV_OPPONENTS JSON in a <script>
+  block; the A select's onchange calls tvSyncOpponent(this) which sets
+  B to the scheduled opponent. Past weeks unchanged (B is locked text,
+  derived from that week's schedule server-side).
+- Verified via node executing the embedded JS with a stub DOM: Namaste ->
+  Victory Formation, KNP Dripp -> Otto-matic Win!. Rust regression test
+  added (38 Rust tests). 325 Python fast tests pass.

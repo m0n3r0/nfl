@@ -632,6 +632,29 @@ async fn teamview_pairs_players_by_slot() {
 }
 
 #[tokio::test]
+async fn teamview_current_picker_maps_each_team_to_scheduled_opponent() {
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    teamview_fixtures(&root); // week 2: Shiba Innu vs Team Beta
+    let (_, html) = get_body(router(cfg(&root)), "/league/teamview").await;
+    // Both dropdowns carry ids and the A picker has a sync handler.
+    assert!(html.contains("id=\"tv-team-a\""));
+    assert!(html.contains("id=\"tv-team-b\""));
+    assert!(html.contains("onchange=\"tvSyncOpponent(this)\""));
+    // The week's schedule is embedded so changing A selects A's real
+    // opponent (a stale b from the form must not pair the wrong teams).
+    assert!(html.contains("const TV_OPPONENTS = "));
+    assert!(
+        html.contains("\"Shiba Innu\":\"Team Beta\"")
+            || html.contains("&quot;Shiba Innu&quot;:&quot;Team Beta&quot;")
+    );
+    assert!(
+        html.contains("\"Team Beta\":\"Shiba Innu\"")
+            || html.contains("&quot;Team Beta&quot;:&quot;Shiba Innu&quot;")
+    );
+}
+
+#[tokio::test]
 async fn teamview_historical_week_from_archive() {
     let tmp = tempfile_dir();
     let root = fixture_root(&tmp);
@@ -750,13 +773,12 @@ async fn teamview_past_def_resolves_city_name_from_plan() {
     let root = fixture_root(&tmp);
     teamview_fixtures(&root); // current week 2; Shiba roster has no DEF row
     let mut run = operator_record("ok");
-    run["proposal"]["plan"]
-        .as_array_mut()
-        .unwrap()
-        .push(json!({"current_slot": "DEF", "proposed_slot": "DEF",
+    run["proposal"]["plan"].as_array_mut().unwrap().push(
+        json!({"current_slot": "DEF", "proposed_slot": "DEF",
                      "name": "Chicago", "position": "DEF", "proj_week": null,
                      "note": "no projection data; kept, locked",
-                     "yahoo_id": "100003"}));
+                     "yahoo_id": "100003"}),
+    );
     write_runs(&root, &[run]);
     let old = json!({
         "captured_at": "2026-09-06T12:00:00+00:00",

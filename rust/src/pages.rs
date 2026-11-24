@@ -424,7 +424,10 @@ fn tv_norm_name(s: &str) -> String {
 /// data.
 pub(crate) fn tv_def_abbr(name: &str) -> Option<&'static str> {
     let norm = name.trim().to_lowercase();
-    let norm = norm.strip_suffix("d/st").map(str::trim_end).unwrap_or(&norm);
+    let norm = norm
+        .strip_suffix("d/st")
+        .map(str::trim_end)
+        .unwrap_or(&norm);
     // Shared-prefix cities resolve on the full name only — "New York"/"Los
     // Angeles" host two teams each, so a first-token match would be a guess.
     match norm {
@@ -874,6 +877,22 @@ pub async fn teamview(
             })
         })
     };
+    // Map every team to its scheduled opponent this week, both directions.
+    // The current-week team pickers use it to auto-select the matching b
+    // when a changes (a stale b param from the form otherwise pairs a team
+    // with the previous team's opponent).
+    let mut opponents = Map::new();
+    if let Some(rows) = sb_rows {
+        for e in rows {
+            if let (Some(t1), Some(t2)) = (
+                e.get("team1").and_then(Value::as_str),
+                e.get("team2").and_then(Value::as_str),
+            ) {
+                opponents.insert(t1.to_string(), json!(t2));
+                opponents.insert(t2.to_string(), json!(t1));
+            }
+        }
+    }
     // Past weeks: the opponent is FIXED by that week's schedule — an
     // arbitrary b param (e.g. left over from the team picker) must never
     // override it. Current week: explicit b allowed for ad-hoc comparison,
@@ -1084,7 +1103,7 @@ pub async fn teamview(
         "a_fan_total": fan_sum(&a), "b_fan_total": fan_sum(&b),
         "a_remaining": remaining(&a), "b_remaining": remaining(&b),
         "has_live": live_maps.has_live, "is_past": is_past, "weeks": weeks,
-        "teams": teams,
+        "teams": teams, "opponents": Value::Object(opponents),
     });
     render(&st, "teamview.html", ctx)
 }
