@@ -110,8 +110,9 @@ pub fn router(cfg: Config) -> Router {
         .route("/league", get(pages::league))
         .route("/league/team/{name}", get(pages::league_team))
         .route("/league/matchup", get(pages::matchup))
-        // Old "Team View" bookmarks keep working: 302 with the query intact
-        // (a=…, week=…), so no one's saved link breaks on the rename.
+        .route("/league/matchup/{team}", get(pages::matchup_named))
+        // Old links keep working: /league/teamview and ?a=&b= query forms
+        // both resolve through the legacy handler below.
         .route("/league/teamview", get(legacy_matchup))
         .route("/logos/{file}", get(logo))
         .route("/live-points", get(live_points))

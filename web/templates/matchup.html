@@ -112,11 +112,12 @@ our model (left) / Yahoo Proj Pts (right). “–” = no data yet.
 {% if is_past %} Viewing week {{ week }} finals from the archive.{% endif %}</p>
 {% if weeks %}
 <div class="tv-weeks">Week:
-  {% for w in weeks %}<a class="tv-week {{ 'on' if w == week else '' }}" href="/league/matchup?week={{ w }}&amp;a={{ a_name | urlencode }}">{{ w }}</a>{% endfor %}
+  {% for w in weeks %}<a class="tv-week {{ 'on' if w == week else '' }}" href="/league/matchup/{{ a_name | urlencode }}?week={{ w }}">{{ w }}</a>{% endfor %}
 </div>
 {% endif %}
 {% if teams %}
-<form class="tv-pick" method="get" action="/league/matchup">
+<form class="tv-pick" method="get" action="/league/matchup"
+      onsubmit="var s=this.querySelector('[name=a]');this.action='/league/matchup/'+encodeURIComponent(s.value);s.disabled=true;return true;">
   {% if week is not none %}<input type="hidden" name="week" value="{{ week }}">{% endif %}
   <select name="a" aria-label="First team">
     {% for t in teams %}<option value="{{ t }}" {{ 'selected' if t == a_name else '' }}>{{ t }}</option>{% endfor %}

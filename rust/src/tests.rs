@@ -393,7 +393,7 @@ async fn league_page_and_team_detail_and_404() {
     assert!(html.contains("value=\"/league/team/Team%20Beta\""));
     assert!(html.contains("mu-score mu-leading"));
     assert!(html.contains("Week 2 matchups"));
-    assert!(html.contains("/league/matchup?a=Shiba%20Innu&amp;b=Team%20Beta"));
+    assert!(html.contains("/league/matchup/Shiba%20Innu"));
     // Yahoo /matchup interaction: the whole card highlights on hover and
     // is clickable anywhere (stretched link); team names stay separate links.
     assert!(html.contains("class=\"mu-open\""));
@@ -404,7 +404,7 @@ async fn league_page_and_team_detail_and_404() {
     assert_eq!(status, StatusCode::OK);
     assert!(html.contains("Beta Rb"));
     assert!(html.contains("Playing us this week")); // opponent matchup card
-    assert!(html.contains("/league/matchup?a=Team%20Beta")); // Matchup link
+    assert!(html.contains("/league/matchup/Team%20Beta")); // Matchup link
     assert!(html.contains("value=\"/league/team/Team%20Beta\" selected")); // nav picker
     let (_, team_html) = get_body(app.clone(), "/team").await;
     assert!(team_html.contains("value=\"/team\" selected")); // own team preselected
@@ -665,6 +665,21 @@ async fn legacy_teamview_route_redirects_to_matchup_with_query() {
 }
 
 #[tokio::test]
+async fn matchup_path_route_selects_team_and_schedule_opponent() {
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    matchup_fixtures(&root);
+    let app = router(cfg(&root));
+    // Clean path URL: team in the path, no ?a=&b= query needed.
+    let (status, html) = get_body(app.clone(), "/league/matchup/Team%20Beta").await;
+    assert_eq!(status, StatusCode::OK);
+    let names: Vec<&str> = html.split("tv-tname\">").skip(1).collect();
+    assert!(names.len() >= 2);
+    assert!(names[0].starts_with("Team Beta"));
+    assert!(names[1].starts_with("Shiba Innu")); // schedule opponent
+}
+
+#[tokio::test]
 async fn matchup_current_opponent_is_schedule_locked_no_dropdown() {
     let tmp = tempfile_dir();
     let root = fixture_root(&tmp);
@@ -867,10 +882,9 @@ async fn matchup_other_team_history_keeps_selected_team() {
     assert!(html.contains("12.34")); // its archived points
     assert!(html.contains("Quarter Back")); // opponent side = our week-1 plan
     assert!(html.contains("25.10"));
-    // Week selector keeps the selected team; b is never carried (each
-    // week's opponent is fixed by the schedule).
-    assert!(html.contains("week=2&amp;a=Team%20Beta"));
-    assert!(!html.contains("week=2&amp;a=Team%20Beta&amp;b="));
+    // Week selector keeps the selected team in the path; b is never carried
+    // (each week's opponent is fixed by the schedule).
+    assert!(html.contains("/league/matchup/Team%20Beta?week=2"));
     // Team picker preselects the team; opponent is locked text, not a dropdown
     assert!(html.contains("<select name=\"a\""));
     assert!(html.contains("value=\"Team Beta\" selected"));

@@ -856,13 +856,31 @@ fn operator_plan(runs: &[Value], week: Option<i64>) -> Option<Vec<Value>> {
         .cloned()
 }
 
-/// /league/matchup?a=<team>&week=<N> — defaults to the current matchup.
-/// The opponent is ALWAYS the team A's scheduled opponent from that week's
-/// scoreboard (no dropdown). Past weeks render from the season history +
-/// the archived weekly finals (logs/live-points-week-N.json).
+/// /league/matchup — defaults to our own matchup (query a= still accepted
+/// for old bookmarks). The opponent is ALWAYS the team's scheduled opponent
+/// from that week's scoreboard (no dropdown, b= is ignored).
 pub async fn matchup(
     State(st): State<AppState>,
     Query(params): Query<HashMap<String, String>>,
+) -> Response {
+    matchup_for(st, params, None).await
+}
+
+/// /league/matchup/<team> — the card's clean click target: the selected
+/// team is a path segment, no query string. Opponent comes from the schedule.
+pub async fn matchup_named(
+    State(st): State<AppState>,
+    Path(team): Path<String>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Response {
+    matchup_for(st, params, Some(team)).await
+}
+
+/// Shared implementation for both the path and legacy-query routes.
+async fn matchup_for(
+    st: AppState,
+    params: HashMap<String, String>,
+    path_team: Option<String>,
 ) -> Response {
     let current = artifacts::read_league_report(&st.cfg.root);
     // The scoreboard's week is authoritative — the matchup page can lag
@@ -894,10 +912,9 @@ pub async fn matchup(
         .and_then(|m| m.get("team"))
         .and_then(Value::as_str)
         .map(str::to_string);
-    let a_name = params
-        .get("a")
+    let a_name = path_team
         .filter(|s| !s.trim().is_empty())
-        .cloned()
+        .or_else(|| params.get("a").filter(|s| !s.trim().is_empty()).cloned())
         .or_else(|| my_name.clone())
         .unwrap_or_default();
     // b defaults to team a's OPPONENT in this week's scoreboard — not to

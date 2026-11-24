@@ -1188,3 +1188,19 @@ Parallel-lane audit of every doc against the current code/architecture:
   resolve to correct matchup pages; 39 Rust + 325 Python tests; 48/48
   mermaid charts render; 0 broken doc links. Docs: README, RUST_WEB,
   RUST_WEB_ARCHITECTURE (new colored chart 4b). Web daemon restarted.
+
+## 2026-11-24 — Matchup URL is a clean path (no ?a=&b=)
+
+- User: the ?a=&b= matchup URL is no longer needed — hovering selects the
+  pair and clicking anywhere jumps to the side-by-side detail.
+- Added /league/matchup/{team} (pages::matchup_named); the selected team is
+  a path segment, b stays derived from the schedule. matchup_for() is the
+  shared impl; /league/matchup (query a=) still works for old bookmarks,
+  /league/teamview still 302s. All generated links now use the path form:
+  League cards, their Matchup text link, team-page link, week selectors,
+  and the team-picker form (tiny onchange builds the path).
+- Docs updated: README (removed stale ?a=/ad-hoc ?b= text), RUST_WEB,
+  RUST_WEB_ARCHITECTURE (route map + hover chart). 48/48 mermaid render.
+- Verified live: cards link to /league/matchup/Namaste etc (no query),
+  path route gives Namaste vs Victory Formation, old query still works,
+  week links use /league/matchup/Namaste?week=N. 40 Rust + 325 Python tests.

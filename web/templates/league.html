@@ -90,7 +90,7 @@ data may be incomplete. Live reads retry on the next cron run.</div>
   {% set lead2 = (e.score2 > e.score1) if live else (e.proj2 > e.proj1) %}
   <div class="mu-card {{ 'mine' if mine else '' }}">
     {# Yahoo /matchup: the whole card is a click target; hovering selects it. #}
-    <a class="mu-open" href="/league/matchup?a={{ e.team1 | urlencode }}&amp;b={{ e.team2 | urlencode }}"
+    <a class="mu-open" href="/league/matchup/{{ e.team1 | urlencode }}"
        aria-label="Open matchup: {{ e.team1 }} vs {{ e.team2 }}"></a>
     <div class="mu-team mu-left">
       <div class="mu-inner">
@@ -114,7 +114,7 @@ data may be incomplete. Live reads retry on the next cron run.</div>
         <div class="mu-val mu-right-val"><span class="mu-proj">{{ e.proj2 }}</span></div>
       </div>
       <div class="mu-row">
-        <a class="mu-tv" href="/league/matchup?a={{ e.team1 | urlencode }}&amp;b={{ e.team2 | urlencode }}">Matchup →</a>
+        <a class="mu-tv" href="/league/matchup/{{ e.team1 | urlencode }}">Matchup →</a>
       </div>
     </div>
     <div class="mu-team mu-right">

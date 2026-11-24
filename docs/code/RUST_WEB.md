@@ -25,7 +25,8 @@ router, serve. `--repo-root`/env make tests and alternate checkouts work.
   the `/ws` broadcast channel + cached menu teams.
 - `router()` — the route table:
   `/` → redirect `/league`; `/league`, `/team`, `/team/pin`,
-  `/league/team/<name>`, `/league/matchup`, `/cron`, `/logos/<file>`,
+  `/league/team/<name>`, `/league/matchup`, `/league/matchup/<team>`,
+  `/cron`, `/logos/<file>`,
   `/live-points`, `/ws`; analytics: `/dashboard`, `/players`,
   `/player/<id>`, `/predictions`, `/ratings`, `/strategy`, `/sos`,
   `/api/predictions`, `/api/modelcard`. Unknown → plain 404 (there is no
@@ -68,7 +69,8 @@ Handlers: `league`, `team`, `team_pin` (POST toggle), `league_team`,
 - `league` — newest ok report (history fallback), standings/scoreboard/
   matchup context; the League home. Each matchup card is a Yahoo-`/matchup`
   hover-selectable target: a pure-CSS stretched link (`.mu-open`, absolute
-  inset:0, z-index:1) makes the whole card clickable to `/league/matchup`;
+  inset:0, z-index:1) makes the whole card clickable to
+  `/league/matchup/<team>` (clean path, opponent from the schedule);
   `:hover`/`:focus-within` give the grape-jelly highlight; team-name links
   stay above it (z-index:2) and still open the team page. See the colored
   [architecture chart](../RUST_WEB_ARCHITECTURE.md#4b-league-matchup-cards--hover-select-click-for-detail).
@@ -95,7 +97,7 @@ Handlers: `league`, `team`, `team_pin` (POST toggle), `league_team`,
 
 ```mermaid
 flowchart TD
-    REQ["🩵 /league/matchup?team=X&week=N"] --> WK["🟢 resolve_week<br/>live + archive + history weeks"]
+    REQ["🩵 /league/matchup/&lt;team&gt;?week=N"] --> WK["🟢 resolve_week<br/>live + archive + history weeks"]
     WK --> OPP["🟢 matchup_entries<br/>that week's scoreboard"]
     OPP --> CTX["🟢 team_view_context"]
     REP["🔵 league-report.json (+history)"] --> CTX
