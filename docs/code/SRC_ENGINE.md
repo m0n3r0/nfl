@@ -230,6 +230,27 @@ flowchart TD
 The rigor layer. Every rating is **as-of** a (season, week): only weeks
 1..W−1 of that season; week 1 uses the strictly-prior season.
 
+```mermaid
+flowchart TD
+    RAW["🟣 nflverse PBP release<br/>play_by_play_2026.csv"] -->|mtime newer| INVALID["🩷 stale-cache guard"]
+    INVALID --> BUILD["🟢 team_ratings_asof(season, week)<br/>weeks 1..W−1 only"]
+    BUILD --> CACHE["🟡 team_ratings_{s}_w{w}.csv.gz<br/>(32 teams, not a week-1 stub)"]
+    CACHE --> FRAME["🟢 build_model_frame → 14 features"]
+    FRAME --> FIT["🟢 train_and_persist (nightly)<br/>train all but latest 2 seasons"]
+    FIT --> ART["🟡 win_prob_model.joblib"]
+    ART --> WEB["🩵 nfl-webd /predictions<br/>artifact read, never trains"]
+    classDef ext fill:#3b1e4a,stroke:#9b41d9,color:#fff
+    classDef guard fill:#4a1e3b,stroke:#d941a4,color:#fff
+    classDef fn fill:#2d4a22,stroke:#6abf4b,color:#fff
+    classDef out fill:#4a3b1e,stroke:#d9a441,color:#fff
+    classDef entry fill:#1e4a4a,stroke:#41d9d9,color:#fff
+    class RAW ext
+    class INVALID guard
+    class BUILD,FRAME,FIT fn
+    class CACHE,ART out
+    class WEB entry
+```
+
 - `_offense_plays(pbp)` — real pass/run plays with valid EPA.
 - `_team_efficiency_from_plays(plays)` — offense grouped by `posteam`,
   defense by `defteam`: EPA/play, success, red-zone TD rate, 3rd-down EPA,
@@ -240,7 +261,9 @@ The rigor layer. Every rating is **as-of** a (season, week): only weeks
 - `team_ratings_asof(season, week, refresh)` — cached to
   `data/processed/team_ratings_{season}_w{week}.csv.gz`; empty results are
   deliberately NOT cached; unpublished seasons return empty without any
-  network call (`_load_pbp_or_empty` checks membership first).
+  network call (`_load_pbp_or_empty` checks membership first). A cache whose
+  PBP source has a newer mtime is rebuilt automatically, so a mid-season PBP
+  refresh cannot leave week-1-stub ratings in place all season.
 - `game_feature_row(rt, home, away, rests)` — the 14 features, **shared by
   training and inference** so they can never drift (#18). None when a team
   is unrated → caller skips the game.
@@ -292,9 +315,10 @@ flowchart TD
   Cross-version pickles are flagged loudly — **retrain after sklearn
   upgrades** (`train_and_persist()`).
 - `train_and_evaluate(train, test)` — strict time split; accuracy /
-  log-loss / Brier for both variants + Vegas-favorite baseline.
+  log-loss / Brier for both variants + Vegas-favorite baseline. The producer
+  picks train/test data-driven from `PBP_SEASONS` (two latest = holdout).
 - `time_series_cv(seasons)` — expanding window, each season tested on all
-  prior ones (min 50 rows per side).
+  prior ones (min 50 rows per side). Includes the current in-season fold.
 - `predict_2026(week)` — per-week as-of ratings; with_spread when the line
   is published, else no_spread; every row tagged with its `model`.
   Uncomputable weeks are skipped with a loud warning (never scored on

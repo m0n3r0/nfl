@@ -1285,3 +1285,19 @@ Parallel-lane audit of every doc against the current code/architecture:
   canonical BASE note. 49/49 mermaid charts, 0 broken links.
 - Verified: clippy clean, 41 Rust + 326 Python tests, 5 live routes 200,
   5 launchd agents loaded (3 running, 2 scheduled-idle).
+
+## 2026-11-24 — prediction engine audit + enhance (latest data)
+
+- Root cause: 2026 PBP was a week-1 stub (323 plays, 4 teams) cached into
+  team_ratings_2026_w*; nflverse had 57MB through week 11. Refreshed all raw
+  assets (PBP 28,467 rows/wk11, games, weekly stats, depth charts, injuries).
+- features.py: _pbp_source_newer() invalidates as-of caches when PBP mtime is
+  newer; ratings rebuild automatically. 2026 now 32 teams/wk (was 4).
+- tools/predictions_report.py: re-fits persisted model each run (1.2s) and
+  derives train/test from PBP_SEASONS (two latest holdout = 2025+2026);
+  evaluation no longer hardcoded to 2024/2025. CV gains a 2026 fold.
+- Measured honest results: train 798 / test 433; no-spread 60.7%, with-spread
+  66.3%, vegas 66.5%, CV mean 66.6%. No speculative model change.
+- Docs: README + SRC_ENGINE updated with new numbers and a colored fresh-data
+  mermaid chart; SOS template wording fixed. 50/50 charts, 0 broken links.
+- Verified: 41 Rust + 328 fast + 20 slow Python tests; 7 live analytics routes 200.

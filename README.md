@@ -275,31 +275,42 @@ summaries) with strict leakage control.
   Delete a cache (or pass `refresh=True`) after changing the window logic.
 
 ### Model evaluation (`src/model.py`)
-- Strict time-based train/test split (train 2022–23, test 2024–25).
+- Strict time-based train/test split, data-driven from `PBP_SEASONS`: train
+  all but the two latest seasons, test the two latest (currently train
+  2022–24, test 2025–26). Rebuilt on every producer run so a new season
+  publishes into the evaluation automatically.
 - Time-series (expanding-window) cross-validation for stability.
 - Probability calibration (Platt) + accuracy / log-loss / Brier reported.
 - Reported **both with and without** the Vegas spread as a feature.
+- The persisted model is re-fitted on every `predictions_report.py` run; the
+  web layer only reads that artifact, never trains in a request.
 
 Fantasy-player projections have a separate leakage-controlled historical
 backtest. Run `python tools/backtest_projections.py` and see
 [`docs/PROJECTION_BACKTEST.md`](docs/PROJECTION_BACKTEST.md) for 2025 rank
 correlation, PPG error, positional hit rates, and baseline comparisons.
 
-Real results (2022–2025 PBP, 1,071 games after dropping the 16 with no
-leakage-free prior; train 2022–23 = 527, test 2024–25 = 544):
+Real results (2022–2026 PBP; train 2022–24 = 798 games, test 2025–26 = 433,
+re-measured 2026-11-24 after refreshing the full 2026 PBP release):
 
 | | Accuracy | Log-loss | Brier |
 |---|---|---|---|
-| Model WITHOUT spread | **61.2%** | 0.654 | 0.231 |
-| Model WITH spread | **68.0%** | 0.616 | 0.214 |
-| Vegas-favorite baseline | **68.4%** | — | — |
+| Model WITHOUT spread | **60.7%** | 0.660 | 0.234 |
+| Model WITH spread | **66.3%** | 0.611 | 0.212 |
+| Vegas-favorite baseline | **66.5%** | — | — |
 
-Time-series CV (expanding window): 2023 63.2%, 2024 69.5%, 2025 66.2%,
-**mean 66.3%**.
+Time-series CV (expanding window): 2023 63.2%, 2024 69.1%, 2025 65.7%,
+2026 68.5%, **mean 66.6%**.
 
-These figures were re-measured on 2026-08-31 after fixing the week-1 leakage bug
-(#17). The previously published numbers (60.9 / 68.2 / 68.4 / 67.0) were measured
-on leaked features; the honest numbers are within ~0.7pp of them. The bug was
+The 2026 PBP release initially cached only week 1 (323 plays, 4 teams), so
+every 2026 as-of rating was built from that stub. `team_ratings_asof()` now
+compares the PBP source mtime to its cache and rebuilds automatically when a
+fresh release publishes; the nightly producer also re-fits the persisted
+model so predictions never serve a stale artifact.
+
+An earlier re-measurement on 2026-08-31 after fixing the week-1 leakage bug
+(#17) showed the previously published numbers (60.9 / 68.2 / 68.4 / 67.0) were
+measured on leaked features; the honest numbers were within ~0.7pp of them. The bug was
 severe in principle — every week-1 game from 2022 to 2025 was rated on full-year
 2025 data — but week 1 is only 64 of 1,087 games, so the headline accuracy barely
 moved. Detail in `docs/archive/REMEDIATION.md`.

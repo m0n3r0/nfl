@@ -43,6 +43,7 @@ def fake_engine(monkeypatch):
         "mean_accuracy": 0.663,
         "folds": [{"test_season": 2024, "accuracy": 0.695}],
     })
+    monkeypatch.setattr(pr.model, "train_and_persist", lambda: {"n_train": 1000})
     monkeypatch.setattr(pr.model, "predict_2026", lambda week=None: pd.DataFrame({
         "week": [1], "home_team": ["BUF"], "away_team": ["KC"],
         "home_win_prob": [0.62], "epa_diff": [0.08], "spread": [None],
@@ -63,6 +64,13 @@ def fake_engine(monkeypatch):
     monkeypatch.setattr(pr.analysis, "sos_ranking",
                         lambda c: pd.DataFrame({"rank": [1], "team": ["BUF"], "sos": [0.3]}))
     return hist
+
+
+def test_eval_split_uses_latest_seasons():
+    """The holdout must track PBP_SEASONS, not hardcode 2024/2025."""
+    assert pr.EVAL_TEST_SEASONS == tuple(pr.PBP_SEASONS[-2:])
+    assert pr.EVAL_TRAIN_SEASONS == tuple(pr.PBP_SEASONS[:-2])
+    assert set(pr.EVAL_TRAIN_SEASONS).isdisjoint(pr.EVAL_TEST_SEASONS)
 
 
 def test_build_all_writes_every_artifact(tmp_path, fake_engine):

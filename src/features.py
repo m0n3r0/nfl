@@ -194,6 +194,26 @@ def _load_pbp_or_empty(season: int) -> pd.DataFrame | None:
     return ingest.load_pbp(season)
 
 
+def _pbp_source_newer(season: int, week: int, cache: Path) -> bool:
+    """True when a fresh PBP download makes this as-of cache stale.
+
+    The nightly report calls team_ratings_asof(..., refresh=False) for every
+    (season, week). Without this check, a week-1 stub cached in September stays
+    in place after the full-season PBP publishes: 2026 ratings kept only 4
+    teams and every later week was scored on that stub. mtime comparison is
+    cheap (one stat per call, memoized via the cache dict in the caller) and
+    needs no new state file.
+    """
+    src_season = season if week > 1 else prior_season(season)
+    if src_season is None:
+        return False
+    pbp = ingest.RAW_DIR / f"play_by_play_{src_season}.csv"
+    try:
+        return pbp.stat().st_mtime > cache.stat().st_mtime
+    except OSError:
+        return False
+
+
 def team_ratings_asof(season: int, week: int, refresh: bool = False) -> pd.DataFrame:
     """Per-team efficiency 'as of' (season, week): uses weeks 1..week-1.
 
@@ -209,7 +229,7 @@ def team_ratings_asof(season: int, week: int, refresh: bool = False) -> pd.DataF
         raise ValueError(f"week must be >= 1, got {week}")
 
     cache = PROCESSED / f"team_ratings_{season}_w{week}.csv.gz"
-    if cache.exists() and not refresh:
+    if cache.exists() and not refresh and not _pbp_source_newer(season, week, cache):
         return pd.read_csv(cache, low_memory=False)
 
     if week > 1:

@@ -49,6 +49,14 @@ from src.config import (  # noqa: E402
 )
 
 
+# The two most recent completed seasons are the honest holdout: training on
+# everything strictly earlier, testing on the latest data. PBP_SEASONS already
+# carries the available seasons, so this never goes stale when a new season
+# publishes (the old hardcoded (2022,2023)/(2024,2025) ignored 2026 entirely).
+EVAL_TEST_SEASONS = tuple(PBP_SEASONS[-2:])
+EVAL_TRAIN_SEASONS = tuple(PBP_SEASONS[:-2])
+
+
 def records(df: pd.DataFrame) -> list:
     """DataFrame -> JSON-safe records (numpy scalars + NaN handled by pandas)."""
     return json.loads(df.to_json(orient="records"))
@@ -99,7 +107,7 @@ def build_all(out: Path = ROOT / "data" / "web") -> dict:
 
     def _dashboard():
         nonlocal evaluation
-        ev = model.train_and_evaluate((2022, 2023), (2024, 2025))
+        ev = model.train_and_evaluate(EVAL_TRAIN_SEASONS, EVAL_TEST_SEASONS)
         cv = model.time_series_cv(PBP_SEASONS)
         evaluation = {"evaluation": ev, "cv": cv}
         write_json(out / "dashboard.json", {
@@ -148,6 +156,11 @@ def build_all(out: Path = ROOT / "data" / "web") -> dict:
             })
 
     def _predictions():
+        # The served model must reflect the latest published data. The nightly
+        # producer is the ONLY place that trains offline; the web never trains.
+        # Re-fitting is ~1s over 1,231 rows, so do it on every artifact build
+        # rather than trusting an artifact whose data may be a week old.
+        model.train_and_persist()
         preds = model.predict_2026(week=None)
         write_json(out / "predictions.json", {
             "generated_at": now,

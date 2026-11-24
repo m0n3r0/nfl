@@ -27,6 +27,40 @@ def _ratings(teams):
     })
 
 
+def test_stale_pbp_cache_is_rebuilt(tmp_path, monkeypatch):
+    """A fresh PBP download must invalidate an as-of cache built from a stub.
+
+    The 2026 cache was built from a week-1-only PBP (4 teams); after the full
+    season published, refresh=False still returned the 4-team stub. The cache
+    now compares the PBP source mtime and rebuilds automatically.
+    """
+    import os
+    import time as _time
+
+    src = tmp_path / "play_by_play_2026.csv"
+    src.write_text("team,epa\nAAA,0.1\n")
+    cache = tmp_path / "team_ratings_2026_w5.csv.gz"
+    cache.write_text("stale")
+    # source newer than cache
+    now = _time.time()
+    os.utime(cache, (now - 100, now - 100))
+    os.utime(src, (now, now))
+    monkeypatch.setattr(features.ingest, "RAW_DIR", tmp_path)
+    monkeypatch.setattr(features, "PROCESSED", tmp_path)
+    # week>1 uses the current season's PBP; make load_pbp return a 2-team frame
+    monkeypatch.setattr(features.ingest, "load_pbp", lambda s: pd.DataFrame({
+        "week": [1, 1], "play_type": ["pass", "run"], "epa": [0.1, -0.1],
+        "success": [1, 0], "down": [1, 2], "ydstogo": [5, 6], "yardline_100": [60, 50],
+        "rush": [0, 1], "pass": [1, 0], "touchdown": [0, 0], "interception": [0, 0],
+        "fumble": [0, 0], "sack": [0, 0], "qb_scramble": [0, 0], "shotgun": [1, 0],
+        "no_huddle": [0, 0], "game_id": ["g1", "g1"], "season": [2026, 2026],
+        "posteam": ["AAA", "BBB"], "defteam": ["BBB", "AAA"],
+    }))
+    out = features.team_ratings_asof(2026, 5, refresh=False)
+    assert set(out["team"]) == {"AAA", "BBB"}  # rebuilt, not the stale cache
+    assert cache.stat().st_size > 5  # gzipped CSV written
+
+
 def test_build_model_frame_drops_unplayed_games(monkeypatch):
     """Games without published scores must not reach the training frame.
 
