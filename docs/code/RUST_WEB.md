@@ -3,7 +3,9 @@
 One axum process on 127.0.0.1:5000 serves **every** page natively with
 minijinja over the shared `web/templates/`. No Flask, no proxy, no
 request-time compute: handlers read local artifacts and filter in Rust.
-8 source files, 29 tests.
+8 source files, 38 tests. See the colored
+[Rust web architecture guide](../RUST_WEB_ARCHITECTURE.md) for a
+human-oriented flowchart of each layer.
 
 Color legend: 🔵 input · 🟢 function · 🟡 output · 🩷 guard · 🟣 external · 🩵 entry.
 
@@ -202,7 +204,7 @@ minijinja environment setup + the filters the templates rely on
 that let the Flask-era templates move over unchanged (one fix: Python
 `str.replace()` calls became the `|replace` filter).
 
-## tests.rs — the 29-test suite
+## tests.rs — the 38-test suite
 
 Hermetic (temp dirs, fixture artifacts): pages render with real shapes,
 pins parity with Python, logos allowlist + traversal rejection,

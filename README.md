@@ -12,6 +12,8 @@ players, and builds a weekly lineup.
 > **New here? Read the [Code Guide](docs/CODE_GUIDE.md)** — every file
 > explained in detail, with colored mermaid charts of what each function
 > does, organized by layer (engine · Yahoo · tools · Rust web · tests).
+> For the Rust web UI specifically, see the
+> [Rust web architecture guide](docs/RUST_WEB_ARCHITECTURE.md).
 
 ## What is fantasy football? (ELI5)
 
@@ -525,7 +527,7 @@ The suite (35 Python files, hermetic-first) includes:
 | `tests/test_backtest.py`, `tests/test_corpus.py`, `tests/test_features.py`, `tests/test_injuries.py` | data/model plumbing: backtest harness, corpus assembly, leakage guards, injury penalties |
 | `tests/test_bye_weeks.py`, `tests/test_schedule.py`, `tests/test_league_scoring.py`, `tests/test_browser.py` | bye weeks, schedule/kickoff locks, league scoring preset, browser launch/heal |
 
-The Rust web daemon has its own suite (29 tests: pages, pins parity,
+The Rust web daemon has its own suite (38 tests: pages, pins parity,
 logos, WebSocket push, artifact readers, Team View history, native
 analytics pages):
 

@@ -73,11 +73,17 @@ pub fn read_logo_manifest(root: &Path) -> Option<Value> {
     manifest.is_object().then_some(manifest)
 }
 
+/// Raw text of the current live-points artifact (None when absent).
+/// The single read path for the HTTP endpoint, the WebSocket initial push,
+/// and the parsed artifact reader below — atomic renames make it safe.
+pub fn read_live_points_text(root: &Path) -> Option<String> {
+    std::fs::read_to_string(root.join("logs/live-points.json")).ok()
+}
+
 /// Live points artifact (logs/live-points.json, written by the ESPN poller).
 /// None when absent/invalid — pages fall back to snapshot data.
 pub fn read_live_points(root: &Path) -> Option<Value> {
-    let text = std::fs::read_to_string(root.join("logs/live-points.json")).ok()?;
-    serde_json::from_str(&text).ok()
+    serde_json::from_str(&read_live_points_text(root)?).ok()
 }
 
 /// A completed week's archived finals (logs/live-points-week-<N>.json,

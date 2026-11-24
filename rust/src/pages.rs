@@ -586,7 +586,9 @@ fn tv_live_maps(live: Option<&Value>, week: &Value) -> TvLiveMaps {
     if !matches {
         return out;
     }
-    let l = live.unwrap();
+    let Some(l) = live else {
+        return out; // no live artifact → has_live stays false
+    };
     if let Some(obj) = l.get("players").and_then(Value::as_object) {
         for (key, p) in obj {
             if let Some(pts) = p.get("points").and_then(Value::as_f64) {
@@ -776,9 +778,82 @@ fn snapshot_week(r: &Value) -> Option<i64> {
         })
 }
 
-/// /league/teamview?a=<team>&b=<team>&week=<N> — defaults to the current
-/// matchup. Past weeks render from the season history + the archived
-/// weekly finals (logs/live-points-week-N.json).
+/// Sum one optional field over the non-bench players of a Team View side,
+/// rounded to 2dp; Null when no player has that field (never a fake 0).
+fn side_sum(side: &Option<Vec<TvEntry>>, field: impl Fn(&TvEntry) -> Option<f64>) -> Value {
+    let known: Vec<f64> = side
+        .as_ref()
+        .map(|entries| {
+            entries
+                .iter()
+                .filter(|e| !e.is_bench())
+                .filter_map(&field)
+                .collect()
+        })
+        .unwrap_or_default();
+    if known.is_empty() {
+        Value::Null
+    } else {
+        json!((known.iter().sum::<f64>() * 100.0).round() / 100.0)
+    }
+}
+
+/// Pick the snapshot for a past week: the newest one WITH rosters supplies
+/// the rosters (late light runs drop them), the newest overall supplies the
+/// FINAL scoreboard/standings (the with-rosters run is mid-week).
+fn past_week_snapshot(hist: &[Value], week: i64) -> Option<Value> {
+    let in_week: Vec<&Value> = hist
+        .iter()
+        .filter(|r| snapshot_week(r) == Some(week))
+        .collect();
+    let captured = |r: &Value| artifacts::as_display_string(r.get("captured_at"));
+    let latest_any = in_week.iter().max_by_key(|r| captured(r)).copied();
+    let latest_rosters = in_week
+        .iter()
+        .filter(|r| {
+            r.get("rosters")
+                .and_then(Value::as_object)
+                .map(|o| !o.is_empty())
+                .unwrap_or(false)
+        })
+        .max_by_key(|r| captured(r))
+        .copied();
+    match (latest_rosters, latest_any) {
+        (Some(base), Some(final_scores)) => {
+            let mut merged = base.clone();
+            for key in ["scoreboard", "standings"] {
+                if let Some(v) = final_scores.get(key) {
+                    merged[key] = v.clone();
+                }
+            }
+            Some(merged)
+        }
+        (Some(base), None) => Some(base.clone()),
+        (None, other) => other.cloned(),
+    }
+}
+
+/// The operator plan to show alongside a side: for a past week the run must
+/// be from that week; for the current week the newest verified run wins.
+fn operator_plan(runs: &[Value], week: Option<i64>) -> Option<Vec<Value>> {
+    runs.iter()
+        .find(|r| {
+            r.get("status").and_then(Value::as_str) == Some("ok")
+                && match week {
+                    Some(w) => r.get("week").and_then(Value::as_i64) == Some(w),
+                    None => true,
+                }
+        })
+        .and_then(|r| r.get("proposal"))
+        .and_then(|p| p.get("plan"))
+        .and_then(Value::as_array)
+        .cloned()
+}
+
+/// /league/teamview?a=<team>&week=<N> — defaults to the current matchup.
+/// The opponent is ALWAYS the team A's scheduled opponent from that week's
+/// scoreboard (no dropdown). Past weeks render from the season history +
+/// the archived weekly finals (logs/live-points-week-N.json).
 pub async fn teamview(
     State(st): State<AppState>,
     Query(params): Query<HashMap<String, String>>,
@@ -795,45 +870,9 @@ pub async fn teamview(
         .and_then(|s| s.trim().parse().ok())
         .filter(|&w| w >= 1 && w <= current_week.min(18));
     let is_past = requested.map(|w| w != current_week).unwrap_or(false);
-    let (report, live, plan_week) = if is_past {
-        let w = requested.unwrap();
-        let hist = artifacts::read_league_history(&st.cfg.root);
-        // Two snapshots, merged: the latest one WITH rosters supplies the
-        // rosters (the last snapshots of a week are light runs without
-        // them), while the overall latest snapshot supplies the FINAL
-        // scoreboard/standings — the with-rosters one is captured before
-        // the late games and carries mid-week scores.
-        let week_snaps: Vec<&Value> = hist
-            .iter()
-            .filter(|r| snapshot_week(r) == Some(w))
-            .collect();
-        let captured = |r: &Value| artifacts::as_display_string(r.get("captured_at"));
-        let latest_any = week_snaps.iter().max_by_key(|r| captured(r)).copied();
-        let latest_ro = week_snaps
-            .iter()
-            .filter(|r| {
-                r.get("rosters")
-                    .and_then(Value::as_object)
-                    .map(|o| !o.is_empty())
-                    .unwrap_or(false)
-            })
-            .max_by_key(|r| captured(r))
-            .copied();
-        let snap = match (latest_ro, latest_any) {
-            (Some(base), Some(fin)) => {
-                let mut merged = base.clone();
-                for key in ["scoreboard", "standings"] {
-                    if let Some(v) = fin.get(key) {
-                        merged[key] = v.clone();
-                    }
-                }
-                Some(merged)
-            }
-            (Some(base), None) => Some(base.clone()),
-            (None, fin) => fin.cloned(),
-        };
+    let (report, live, plan_week) = if let Some(w) = requested.filter(|_| is_past) {
         (
-            snap,
+            past_week_snapshot(&artifacts::read_league_history(&st.cfg.root), w),
             artifacts::read_live_points_week(&st.cfg.root, w),
             Some(w),
         )
@@ -893,28 +932,15 @@ pub async fn teamview(
             }
         })
         .unwrap_or_default();
-    let week = if is_past {
-        json!(requested.unwrap())
-    } else if current_week > 0 {
-        json!(current_week)
-    } else {
-        Value::Null
+    // Week shown in the header: the explicit past week, else the current
+    // one; Null only when no snapshot has established a week yet.
+    let week = match requested.filter(|_| is_past) {
+        Some(w) => json!(w),
+        None if current_week > 0 => json!(current_week),
+        None => Value::Null,
     };
     let rosters = report.as_ref().and_then(|r| r.get("rosters"));
-    let runs = artifacts::read_operator_runs(&st.cfg.root, 200);
-    let plan: Option<Vec<Value>> = runs
-        .iter()
-        .find(|r| {
-            r.get("status").and_then(Value::as_str) == Some("ok")
-                && match plan_week {
-                    Some(w) => r.get("week").and_then(Value::as_i64) == Some(w),
-                    None => true,
-                }
-        })
-        .and_then(|r| r.get("proposal"))
-        .and_then(|p| p.get("plan"))
-        .and_then(Value::as_array)
-        .cloned();
+    let plan = operator_plan(&artifacts::read_operator_runs(&st.cfg.root, 200), plan_week);
     let live_maps = tv_live_maps(live.as_ref(), &week);
     let games = tv_team_games(live.as_ref());
     let current_rosters = current.as_ref().and_then(|r| r.get("rosters"));
@@ -990,22 +1016,7 @@ pub async fn teamview(
             .or_else(|| snapshot_score(name).map(|v| json!(v)))
             .unwrap_or(Value::Null)
     };
-    let proj_sum = |side: &Option<Vec<TvEntry>>| -> Value {
-        side.as_ref()
-            .map(|entries| {
-                let known: Vec<f64> = entries
-                    .iter()
-                    .filter(|e| !e.is_bench())
-                    .filter_map(|e| e.proj)
-                    .collect();
-                if known.is_empty() {
-                    Value::Null
-                } else {
-                    json!((known.iter().sum::<f64>() * 100.0).round() / 100.0)
-                }
-            })
-            .unwrap_or(Value::Null)
-    };
+    let proj_sum = |side: &Option<Vec<TvEntry>>| side_sum(side, |e| e.proj);
     let remaining = |side: &Option<Vec<TvEntry>>| -> Value {
         if !live_maps.has_live {
             return Value::Null;
@@ -1026,22 +1037,7 @@ pub async fn teamview(
             })
             .unwrap_or(Value::Null)
     };
-    let fan_sum = |side: &Option<Vec<TvEntry>>| -> Value {
-        side.as_ref()
-            .map(|entries| {
-                let known: Vec<f64> = entries
-                    .iter()
-                    .filter(|e| !e.is_bench())
-                    .filter_map(|e| e.fan_pts)
-                    .collect();
-                if known.is_empty() {
-                    Value::Null
-                } else {
-                    json!((known.iter().sum::<f64>() * 100.0).round() / 100.0)
-                }
-            })
-            .unwrap_or(Value::Null)
-    };
+    let fan_sum = |side: &Option<Vec<TvEntry>>| side_sum(side, |e| e.fan_pts);
     let max_week = current_week.clamp(0, 18);
     let weeks: Vec<i64> = (1..=max_week).collect();
     let teams: Vec<String> = report

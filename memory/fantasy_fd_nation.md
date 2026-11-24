@@ -1120,3 +1120,25 @@ Parallel-lane audit of every doc against the current code/architecture:
 - Verified via node executing the embedded JS with a stub DOM: Namaste ->
   Victory Formation, KNP Dripp -> Otto-matic Win!. Rust regression test
   added (38 Rust tests). 325 Python fast tests pass.
+
+## 2026-11-24 — Rust web UI swarm review + refactor + architecture doc
+
+- User: review overall Rust web code for robustness/clarity without over-
+  engineering; colored mermaid docs; update all docs; use swarm subagents.
+  No subagent tool exists in this session → five independent scoped passes
+  (R1 structure, R2 robustness, R3 docs, R4 tests, R5 behavior). Ledger:
+  ~/.hermes/cache/scratch/nfl-rust-swarm-20261124.md.
+- Found+fixed:
+  * teamview was a 298-line handler → extracted past_week_snapshot(),
+    operator_plan(), side_sum(); now ~200 lines, no new abstractions.
+  * live-points.json was read 3 different ways → single
+    artifacts::read_live_points_text() used by endpoint, WS push, reader.
+  * 3 bounded unwrap()s → let-else / match (no panic path).
+  * doc comment still described the removed b dropdown → corrected.
+- New docs/RUST_WEB_ARCHITECTURE.md: 7 colored mermaid charts (overview,
+  startup, route table, Team View, analytics, pins, live WS) + refactor
+  rationale. Linked from README + CODE_GUIDE + RUST_WEB.md.
+- Doc freshness: 29 → 38 Rust tests in README / RUST_WEB / TESTS_INFRA.
+- Verified: 47/47 mermaid blocks across 8 docs render via mmdc; 26/26 doc
+  links resolve; 38 Rust + 325 Python fast tests; 12/12 routes 200 via
+  tunnel; Team View opponent still schedule-locked (stale b ignored).

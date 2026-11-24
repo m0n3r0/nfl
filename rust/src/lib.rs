@@ -163,8 +163,8 @@ fn spawn_live_watcher(root: PathBuf, tx: broadcast::Sender<String>) {
 
 /// /live-points — the artifact as JSON (initial load + polling fallback).
 async fn live_points(State(st): State<AppState>) -> Response {
-    match std::fs::read_to_string(st.cfg.root.join("logs/live-points.json")) {
-        Ok(text) => (
+    match artifacts::read_live_points_text(&st.cfg.root) {
+        Some(text) => (
             StatusCode::OK,
             [
                 (header::CONTENT_TYPE, "application/json"),
@@ -173,7 +173,7 @@ async fn live_points(State(st): State<AppState>) -> Response {
             text,
         )
             .into_response(),
-        Err(_) => (
+        None => (
             StatusCode::NOT_FOUND,
             [(header::CONTENT_TYPE, "application/json")],
             "{\"error\":\"no live points yet\"}",
@@ -191,7 +191,7 @@ async fn ws_upgrade(State(st): State<AppState>, ws: WebSocketUpgrade) -> Respons
 async fn ws_conn(socket: WebSocket, st: AppState) {
     let (mut sender, mut receiver) = socket.split();
     let mut rx = st.live_tx.subscribe();
-    if let Ok(text) = std::fs::read_to_string(st.cfg.root.join("logs/live-points.json")) {
+    if let Some(text) = artifacts::read_live_points_text(&st.cfg.root) {
         if sender.send(Message::Text(text.into())).await.is_err() {
             return;
         }
