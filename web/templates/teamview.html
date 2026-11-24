@@ -118,27 +118,11 @@ our model (left) / Yahoo Proj Pts (right). “–” = no data yet.
 {% if teams %}
 <form class="tv-pick" method="get" action="/league/teamview">
   {% if week is not none %}<input type="hidden" name="week" value="{{ week }}">{% endif %}
-  <select name="a" aria-label="First team" id="tv-team-a"
-          {% if not is_past %}onchange="tvSyncOpponent(this)"{% endif %}>
+  <select name="a" aria-label="First team">
     {% for t in teams %}<option value="{{ t }}" {{ 'selected' if t == a_name else '' }}>{{ t }}</option>{% endfor %}
   </select>
   <span class="tv-vs">vs</span>
-  {% if is_past %}
   <span class="tv-locked" title="Opponent is fixed by this week's schedule">{{ b_name }}</span>
-  {% else %}
-  <select name="b" aria-label="Second team" id="tv-team-b">
-    {% for t in teams %}<option value="{{ t }}" {{ 'selected' if t == b_name else '' }}>{{ t }}</option>{% endfor %}
-  </select>
-  <script>
-  // Changing team A auto-selects its scheduled opponent for this week,
-  // so the form never submits a stale b from the previous pairing.
-  const TV_OPPONENTS = {{ opponents | tojson }};
-  function tvSyncOpponent(s) {
-    const b = document.getElementById('tv-team-b');
-    if (b && TV_OPPONENTS[s.value]) b.value = TV_OPPONENTS[s.value];
-  }
-  </script>
-  {% endif %}
   <button type="submit">Go</button>
 </form>
 {% endif %}

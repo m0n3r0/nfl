@@ -877,53 +877,22 @@ pub async fn teamview(
             })
         })
     };
-    // Map every team to its scheduled opponent this week, both directions.
-    // The current-week team pickers use it to auto-select the matching b
-    // when a changes (a stale b param from the form otherwise pairs a team
-    // with the previous team's opponent).
-    let mut opponents = Map::new();
-    if let Some(rows) = sb_rows {
-        for e in rows {
-            if let (Some(t1), Some(t2)) = (
-                e.get("team1").and_then(Value::as_str),
-                e.get("team2").and_then(Value::as_str),
-            ) {
-                opponents.insert(t1.to_string(), json!(t2));
-                opponents.insert(t2.to_string(), json!(t1));
-            }
-        }
-    }
-    // Past weeks: the opponent is FIXED by that week's schedule — an
-    // arbitrary b param (e.g. left over from the team picker) must never
-    // override it. Current week: explicit b allowed for ad-hoc comparison,
-    // else team a's scheduled opponent.
-    let b_name = if is_past {
-        opponent_of(&a_name)
-            .or_else(|| {
-                if Some(a_name.as_str()) == my_name.as_deref() {
-                    matchup
-                        .and_then(|m| m.get("opponent"))
-                        .and_then(Value::as_str)
-                        .map(str::to_string)
-                } else {
-                    None
-                }
-            })
-            .unwrap_or_default()
-    } else {
-        params
-            .get("b")
-            .filter(|s| !s.trim().is_empty())
-            .cloned()
-            .or_else(|| opponent_of(&a_name))
-            .or_else(|| {
+    // The opponent is ALWAYS fixed by this week's schedule, past or current.
+    // An arbitrary b param (left over from the team picker) must never
+    // override it — there is no opponent dropdown, so a stale b can't pair
+    // a team with the previous selection's opponent.
+    let b_name = opponent_of(&a_name)
+        .or_else(|| {
+            if Some(a_name.as_str()) == my_name.as_deref() {
                 matchup
                     .and_then(|m| m.get("opponent"))
                     .and_then(Value::as_str)
                     .map(str::to_string)
-            })
-            .unwrap_or_default()
-    };
+            } else {
+                None
+            }
+        })
+        .unwrap_or_default();
     let week = if is_past {
         json!(requested.unwrap())
     } else if current_week > 0 {
@@ -1103,7 +1072,7 @@ pub async fn teamview(
         "a_fan_total": fan_sum(&a), "b_fan_total": fan_sum(&b),
         "a_remaining": remaining(&a), "b_remaining": remaining(&b),
         "has_live": live_maps.has_live, "is_past": is_past, "weeks": weeks,
-        "teams": teams, "opponents": Value::Object(opponents),
+        "teams": teams,
     });
     render(&st, "teamview.html", ctx)
 }

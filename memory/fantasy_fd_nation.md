@@ -1091,7 +1091,20 @@ Parallel-lane audit of every doc against the current code/architecture:
   agent (it cached the old module) — its own poll now holds the fix.
 - 325 Python fast + 37 Rust tests pass.
 
-## 2026-11-24 — Team View current-week picker auto-syncs opponent
+## 2026-11-24 — Team View opponent is ALWAYS schedule-locked (no B dropdown)
+
+- User: the JS auto-sync fix was not enough — current-week Team View must
+  NOT offer an opponent dropdown at all, like past weeks. Opponent is
+  always fixed by that week's schedule.
+- Replaced the JS auto-sync (previous section's approach) with server-side
+  lock: b_name = opponent_of(a_name) from the week scoreboard for BOTH
+  past and current; explicit b param ignored everywhere. Template shows
+  tv-locked text for b; only team A is a dropdown. Removed the
+  opponents map / TV_OPPONENTS script.
+- Updated 3 Rust tests (no B dropdown, stale b ignored, query override).
+  Verified all 10 teams live: each pairs with its schedule opponent;
+  stale b=Take it in the Browns with a=Namaste still yields Victory Formation.
+- 325 Python + 38 Rust tests pass; web daemon restarted.
 
 - User: current-week Team View team dropdown changed team A but kept the
   old team's opponent as B (e.g. selecting Namaste paired it with Take it

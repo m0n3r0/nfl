@@ -632,26 +632,20 @@ async fn teamview_pairs_players_by_slot() {
 }
 
 #[tokio::test]
-async fn teamview_current_picker_maps_each_team_to_scheduled_opponent() {
+async fn teamview_current_opponent_is_schedule_locked_no_dropdown() {
     let tmp = tempfile_dir();
     let root = fixture_root(&tmp);
     teamview_fixtures(&root); // week 2: Shiba Innu vs Team Beta
-    let (_, html) = get_body(router(cfg(&root)), "/league/teamview").await;
-    // Both dropdowns carry ids and the A picker has a sync handler.
-    assert!(html.contains("id=\"tv-team-a\""));
-    assert!(html.contains("id=\"tv-team-b\""));
-    assert!(html.contains("onchange=\"tvSyncOpponent(this)\""));
-    // The week's schedule is embedded so changing A selects A's real
-    // opponent (a stale b from the form must not pair the wrong teams).
-    assert!(html.contains("const TV_OPPONENTS = "));
-    assert!(
-        html.contains("\"Shiba Innu\":\"Team Beta\"")
-            || html.contains("&quot;Shiba Innu&quot;:&quot;Team Beta&quot;")
-    );
-    assert!(
-        html.contains("\"Team Beta\":\"Shiba Innu\"")
-            || html.contains("&quot;Team Beta&quot;:&quot;Shiba Innu&quot;")
-    );
+    let app = router(cfg(&root));
+    // No opponent dropdown in the current week — only team A is selectable.
+    let (_, html) = get_body(app.clone(), "/league/teamview").await;
+    assert!(!html.contains("<select name=\"b\""));
+    assert!(html.contains("tv-locked"));
+    assert!(!html.contains("TV_OPPONENTS"));
+    // A stale b param must NOT pair a team with the wrong opponent.
+    let (_, html) = get_body(app, "/league/teamview?a=Shiba%20Innu&b=No%20Such%20Team").await;
+    assert!(!html.contains("No Such Team"));
+    assert!(html.contains("tv-tname\">Team Beta<")); // still the scheduled opponent
 }
 
 #[tokio::test]
@@ -857,11 +851,12 @@ async fn teamview_other_team_history_keeps_selected_team() {
     .await;
     assert!(html.contains("Quarter Back")); // still Shiba Innu's week-1 plan
     assert!(!html.contains("No Such Team"));
-    // Current week with a only: opponent from the current scoreboard,
-    // and the b dropdown IS available for ad-hoc comparison
+    // Current week with a only: opponent from the current scoreboard.
+    // There is NO b dropdown — the opponent is always schedule-locked.
     let (_, html) = get_body(app, "/league/teamview?a=Team%20Beta").await;
     assert!(html.contains("Enemy Qb") && html.contains("Quarter Back"));
-    assert!(html.contains("<select name=\"b\""));
+    assert!(!html.contains("<select name=\"b\""));
+    assert!(html.contains("tv-locked"));
 }
 
 #[tokio::test]
@@ -910,10 +905,13 @@ async fn teamview_query_override_and_missing_roster() {
     let root = fixture_root(&tmp);
     teamview_fixtures(&root);
     let app = router(cfg(&root));
+    // b is ignored — Team Beta's scheduled opponent is Shiba Innu, not
+    // Team Beta. Only one side shows Enemy Qb now.
     let (status, html) =
         get_body(app.clone(), "/league/teamview?a=Team%20Beta&b=Team%20Beta").await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(html.matches("tv-name\">Enemy Qb").count(), 2); // both sides same roster
+    assert_eq!(html.matches("tv-name\">Enemy Qb").count(), 1);
+    assert!(html.contains("tv-tname\">Shiba Innu<")); // schedule-locked opponent
     let (status, html) = get_body(app, "/league/teamview?a=No%20Such%20Team&b=Team%20Beta").await;
     assert_eq!(status, StatusCode::OK);
     assert!(html.contains("roster for one of these teams"));
