@@ -122,7 +122,7 @@ from that week's scoreboard — no b parameter, no dropdown.
 
 ```mermaid
 flowchart TD
-    Q["🩵 ?a=team&week=N"] --> W["🟢 snapshot_week(current)<br/>bound requested to 1..current"]
+    Q["🩵 /league/matchup/&lt;team&gt;?week=N"] --> W["🟢 snapshot_week(current)<br/>bound requested to 1..current"]
     W --> PAST{"🩷 past week?"}
     PAST -->|yes| MERGE["🟢 past_week_snapshot(hist, w)<br/>newest rosters + final scores"]
     PAST -->|no| NOW["🟢 current snapshot + live-points.json"]
@@ -265,6 +265,32 @@ flowchart LR
 
 ---
 
+## 7b. On-page team picker — plain top menu, selector in the body
+
+The FD nation top menu is plain links (League · My Team · Cron). The team
+selector lives in the page body of `/team` and `/league/team/<name>` via the
+`team_picker.html` partial; `add_team_picker()` feeds it from `team_names()`,
+the one helper that reads standings order (or sorted roster keys) — also
+used by the matchup page's team list. Selecting a team jumps to that team's
+page. No global nav context, no menu cache.
+
+```mermaid
+flowchart TD
+    LINK["🩵 click 'My Team' (plain top-menu link)"] --> PAGE["🟢 /team or /league/team/&lt;name&gt;"]
+    PAGE --> CTX["🟢 add_team_picker(ctx, current)<br/>team_names(snapshot) + current"]
+    CTX --> SEL["🟡 'Viewing team:' select in page body<br/>all teams, current selected"]
+    SEL --> JUMP["🟢 onchange → /league/team/&lt;name&gt;"]
+    TOP["🩵 FD nation top menu"] --> PLAIN["🟢 League · My Team · Cron<br/>(no select, no dropdown)"]
+    classDef entry fill:#1e4a4a,stroke:#41d9d9,color:#fff
+    classDef fn fill:#2d4a22,stroke:#6abf4b,color:#fff
+    classDef out fill:#4a3b1e,stroke:#d9a441,color:#fff
+    class LINK,TOP entry
+    class PAGE,CTX,SEL,JUMP,PLAIN fn
+    class SEL out
+```
+
+---
+
 ## 8. What the 2026-11-24 refactor changed (and deliberately did not)
 
 | Change | Why |
@@ -273,6 +299,8 @@ flowchart LR
 | `live-points.json` read in one place (`read_live_points_text`) | three callers had three slightly different behaviors |
 | 3 bounded `unwrap()`s → `let Some ... else` / `match` | same behavior, no panic path to reason about |
 | Doc comment updated to the schedule-locked opponent | docs described the removed b dropdown |
+| `team_names()` / `safe_segment()` — two duplicated idioms became one helper each | standings/roster extraction and path-segment validation had two copies; one source of truth |
+| `url_for` compat global removed, `nav_*` context removed, menu cache removed | dead Flask-era abstraction plus a top-menu dropdown the user asked to drop |
 
 Deliberately **not** done: no traits for renderers, no generic artifact
 cache, no new crate, no config DSL. Those would add indirection without

@@ -75,12 +75,11 @@ pub(crate) fn render(st: &AppState, template: &str, ctx: Value) -> Response {
     }
 }
 
-/// On-page team picker data (the top nav stays plain links): every league
-/// team, plus which one is currently shown so the select marks it selected.
-fn add_team_picker(st: &AppState, ctx: &mut Value, current: &str) {
-    let report = artifacts::read_league_report(&st.cfg.root);
-    let mut teams: Vec<String> = report
-        .as_ref()
+/// All league team names from a snapshot: standings order, or sorted roster
+/// keys when standings are absent. The team picker and the matchup page both
+/// need this list — one place keeps them consistent.
+fn team_names(report: Option<&Value>) -> Vec<String> {
+    let from_standings: Vec<String> = report
         .and_then(|r| r.get("standings"))
         .and_then(Value::as_array)
         .map(|rows| {
@@ -89,15 +88,22 @@ fn add_team_picker(st: &AppState, ctx: &mut Value, current: &str) {
                 .collect()
         })
         .unwrap_or_default();
-    if teams.is_empty() {
-        teams = report
-            .as_ref()
-            .and_then(|r| r.get("rosters"))
-            .and_then(Value::as_object)
-            .map(|o| o.keys().cloned().collect())
-            .unwrap_or_default();
-        teams.sort();
+    if !from_standings.is_empty() {
+        return from_standings;
     }
+    let mut names: Vec<String> = report
+        .and_then(|r| r.get("rosters"))
+        .and_then(Value::as_object)
+        .map(|o| o.keys().cloned().collect())
+        .unwrap_or_default();
+    names.sort();
+    names
+}
+
+/// On-page team picker data (the top nav stays plain links): every league
+/// team, plus which one is currently shown so the select marks it selected.
+fn add_team_picker(st: &AppState, ctx: &mut Value, current: &str) {
+    let teams = team_names(artifacts::read_league_report(&st.cfg.root).as_ref());
     if let Some(obj) = ctx.as_object_mut() {
         obj.insert("picker_teams".into(), json!(teams));
         obj.insert("picker_current".into(), json!(current));
@@ -1066,24 +1072,7 @@ async fn matchup_for(
     let fan_sum = |side: &Option<Vec<MatchupEntry>>| side_sum(side, |e| e.fan_pts);
     let max_week = current_week.clamp(0, 18);
     let weeks: Vec<i64> = (1..=max_week).collect();
-    let teams: Vec<String> = report
-        .as_ref()
-        .and_then(|r| r.get("standings"))
-        .and_then(Value::as_array)
-        .map(|rows| {
-            rows.iter()
-                .filter_map(|r| r.get("team").and_then(Value::as_str).map(str::to_string))
-                .collect::<Vec<String>>()
-        })
-        .filter(|v| !v.is_empty())
-        .unwrap_or_else(|| {
-            let mut names: Vec<String> = rosters
-                .and_then(Value::as_object)
-                .map(|o| o.keys().cloned().collect())
-                .unwrap_or_default();
-            names.sort();
-            names
-        });
+    let teams = team_names(report.as_ref());
     let ctx = json!({
         "a_name": a_name, "b_name": b_name, "week": week,
         "starters": starters, "bench": bench, "missing": missing,

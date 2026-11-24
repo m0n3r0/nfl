@@ -14,7 +14,7 @@ use axum::{
 };
 use serde_json::{json, Value};
 
-use crate::{artifacts, pages, AppState};
+use crate::{artifacts, pages, safe_segment, AppState};
 
 fn missing(st: &AppState, page: &str) -> Response {
     pages::render(st, "analytics_missing.html", json!({"page": page}))
@@ -71,13 +71,7 @@ pub async fn players(
 
 /// /player/<pid> — per-player history + projection from its own artifact.
 pub async fn player_detail(State(st): State<AppState>, Path(pid): Path<String>) -> Response {
-    let ok = !pid.is_empty()
-        && pid.len() <= 32
-        && !pid.contains("..")
-        && pid
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c));
-    if !ok {
+    if !safe_segment(&pid, 32) {
         return (StatusCode::NOT_FOUND, "player not found").into_response();
     }
     match artifacts::read_web_artifact(&st.cfg.root, &format!("players/{pid}.json")) {

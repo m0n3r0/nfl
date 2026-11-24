@@ -240,17 +240,20 @@ async fn ws_conn(socket: WebSocket, st: AppState) {
     }
 }
 
+/// Safe single path segment from a URL: no traversal, no odd bytes. Shared by
+/// /logos/<file> and /player/<id> — keep the boundary check in one place.
+pub(crate) fn safe_segment(s: &str, max_len: usize) -> bool {
+    !s.is_empty()
+        && s.len() <= max_len
+        && !s.contains("..")
+        && s.chars()
+            .all(|c| c.is_ascii_alphanumeric() || "._-".contains(c))
+}
+
 /// /logos/<file> — team logos captured by cron into data/logos/.
 /// Strict filename allowlist: no path traversal, no hidden files.
 async fn logo(State(st): State<AppState>, Path(file): Path<String>) -> Response {
-    let ok = !file.is_empty()
-        && file.len() <= 64
-        && !file.contains("..")
-        && !file.starts_with('.')
-        && file
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || "._-".contains(c));
-    if !ok {
+    if !safe_segment(&file, 64) || file.starts_with('.') {
         return StatusCode::NOT_FOUND.into_response();
     }
     let bytes = match std::fs::read(st.cfg.root.join("data/logos").join(&file)) {

@@ -476,9 +476,10 @@ retained in the append-only `league-report.jsonl` / `team-operator.jsonl`.
 Past-week rosters come from the latest snapshot of that week that HAS
 rosters (the last snapshots are light runs without them), merged with the
 overall latest snapshot's FINAL scoreboard/standings (the with-rosters
-one is captured before the late games). With only `?a=` given, `b`
-resolves to that team's opponent from the week's scoreboard — browsing
-another team's history never snaps back to our own matchup. Caveat: an
+one is captured before the late games). The viewed team is the one in the
+URL path (`/league/matchup/<team>`); its opponent resolves from the week's
+scoreboard — browsing another team's history never snaps back to our own
+matchup. Caveat: an
 opponent's starter/bench split reflects the last pre-game snapshot, so it
 can differ slightly from their final lineup (late Sunday swaps); the
 header always shows Yahoo's official total.

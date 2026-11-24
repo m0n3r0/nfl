@@ -20,9 +20,10 @@ router, serve. `--repo-root`/env make tests and alternate checkouts work.
 
 ## lib.rs — wiring and shared state
 
-- `Config` — repo_root, template_dir, data/logs paths, pins path.
+- `Config` — `bind` (default 127.0.0.1:5000) and `root` (repo root, discovered
+  from env / cwd / executable path); the daemon reads its own paths from there.
 - `AppState` — Config + minijinja `Environment` (templates loaded once) +
-  the `/ws` broadcast channel + cached menu teams.
+  the `/ws` broadcast channel. No menu cache (the top nav is plain links).
 - `router()` — the route table:
   `/` → redirect `/league`; `/league`, `/team`, `/team/pin`,
   `/league/team/<name>`, `/league/matchup`, `/league/matchup/<team>`,
@@ -31,15 +32,16 @@ router, serve. `--repo-root`/env make tests and alternate checkouts work.
   `/player/<id>`, `/predictions`, `/ratings`, `/strategy`, `/sos`,
   `/api/predictions`, `/api/modelcard`. Unknown → plain 404 (there is no
   upstream anymore).
-- `watch_live_points()` — notify-based file watcher on
-  `logs/live-points.json` → broadcasts the new payload to every WebSocket
-  client (the League page's live updates).
+- `spawn_live_watcher()` — 2s mtime poll of `logs/live-points.json` →
+  broadcasts the new payload to every WebSocket client (the League page's
+  live updates). No extra dependency; the poller's atomic rename makes
+  reads safe.
 
 ```mermaid
 flowchart TD
-    BIN["🩵 main.rs: flags + Config"] --> STATE["🟢 AppState<br/>templates + broadcast + menu cache"]
+    BIN["🩵 main.rs: flags + Config"] --> STATE["🟢 AppState<br/>templates + broadcast"]
     STATE --> ROUTER["🟢 router(): all routes"]
-    WATCH["🟢 watch_live_points<br/>(notify file watcher)"] --> BC["🟡 /ws broadcast"]
+    WATCH["🟢 spawn_live_watcher<br/>(2s mtime poll)"] --> BC["🟡 /ws broadcast"]
     ART["🔵 logs/live-points.json"] --> WATCH
     ROUTER --> PAGES["🟢 pages.rs (fantasy)"]
     ROUTER --> ANA["🟢 analytics.rs (engine pages)"]

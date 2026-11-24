@@ -1259,3 +1259,14 @@ Parallel-lane audit of every doc against the current code/architecture:
 - Verified: 41 Rust + 325 Python tests, 48/48 mermaid, 0 broken links; live
   /team has 10 team options with Shiba Innu selected, /league/team/Namaste
   has Namaste selected, top menu has 0 selects, 0 selects in header.
+
+## 2026-11-24 — Rust web UI review/refactor (swarm, 5 scoped passes)
+
+- Two duplicated idioms deduped (no new abstraction): `team_names(report)`
+  in pages.rs (was copy-pasted in add_team_picker + matchup_for) and
+  `safe_segment(s, max)` in lib.rs (was copy-pasted in logo + player_detail).
+- Docs de-staled: RUST_WEB.md (spawn_live_watcher 2s mtime poll, no menu
+  cache, Config fields), README (?a= -> URL path), RUST_WEB_ARCHITECTURE
+  (chart node + new §7b colored team-picker chart + refactor table rows).
+- Verified: clippy clean, 41 Rust + 325 Python tests, 49/49 mermaid render,
+  0 broken links, 6 live routes 200. Ledger in scratch swarm file.
