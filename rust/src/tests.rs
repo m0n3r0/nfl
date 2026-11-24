@@ -399,7 +399,6 @@ async fn league_page_and_team_detail_and_404() {
     assert!(html.contains("class=\"mu-open\""));
     assert!(html.contains("mu-card:hover"));
     assert!(html.contains(":focus-within"));
-    assert!(html.contains("Hover a matchup to select it"));
     let (status, html) = get_body(app.clone(), "/league/team/Team%20Beta").await;
     assert_eq!(status, StatusCode::OK);
     assert!(html.contains("Beta Rb"));

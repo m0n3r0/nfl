@@ -77,10 +77,6 @@ data may be incomplete. Live reads retry on the next cron run.</div>
 {% if scoreboard %}
 <div class="card" data-week="{{ scoreboard[0].week }}">
   <h2>Week {{ scoreboard[0].week }} matchups <span id="live-status" class="live-badge" title="live points feed">…</span></h2>
-  <p class="muted">GameChannel-style side-by-side layout. Green = current leader
-  (score, or projection before kickoff). Your matchup is highlighted.
-  <b>Hover a matchup to select it; click anywhere on it for the side-by-side
-  player detail.</b></p>
   {% for e in scoreboard %}
   {% set mine = e.team1 == my_name or e.team2 == my_name %}
   {% set live = e.score1 > 0 or e.score2 > 0 %}

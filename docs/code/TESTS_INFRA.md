@@ -46,7 +46,7 @@ flowchart LR
 
 ---
 
-## The Rust suite (rust/src/tests.rs, 38 tests)
+## The Rust suite (rust/src/tests.rs, 40 tests)
 
 Run: `cd rust && cargo test --lib`. Hermetic: temp-dir repo roots with
 fixture artifacts. Covers page rendering shapes, pins parity with the

@@ -1,9 +1,7 @@
 //! minijinja environment over web/templates/ — the single template source
 //! for every page (the Flask renderer is gone). Jinja2-compatible syntax:
-//! extends/blocks, filters, tests. Two Flask-isms are bridged here so the
-//! templates stay portable:
-//!   url_for(endpoint)  -> global function mapping endpoint names to paths
-//!   tojson(indent=N)   -> filter with Flask's HTML-safe escaping
+//! extends/blocks, filters, tests. One Flask-ism is bridged so the templates
+//! stay portable: tojson(indent=N) with Flask's HTML-safe escaping.
 
 use std::path::Path;
 
@@ -38,27 +36,6 @@ fn tojson(value: Value, indent: Option<usize>) -> Result<String, Error> {
     Ok(htmlsafe_json(&out))
 }
 
-fn url_for(endpoint: &str) -> &'static str {
-    match endpoint {
-        "my_team" => "/team",
-        "pin_toggle" => "/team/pin",
-        "league" => "/league",
-        "league_team" => "/league/team/",
-        "league_matchup" => "/league/matchup",
-        "cron_status" => "/cron",
-        "dashboard" => "/dashboard",
-        "players" => "/players",
-        "player_detail" => "/player/",
-        "predictions" => "/predictions",
-        "sos" => "/sos",
-        "ratings" => "/ratings",
-        "strategy" => "/strategy",
-        "api_predictions" => "/api/predictions",
-        "api_modelcard" => "/api/modelcard",
-        _ => "/",
-    }
-}
-
 pub fn environment(root: &Path) -> Environment<'static> {
     let mut env = Environment::new();
     let templates = root.join("web").join("templates");
@@ -77,7 +54,6 @@ pub fn environment(root: &Path) -> Environment<'static> {
             ),
         }
     });
-    env.add_global("url_for", Value::from_function(url_for));
     env.add_filter("tojson", tojson);
     env
 }

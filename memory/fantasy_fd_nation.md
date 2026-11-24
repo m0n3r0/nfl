@@ -1204,3 +1204,19 @@ Parallel-lane audit of every doc against the current code/architecture:
 - Verified live: cards link to /league/matchup/Namaste etc (no query),
   path route gives Namaste vs Victory Formation, old query still works,
   week links use /league/matchup/Namaste?week=N. 40 Rust + 325 Python tests.
+
+## 2026-11-24 — remove League hint text; trim dead web-UI abstraction
+
+- User: remove the "GameChannel-style side-by-side layout... Hover a matchup
+  to select it..." paragraph from /league (clutter; clicking is intuitive),
+  and refactor the overall web UI without over-engineering.
+- Removed the hint <p> from league.html and its test assertion.
+- Dead-code cleanup (no new abstraction): removed the Flask-compat url_for
+  global from render.rs (14 endpoint mappings, only pin_toggle was used,
+  league_matchup mapping was stale) — the 2 team.html pin forms now use the
+  literal action="/team/pin". render.rs now has just the template loader +
+  one custom tojson filter; all other filters are minijinja built-ins.
+- Docs de-staled: RUST_WEB render.rs section, test count 38->40 (README,
+  RUST_WEB, TESTS_INFRA). 48/48 mermaid render, 0 broken links.
+- Verified: 40 Rust + 325 Python fast tests, clippy clean; live /league has
+  0 hint text + 5 stretched links, /team has 19 working pin forms.

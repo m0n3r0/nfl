@@ -526,7 +526,7 @@ The suite (35 Python files, hermetic-first) includes:
 | `tests/test_backtest.py`, `tests/test_corpus.py`, `tests/test_features.py`, `tests/test_injuries.py` | data/model plumbing: backtest harness, corpus assembly, leakage guards, injury penalties |
 | `tests/test_bye_weeks.py`, `tests/test_schedule.py`, `tests/test_league_scoring.py`, `tests/test_browser.py` | bye weeks, schedule/kickoff locks, league scoring preset, browser launch/heal |
 
-The Rust web daemon has its own suite (38 tests: pages, pins parity,
+The Rust web daemon has its own suite (40 tests: pages, pins parity,
 logos, WebSocket push, artifact readers, Matchup history, native
 analytics pages):
 
