@@ -1167,3 +1167,24 @@ Parallel-lane audit of every doc against the current code/architecture:
   47/47 mermaid charts render, 0 broken doc links, live tunnel: new route
   renders KNP Dripp vs Otto-matic Win!, old route 302s with a= query,
   League page shows "Matchup →".
+
+## 2026-11-24 — League matchup cards: Yahoo hover-select + click-to-detail
+
+- User: on Yahoo's /f1/1329011/matchup, moving the cursor over a matchup
+  SELECTS it (no click) and clicking shows the side-by-side player detail;
+  make our /league cards behave the same. Swarm agents (five scoped passes,
+  no subagent tool) — ledger: ~/.hermes/cache/scratch/nfl-matchup-hover-swarm-20261124.md.
+- RE (live Yahoo, one throwaway CDP tab + one navigation per page, tab closed):
+  league home "View Matchup" links carry mid1/mid2; /matchup selector has
+  `._yb_xx0e59 li:hover, li[aria-selected="true"] { color: grape-jelly }`.
+- Implemented in web/templates/league.html ONLY (no Rust handler change,
+  no JS, no new dep): each .mu-card gets an absolutely-positioned stretched
+  link .mu-open (inset:0, z-index:1) to /league/matchup?a=&b=; CSS
+  :hover/:focus-within highlights the card background + turns the team name
+  grape-jelly (#c9a6ff); team-name links stay above (z-index:2) and still
+  open the team page. Link labels/hint updated.
+- Verified with CDP on OUR page: hover changes bg rgb(29,43,58)->(42,61,82),
+  name -> (201,166,255), overlay absolute z1, name z2; all 5 card hrefs
+  resolve to correct matchup pages; 39 Rust + 325 Python tests; 48/48
+  mermaid charts render; 0 broken doc links. Docs: README, RUST_WEB,
+  RUST_WEB_ARCHITECTURE (new colored chart 4b). Web daemon restarted.

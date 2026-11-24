@@ -390,7 +390,9 @@ when all pages moved to Rust; the Python engine lives on in `src/` +
 `tools/predictions_report.py`.
 
 Pages: **league** (home — standings, GameChannel-style matchup cards with
-team logos, live scores over WebSocket, Matchup links), **matchup**
+team logos, live scores over WebSocket; hovering a card selects it and
+clicking anywhere on it opens the matchup detail — Yahoo's `/matchup`
+interaction, a pure-CSS stretched link), **matchup**
 (`/league/matchup` — Yahoo-matchup-style aligned mirrored table, our
 model's projections vs Yahoo's captured Proj Pts, live Fan Pts column,
 JST game info; `?week=N` browses past weeks from the season history +

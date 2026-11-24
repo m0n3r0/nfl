@@ -66,7 +66,12 @@ Handlers: `league`, `team`, `team_pin` (POST toggle), `league_team`,
 `matchup`, `cron`, `logos`, `live_points`, `ws`.
 
 - `league` — newest ok report (history fallback), standings/scoreboard/
-  matchup context; the League home.
+  matchup context; the League home. Each matchup card is a Yahoo-`/matchup`
+  hover-selectable target: a pure-CSS stretched link (`.mu-open`, absolute
+  inset:0, z-index:1) makes the whole card clickable to `/league/matchup`;
+  `:hover`/`:focus-within` give the grape-jelly highlight; team-name links
+  stay above it (z-index:2) and still open the team page. See the colored
+  [architecture chart](../RUST_WEB_ARCHITECTURE.md#4b-league-matchup-cards--hover-select-click-for-detail).
 - `team` — operator runs + pins + roster fallbacks; the My Team operator
   view with pin buttons.
 - `league_team` — any team's page: roster from the latest report

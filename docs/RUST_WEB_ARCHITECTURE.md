@@ -146,6 +146,34 @@ flowchart TD
 
 ---
 
+## 4b. League matchup cards — hover-select, click for detail
+
+The League home copied Yahoo's `/matchup` interaction (reverse-engineered
+via CDP 2026-11-24): Yahoo highlights a matchup on `li:hover` and marks the
+shown one `aria-selected`, with "View Matchup" links carrying `mid1/mid2`.
+Our card does the same with a pure-CSS stretched link — no JS: hovering
+selects (background + grape-jelly team name), clicking anywhere on the card
+opens `/league/matchup?a=&b=`; the team-name links stay on top and still go
+to the team page.
+
+```mermaid
+flowchart TD
+    HOVER["🩵 cursor over a matchup card"] --> SEL["🟢 .mu-card:hover<br/>:focus-within highlight"]
+    SEL --> LOOK["🟡 background + grape-jelly name<br/>(Yahoo: li:hover / aria-selected)"]
+    CLICK["🩵 click anywhere on card"] --> OPEN["🟢 .mu-open stretched link<br/>absolute inset:0 z-index:1"]
+    OPEN --> DETAIL["🟡 /league/matchup?a=&b=<br/>side-by-side player detail"]
+    NAME["🩵 click a team name"] --> TEAM["🟢 .mu-name z-index:2<br/>(above the overlay)"]
+    TEAM --> PAGE["🟡 /league/team/&lt;name&gt;"]
+    classDef entry fill:#1e4a4a,stroke:#41d9d9,color:#fff
+    classDef fn fill:#2d4a22,stroke:#6abf4b,color:#fff
+    classDef out fill:#4a3b1e,stroke:#d9a441,color:#fff
+    class HOVER,CLICK,NAME entry
+    class SEL,OPEN,TEAM fn
+    class LOOK,DETAIL,PAGE out
+```
+
+---
+
 ## 5. Analytics pages — the FD nation method
 
 Each analytics handler is the same three lines of thought: read the

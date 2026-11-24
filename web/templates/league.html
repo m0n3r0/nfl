@@ -5,10 +5,20 @@
   /* Yahoo GameChannel matchup layout (reverse-engineered 2026-11-20 via CDP):
      flex row 5:3:5 — mirrored team blocks flanking a center column of
      value|label|value rows. Adapted to our dark theme + artifact data. */
-  .mu-card { display: flex; justify-content: center; align-items: center;
-             padding: 14px 10px; border-bottom: 1px solid #202c38; }
+  /* Yahoo /matchup: hovering a matchup SELECTS it (grape-jelly highlight),
+     clicking opens that matchup's side-by-side player detail. We copy the
+     interaction with a stretched link + :hover/:focus-within styles — no JS. */
+  .mu-card { position: relative; display: flex; justify-content: center; align-items: center;
+             padding: 14px 10px; border-bottom: 1px solid #202c38;
+             transition: background-color .12s ease; }
   .mu-card:last-child { border-bottom: none; }
+  .mu-card:hover, .mu-card:focus-within { background: #26354a; }
   .mu-card.mine { background: #1d2b3a; border-radius: 8px; }
+  .mu-card.mine:hover, .mu-card.mine:focus-within { background: #2a3d52; }
+  /* The whole card is the click target; team-name links sit above it. */
+  .mu-open { position: absolute; inset: 0; z-index: 1; cursor: pointer; }
+  .mu-name, .mu-tv { position: relative; z-index: 2; }
+  .mu-card:hover .mu-name, .mu-card:focus-within .mu-name { color: #c9a6ff; }
   .mu-team { flex: 5; display: flex; align-items: center; justify-content: center; min-width: 0; }
   .mu-inner { display: flex; flex: 1; align-items: center; padding: 0 10px; gap: 10px; min-width: 0; }
   .mu-left .mu-inner { flex-direction: row-reverse; }
@@ -70,13 +80,18 @@ data may be incomplete. Live reads retry on the next cron run.</div>
 <div class="card" data-week="{{ scoreboard[0].week }}">
   <h2>Week {{ scoreboard[0].week }} matchups <span id="live-status" class="live-badge" title="live points feed">…</span></h2>
   <p class="muted">GameChannel-style side-by-side layout. Green = current leader
-  (score, or projection before kickoff). Your matchup is highlighted.</p>
+  (score, or projection before kickoff). Your matchup is highlighted.
+  <b>Hover a matchup to select it; click anywhere on it for the side-by-side
+  player detail.</b></p>
   {% for e in scoreboard %}
   {% set mine = e.team1 == my_name or e.team2 == my_name %}
   {% set live = e.score1 > 0 or e.score2 > 0 %}
   {% set lead1 = (e.score1 > e.score2) if live else (e.proj1 > e.proj2) %}
   {% set lead2 = (e.score2 > e.score1) if live else (e.proj2 > e.proj1) %}
   <div class="mu-card {{ 'mine' if mine else '' }}">
+    {# Yahoo /matchup: the whole card is a click target; hovering selects it. #}
+    <a class="mu-open" href="/league/matchup?a={{ e.team1 | urlencode }}&amp;b={{ e.team2 | urlencode }}"
+       aria-label="Open matchup: {{ e.team1 }} vs {{ e.team2 }}"></a>
     <div class="mu-team mu-left">
       <div class="mu-inner">
         {% if logos[e.team1] %}<img class="mu-logo" src="{{ logos[e.team1] }}" alt="{{ e.team1 }}">

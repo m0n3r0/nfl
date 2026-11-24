@@ -394,6 +394,12 @@ async fn league_page_and_team_detail_and_404() {
     assert!(html.contains("mu-score mu-leading"));
     assert!(html.contains("Week 2 matchups"));
     assert!(html.contains("/league/matchup?a=Shiba%20Innu&amp;b=Team%20Beta"));
+    // Yahoo /matchup interaction: the whole card highlights on hover and
+    // is clickable anywhere (stretched link); team names stay separate links.
+    assert!(html.contains("class=\"mu-open\""));
+    assert!(html.contains("mu-card:hover"));
+    assert!(html.contains(":focus-within"));
+    assert!(html.contains("Hover a matchup to select it"));
     let (status, html) = get_body(app.clone(), "/league/team/Team%20Beta").await;
     assert_eq!(status, StatusCode::OK);
     assert!(html.contains("Beta Rb"));
