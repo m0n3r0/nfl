@@ -14,9 +14,8 @@ from typing import Any, Callable, Protocol
 from urllib.parse import urlencode, urlparse
 
 from .cdp import CdpError
-from .team import INJURED_RESERVE_SLOTS, LEAGUE_ID, TEAM_ID, TEAM_PATH, TeamSnapshot, YahooTeamReader
+from .team import BASE, INJURED_RESERVE_SLOTS, LEAGUE_ID, TEAM_ID, TEAM_PATH, TeamSnapshot, YahooTeamReader
 
-BASE = "https://football.fantasysports.yahoo.com"
 ADD_PATH = f"/f1/{LEAGUE_ID}/addplayer"
 TEAM_ADD_PATH = f"/f1/{LEAGUE_ID}/{TEAM_ID}/addplayer"
 TRANSACTIONS_PATH = f"/f1/{LEAGUE_ID}/transactions"

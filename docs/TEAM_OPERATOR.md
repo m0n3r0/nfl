@@ -294,6 +294,11 @@ launchd agent (`tools/live_points.py --loop`); install with
 37 9 * * 0     cd /path/to/nfl && .venv/bin/python tools/profile_backup.py >> logs/profile-backup-cron.log 2>&1
 ```
 
+The schedule above is mirrored in `rust/src/pages.rs::CRON_SCHEDULE` for the
+`/cron` page display — update BOTH when the crontab changes (the Rust
+constant is a display-only copy; the crontab is the source of truth). The
+Wed waiver job's `--jev 5` is pinned by a Rust test.
+
 - twice daily (08:24 / 20:24): monitor + report; catches injury/lineup news.
 - Sunday 23:47 (= Sunday ~10:47 ET): `--apply` safety net — cron has no
   catch-up when the Mac sleeps, and the 01:23 fire below lands when the host

@@ -20,7 +20,8 @@ LEAGUE_ID = "1329011"
 TEAM_ID = "2"
 TEAM_PATH = f"/f1/{LEAGUE_ID}/{TEAM_ID}"
 YAHOO_FANTASY_HOST = "football.fantasysports.yahoo.com"
-TEAM_URL = f"https://{YAHOO_FANTASY_HOST}{TEAM_PATH}"
+BASE = f"https://{YAHOO_FANTASY_HOST}"  # canonical host for every Yahoo reader
+TEAM_URL = f"{BASE}{TEAM_PATH}"
 EXPECTED_ACTIVE_SLOTS = Counter({"QB": 1, "RB": 2, "WR": 2, "TE": 1, "W/R/T": 1, "K": 1, "DEF": 1, "BN": 6})
 INJURED_RESERVE_SLOTS = {"IR", "IL"}
 

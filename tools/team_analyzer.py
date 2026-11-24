@@ -35,12 +35,11 @@ from yahoo.cdp import CdpClient, CdpError, list_targets  # noqa: E402
 from yahoo.identity import TEAM_ALIASES  # noqa: E402
 from yahoo.league import LeagueWafBlocked, matchup, opponent_roster, standings  # noqa: E402
 from yahoo.recommend import monitor_report, propose_lineup  # noqa: E402
-from yahoo.team import TEAM_PATH, YahooTeamReader  # noqa: E402
+from yahoo.team import BASE, TEAM_PATH, YahooTeamReader  # noqa: E402
 from yahoo.wire import WireScanBlocked, rank_targets, scan_available  # noqa: E402
 
 import preflight as preflight_mod  # noqa: E402  # tools/preflight.py
 
-BASE = "https://football.fantasysports.yahoo.com"
 MY_TEAM_ID = "2"
 LEAGUE_TEAM_IDS = [str(i) for i in range(1, 11)]
 

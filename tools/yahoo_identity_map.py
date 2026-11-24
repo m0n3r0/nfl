@@ -19,9 +19,8 @@ from src.config import league_preset
 from yahoo.cdp import CdpClient
 from yahoo.identity import YahooPlayerIdentity, reconcile_identities, write_identity_map
 from yahoo.players import YahooPlayerReader
-from yahoo.team import TEAM_PATH, YahooTeamReader, find_team_target
+from yahoo.team import BASE, TEAM_PATH, YahooTeamReader, find_team_target
 
-BASE = "https://football.fantasysports.yahoo.com"
 POSITIONS = ("QB", "RB", "WR", "TE")
 
 

@@ -367,6 +367,9 @@ async fn cron_page_lists_schedule_and_runs() {
     assert_eq!(status, StatusCode::OK);
     assert!(html.contains("47 23 * * 0"));
     assert!(html.contains("team_operator.py --apply"));
+    // Mirrors the real crontab — the Wed waiver job carries --jev 5.
+    assert!(html.contains("11 20 * * 3"));
+    assert!(html.contains("--waiver-scan --refresh-data --jev 5"));
 }
 
 #[tokio::test]

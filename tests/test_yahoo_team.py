@@ -5,7 +5,13 @@ from __future__ import annotations
 import pytest
 
 from yahoo.cdp import Target
-from yahoo.team import TeamReadError, YahooTeamReader, _parse_payload, is_team_target
+from yahoo.team import BASE, TEAM_URL, TeamReadError, YahooTeamReader, _parse_payload, is_team_target
+
+
+def test_yahoo_base_is_single_source_of_truth():
+    """All Yahoo readers share one host constant (no drift across tools)."""
+    assert BASE == "https://football.fantasysports.yahoo.com"
+    assert TEAM_URL.startswith(BASE)
 
 
 SLOTS = ["QB", "RB", "RB", "WR", "WR", "TE", "W/R/T", "BN", "BN", "BN", "BN", "BN", "BN", "K", "DEF"]

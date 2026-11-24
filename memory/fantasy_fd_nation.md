@@ -1270,3 +1270,18 @@ Parallel-lane audit of every doc against the current code/architecture:
   (chart node + new §7b colored team-picker chart + refactor table rows).
 - Verified: clippy clean, 41 Rust + 325 Python tests, 49/49 mermaid render,
   0 broken links, 6 live routes 200. Ledger in scratch swarm file.
+
+## 2026-11-24 — full-stack architecture audit + refactor (5 passes)
+
+- No subagent tool connected; ledger ~/.hermes/cache/scratch/nfl-fullstack-swarm-20261124.md.
+- Yahoo host had 8 duplicated `"https://football.fantasysports.yahoo.com"`
+  literals (5 tools + 3 yahoo modules) -> one `BASE` in yahoo/team.py
+  (from YAHOO_FANTASY_HOST); all 8 import it; test_yahoo_team pins it.
+- Real drift fixed: /cron page's CRON_SCHEDULE lacked `--jev 5` that the real
+  Wed waiver crontab line carries. Added to the constant + Rust test;
+  documented the cron-is-source-of-truth / Rust-is-display-copy contract
+  in TEAM_OPERATOR.md and the code comment.
+- Docs de-staled: CODE_GUIDE tools count (23 .py + 7 launchd), YAHOO_LAYER
+  canonical BASE note. 49/49 mermaid charts, 0 broken links.
+- Verified: clippy clean, 41 Rust + 326 Python tests, 5 live routes 200,
+  5 launchd agents loaded (3 running, 2 scheduled-idle).

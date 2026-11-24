@@ -33,10 +33,9 @@ from yahoo.league import (  # noqa: E402
     team_ids,
     team_logos,
 )
-from yahoo.team import TEAM_ID, TEAM_PATH, find_team_target  # noqa: E402
+from yahoo.team import BASE, TEAM_ID, TEAM_PATH, find_team_target  # noqa: E402
 from logo_sync import sync_logos  # noqa: E402  # tools/logo_sync.py
 
-BASE = "https://football.fantasysports.yahoo.com"
 
 
 def write_report(path: str, report: dict) -> None:

@@ -15,8 +15,9 @@ use serde_json::{json, Map, Value};
 
 use crate::{artifacts, pins, AppState};
 
-/// The host crontab (docs/TEAM_OPERATOR.md is the authoritative runbook),
-/// mirrored here for the /cron page — update both when the crontab changes.
+/// The host crontab (docs/TEAM_OPERATOR.md is the authoritative runbook;
+/// mirrored here for the /cron page display only — update both). A Rust test
+/// pins the waiver job's --jev 5 so the display cannot silently drift.
 const CRON_SCHEDULE: [(&str, &str, &str); 9] = [
     (
         "24 8,20 * * *",
@@ -36,7 +37,7 @@ const CRON_SCHEDULE: [(&str, &str, &str); 9] = [
     (
         "11 20 * * 3",
         "Wed 20:11",
-        "team_operator.py --waiver-scan --refresh-data",
+        "team_operator.py --waiver-scan --refresh-data --jev 5 — advisory wire review",
     ),
     (
         "19 21 * * *",

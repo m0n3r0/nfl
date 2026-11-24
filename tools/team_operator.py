@@ -31,12 +31,11 @@ from yahoo.cdp import CdpClient, CdpError  # noqa: E402
 from yahoo.league import LeagueWafBlocked, matchup  # noqa: E402
 from yahoo.lineup import LineupError, YahooLineupOperator  # noqa: E402
 from yahoo.recommend import apply_schedule_locks, monitor_report, propose_lineup  # noqa: E402
-from yahoo.team import TEAM_PATH, YahooTeamReader, find_team_target  # noqa: E402
+from yahoo.team import BASE, TEAM_PATH, YahooTeamReader, find_team_target  # noqa: E402
 from yahoo.wire import WireScanBlocked, rank_targets, scan_available  # noqa: E402
 
 import preflight as preflight_mod  # noqa: E402  # tools/preflight.py
 
-BASE = "https://football.fantasysports.yahoo.com"
 AUDIT_LOG = ROOT / "logs" / "team-operator.jsonl"
 LOCK_PATH = ROOT / "logs" / "team-operator.lock"
 

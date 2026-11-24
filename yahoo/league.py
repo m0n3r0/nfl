@@ -14,10 +14,9 @@ from typing import Any, Callable, Protocol
 from urllib.parse import urlparse
 
 from .cdp import CdpError
-from .team import LEAGUE_ID, TEAM_ID
+from .team import BASE, LEAGUE_ID, TEAM_ID
 from .waf import denied as _waf_denied
 
-BASE = "https://football.fantasysports.yahoo.com"
 LEAGUE_HOME = f"/f1/{LEAGUE_ID}"
 MATCHUP_PATH = f"/f1/{LEAGUE_ID}/matchup"
 

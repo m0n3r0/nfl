@@ -28,10 +28,9 @@ if str(ROOT) not in sys.path:
 from src import corpus as corpus_mod, jev, projections  # noqa: E402
 from src.config import league_preset  # noqa: E402
 from yahoo.cdp import CdpClient, CdpError  # noqa: E402
-from yahoo.team import TEAM_PATH, YahooTeamReader, find_team_target  # noqa: E402
+from yahoo.team import BASE, TEAM_PATH, YahooTeamReader, find_team_target  # noqa: E402
 from yahoo.wire import WireScanBlocked, rank_targets, scan_available  # noqa: E402
 
-BASE = "https://football.fantasysports.yahoo.com"
 
 
 def main() -> int:

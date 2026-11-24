@@ -122,6 +122,9 @@ flowchart TD
 
 ## team.py — the authoritative roster read
 
+- `BASE`, `LEAGUE_ID`, `TEAM_ID`, `TEAM_PATH`, `TEAM_URL` — the canonical
+  Yahoo host/id constants for the whole repo. Every tool and `yahoo/`
+  reader imports `BASE` from here; there is no second copy of the host.
 - `is_team_url` / `is_team_target` — exactly `/f1/1329011/2`.
 - `find_team_target()` — heals drift: no tab on the team route but one
   anywhere on the fantasy host → navigate it home (one load). No

@@ -14,10 +14,9 @@ import pandas as pd
 
 from .identity import YahooPlayerIdentity, reconcile_identities
 from .players import AvailablePlayer, PlayerReadError, YahooPlayerReader
-from .team import LEAGUE_ID
+from .team import BASE, LEAGUE_ID
 from .waf import denied as _waf_denied
 
-BASE = "https://football.fantasysports.yahoo.com"
 PLAYERS_PATH = f"/f1/{LEAGUE_ID}/players"
 POSITIONS = ("QB", "RB", "WR", "TE")
 
