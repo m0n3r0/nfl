@@ -1237,3 +1237,25 @@ Parallel-lane audit of every doc against the current code/architecture:
 - Verified: 40 Rust + 325 Python fast tests, clippy clean, 48/48 mermaid
   charts, 0 broken links; live nav shows exactly League/My Team/Cron links
   and standings still expose all team links.
+
+## 2026-11-24 — on-page team picker (option b), top menu stays plain
+
+- User wanted the team dropdown back but NOT in the top menu: put it on the
+  page reached by "My Team". Chose option (b) from the mockup: picking a team
+  jumps to that team's /league/team/<name> page.
+- Mockup: ~/.hermes/cache/scratch/my_team_picker_mockup.html.
+- New partial web/templates/team_picker.html ("Viewing team:" select, all
+  league teams, current selected, onchange -> /league/team/<urlencode>).
+  Included in team.html and league_team.html below the h1. CSS in layout.html.
+  Top menu unchanged (plain League/My Team/Cron links).
+- Rust: add_team_picker(st, ctx, current) injects picker_teams/picker_current
+  only into team_context (current = report.matchup.team) and both league_team
+  contexts (current = viewed name); no global injection. Fixture helper now
+  copies ALL *.html from web/templates (a hardcoded list went stale with the
+  new partial and broke 7 tests — fixed permanently).
+- Docs: README, RUST_WEB, TESTS_INFRA (15 templates, 41 tests). Note: must
+  `cargo build --release` before restarting the daemon or the live page runs
+  the old binary (bit us once here).
+- Verified: 41 Rust + 325 Python tests, 48/48 mermaid, 0 broken links; live
+  /team has 10 team options with Shiba Innu selected, /league/team/Namaste
+  has Namaste selected, top menu has 0 selects, 0 selects in header.

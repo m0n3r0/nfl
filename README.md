@@ -347,8 +347,10 @@ corpus builds or model training. Missing artifacts render an honest
 notice telling you to run the producer.
 `/` redirects to `/league` (League is the default page; menu order
 League · My Team · Cron). "My Team" is a plain link to the operator view
-(`/team`); to view any other team, click its name in the League standings
-or matchup cards (`/league/team/<name>`). The model-card dashboard lives
+(`/team`). Both the `/team` and `/league/team/<name>` pages have an on-page
+"Viewing team" dropdown (below the heading, NOT in the top menu) listing all
+league teams; selecting one jumps to that team's page. Team names in the
+League standings/matchup cards are links too. The model-card dashboard lives
 at `/dashboard`.
 The public tunnel points at :5000 only.
 
@@ -526,7 +528,7 @@ The suite (35 Python files, hermetic-first) includes:
 | `tests/test_backtest.py`, `tests/test_corpus.py`, `tests/test_features.py`, `tests/test_injuries.py` | data/model plumbing: backtest harness, corpus assembly, leakage guards, injury penalties |
 | `tests/test_bye_weeks.py`, `tests/test_schedule.py`, `tests/test_league_scoring.py`, `tests/test_browser.py` | bye weeks, schedule/kickoff locks, league scoring preset, browser launch/heal |
 
-The Rust web daemon has its own suite (40 tests: pages, pins parity,
+The Rust web daemon has its own suite (41 tests: pages, pins parity,
 logos, WebSocket push, artifact readers, Matchup history, native
 analytics pages):
 

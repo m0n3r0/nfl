@@ -21,23 +21,13 @@ fn fixture_root(tmp: &Path) -> PathBuf {
     let tpl_dst = root.join("web/templates");
     std::fs::create_dir_all(&tpl_dst).unwrap();
     let tpl_src = Path::new(REPO_ROOT).join("web/templates");
-    for name in [
-        "layout.html",
-        "team.html",
-        "league.html",
-        "league_team.html",
-        "cron.html",
-        "matchup.html",
-        "dashboard.html",
-        "players.html",
-        "player.html",
-        "predictions.html",
-        "ratings.html",
-        "strategy.html",
-        "sos.html",
-        "analytics_missing.html",
-    ] {
-        std::fs::copy(tpl_src.join(name), tpl_dst.join(name)).unwrap();
+    // Copy every template including partials — never let a new include go
+    // stale in the fixture (this bit us once with the team-picker partial).
+    for entry in std::fs::read_dir(&tpl_src).unwrap() {
+        let src = entry.unwrap().path();
+        if src.extension().is_some_and(|e| e == "html") {
+            std::fs::copy(&src, tpl_dst.join(src.file_name().unwrap())).unwrap();
+        }
     }
     std::fs::create_dir_all(root.join("logs")).unwrap();
     std::fs::create_dir_all(root.join("data")).unwrap();
@@ -239,6 +229,12 @@ async fn team_page_renders_plan_and_pin_buttons() {
     let tmp = tempfile_dir();
     let root = fixture_root(&tmp);
     write_runs(&root, &[operator_record("ok")]);
+    // The on-page picker needs the league snapshot for its team list.
+    std::fs::write(
+        root.join("logs/league-report.json"),
+        json!({"standings": [{"team": "Shiba Innu"}, {"team": "Team Beta"}]}).to_string(),
+    )
+    .unwrap();
     let (status, html) = get_body(router(cfg(&root)), "/team").await;
     assert_eq!(status, StatusCode::OK);
     assert!(html.contains("Running Back"), "{html}");
@@ -249,6 +245,27 @@ async fn team_page_renders_plan_and_pin_buttons() {
         "{html}"
     );
     assert!(html.contains("name=\"yahoo_id\" value=\"2\""));
+    // On-page team picker (NOT the top menu): all teams listed, my team
+    // selected, each option jumps to that team's page.
+    assert!(html.contains("Viewing team:"));
+    assert!(html.contains("<select id=\"team-pick\""));
+    assert!(html.contains("/league/team/Team%20Beta"));
+    assert!(
+        html.contains("value=\"/league/team/Shiba%20Innu\" selected")
+            || html.contains("value=\"&#x2f;league&#x2f;team&#x2f;Shiba%20Innu\" selected")
+    );
+}
+
+#[tokio::test]
+async fn team_page_picker_is_absent_from_top_menu() {
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    write_runs(&root, &[operator_record("ok")]);
+    let (_, html) = get_body(router(cfg(&root)), "/team").await;
+    // The FD nation header still has plain links, no select.
+    let header = html.split("</header>").next().unwrap_or("");
+    assert!(!header.contains("<select"));
+    assert!(header.contains(">My Team</a>"));
 }
 
 #[tokio::test]

@@ -6,6 +6,7 @@
              vertical-align: middle; margin-right: 8px; border: 1px solid #2c4055; }
 </style>
 <h1>{% if logo %}<img class="tv-logo" src="{{ logo }}" alt="">{% endif %}{{ name }}</h1>
+{% include "team_picker.html" %}
 <p class="muted"><a href="/league/matchup/{{ name | urlencode }}">Matchup →</a>
 · <a href="/league">Back to standings</a></p>
 

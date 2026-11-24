@@ -75,6 +75,35 @@ pub(crate) fn render(st: &AppState, template: &str, ctx: Value) -> Response {
     }
 }
 
+/// On-page team picker data (the top nav stays plain links): every league
+/// team, plus which one is currently shown so the select marks it selected.
+fn add_team_picker(st: &AppState, ctx: &mut Value, current: &str) {
+    let report = artifacts::read_league_report(&st.cfg.root);
+    let mut teams: Vec<String> = report
+        .as_ref()
+        .and_then(|r| r.get("standings"))
+        .and_then(Value::as_array)
+        .map(|rows| {
+            rows.iter()
+                .filter_map(|r| r.get("team").and_then(Value::as_str).map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default();
+    if teams.is_empty() {
+        teams = report
+            .as_ref()
+            .and_then(|r| r.get("rosters"))
+            .and_then(Value::as_object)
+            .map(|o| o.keys().cloned().collect())
+            .unwrap_or_default();
+        teams.sort();
+    }
+    if let Some(obj) = ctx.as_object_mut() {
+        obj.insert("picker_teams".into(), json!(teams));
+        obj.insert("picker_current".into(), json!(current));
+    }
+}
+
 /// Shared /team context: newest runs, ok-fallback report, live pins.
 /// A corrupt pin file is shown as a notice — the operator refuses to run
 /// until it is fixed, so the page must say so loudly.
@@ -90,7 +119,16 @@ fn team_context(st: &AppState) -> Value {
         Ok(p) => (json!(p), Value::Null),
         Err(e) => (json!({}), Value::String(e.to_string())),
     };
-    json!({"latest": latest, "report": report, "pins": pins, "pins_error": pins_error})
+    let my = report
+        .get("matchup")
+        .and_then(|m| m.get("team"))
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    let mut ctx =
+        json!({"latest": latest, "report": report, "pins": pins, "pins_error": pins_error});
+    add_team_picker(st, &mut ctx, &my);
+    ctx
 }
 
 pub async fn team(State(st): State<AppState>) -> Response {
@@ -294,10 +332,11 @@ pub async fn league_team(State(st): State<AppState>, Path(name): Path<String>) -
     }
 
     if row.is_none() && trend.is_empty() {
-        let ctx = json!({"name": name, "row": Value::Null, "trend": [], "games": 0,
-                         "matchup": Value::Null, "roster": Value::Null,
-                         "roster_date": Value::Null, "captured_at": Value::Null,
-                         "logo": Value::Null});
+        let mut ctx = json!({"name": name, "row": Value::Null, "trend": [], "games": 0,
+                             "matchup": Value::Null, "roster": Value::Null,
+                             "roster_date": Value::Null, "captured_at": Value::Null,
+                             "logo": Value::Null});
+        add_team_picker(&st, &mut ctx, &name);
         return (StatusCode::NOT_FOUND, render(&st, "league_team.html", ctx)).into_response();
     }
     let games = row
@@ -308,7 +347,7 @@ pub async fn league_team(State(st): State<AppState>, Path(name): Path<String>) -
         .get(&name)
         .cloned()
         .unwrap_or(Value::Null);
-    let ctx = json!({
+    let mut ctx = json!({
         "name": name,
         "row": row.unwrap_or(Value::Null),
         "trend": trend,
@@ -319,6 +358,7 @@ pub async fn league_team(State(st): State<AppState>, Path(name): Path<String>) -
         "captured_at": get("captured_at").unwrap_or(Value::Null),
         "logo": logo,
     });
+    add_team_picker(&st, &mut ctx, &name);
     render(&st, "league_team.html", ctx)
 }
 

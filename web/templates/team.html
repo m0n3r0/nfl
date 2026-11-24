@@ -8,6 +8,7 @@
   .pin-btn.on { background: #2a2118; border-color: #5c4526; color: #e8c98a; }
 </style>
 <h1>My Team{% if report and report.matchup %} — {{ report.matchup.team }}{% endif %}</h1>
+{% include "team_picker.html" %}
 
 {% if pins_error %}
 <div class="notice">Pin file problem: {{ pins_error }} — the operator refuses to

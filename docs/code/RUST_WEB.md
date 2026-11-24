@@ -3,7 +3,7 @@
 One axum process on 127.0.0.1:5000 serves **every** page natively with
 minijinja over the shared `web/templates/`. No Flask, no proxy, no
 request-time compute: handlers read local artifacts and filter in Rust.
-8 source files, 40 tests. See the colored
+8 source files, 41 tests. See the colored
 [Rust web architecture guide](../RUST_WEB_ARCHITECTURE.md) for a
 human-oriented flowchart of each layer.
 
@@ -75,7 +75,8 @@ Handlers: `league`, `team`, `team_pin` (POST toggle), `league_team`,
   stay above it (z-index:2) and still open the team page. See the colored
   [architecture chart](../RUST_WEB_ARCHITECTURE.md#4b-league-matchup-cards--hover-select-click-for-detail).
 - `team` — operator runs + pins + roster fallbacks; the My Team operator
-  view with pin buttons.
+  view with pin buttons. `team_context()` also builds the on-page team picker
+  via `add_team_picker()` (all league teams + current one selected).
 - `league_team` — any team's page: roster from the latest report
   (history fallback), Yahoo Proj Pts rendered or "—", never invented.
 - `matchup` — **the GameChannel-style table**. Key functions:
@@ -212,7 +213,7 @@ with Flask's HTML-safe escaping for the one template that embeds JSON.
 Everything else (`replace`, `join`, `round`, `upper`, `urlencode`, …) is a
 minijinja built-in — no custom filter registry to maintain.
 
-## tests.rs — the 40-test suite
+## tests.rs — the 41-test suite
 
 Hermetic (temp dirs, fixture artifacts): pages render with real shapes,
 pins parity with Python, logos allowlist + traversal rejection,

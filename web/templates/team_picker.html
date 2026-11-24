@@ -1,0 +1,13 @@
+{# On-page team selector — NOT in the top menu. Choosing a team jumps to
+   that team's page (/league/team/<name>). #}
+{% if picker_teams %}
+<div class="team-picker">
+  <label for="team-pick">Viewing team:</label>
+  <select id="team-pick" aria-label="Select a team to view"
+          onchange="if (this.value) window.location.href = this.value">
+    {% for t in picker_teams %}
+    <option value="/league/team/{{ t | urlencode }}" {% if t == picker_current %}selected{% endif %}>{{ t }}</option>
+    {% endfor %}
+  </select>
+</div>
+{% endif %}

@@ -46,7 +46,7 @@ flowchart LR
 
 ---
 
-## The Rust suite (rust/src/tests.rs, 40 tests)
+## The Rust suite (rust/src/tests.rs, 41 tests)
 
 Run: `cd rust && cargo test --lib`. Hermetic: temp-dir repo roots with
 fixture artifacts. Covers page rendering shapes, pins parity with the
@@ -97,10 +97,12 @@ GitHub Actions on push/PR: Python setup, dependency install, the fast
 pytest suite. The Rust suite runs locally via cargo (the daemon is
 built with `cargo build --release` before installing the web agent).
 
-## web/templates/ (14 templates, shared by the Rust renderer)
+## web/templates/ (15 templates, shared by the Rust renderer)
 
 - `layout.html` — the shell: top menu (League · My Team · Cron, plain links),
   shared CSS, the `/ws` client script.
+- `team_picker.html` — partial: on-page "Viewing team" dropdown included in
+  `team.html` and `league_team.html` (never in the top menu).
 - Fantasy: `league.html`, `team.html` (pin buttons), `league_team.html`,
   `matchup.html` (side-by-side GameChannel tables + week/opponent
   pickers), `cron.html`.
