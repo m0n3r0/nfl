@@ -346,10 +346,10 @@ handlers are pure artifact reads — milliseconds, never request-time
 corpus builds or model training. Missing artifacts render an honest
 notice telling you to run the producer.
 `/` redirects to `/league` (League is the default page; menu order
-League · My Team · Cron). "My Team" is a dropdown of all 10 league teams:
-our own team opens the operator view (`/team`), any other team opens its
-league page (`/league/team/<name>`); the current team stays preselected.
-The model-card dashboard lives at `/dashboard`.
+League · My Team · Cron). "My Team" is a plain link to the operator view
+(`/team`); to view any other team, click its name in the League standings
+or matchup cards (`/league/team/<name>`). The model-card dashboard lives
+at `/dashboard`.
 The public tunnel points at :5000 only.
 
 On `/team` you can pin players (📌) to freeze their current slot: the

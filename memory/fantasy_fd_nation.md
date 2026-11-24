@@ -1220,3 +1220,20 @@ Parallel-lane audit of every doc against the current code/architecture:
   RUST_WEB, TESTS_INFRA). 48/48 mermaid render, 0 broken links.
 - Verified: 40 Rust + 325 Python fast tests, clippy clean; live /league has
   0 hint text + 5 stretched links, /team has 19 working pin forms.
+
+## 2026-11-24 — FD nation nav: drop team-picker dropdown
+
+- User disliked the "My Team: Shiba Innu" dropdown in the FD nation top menu
+  (League · My Team · Cron) and asked for a more appropriate name, no dropdown.
+- Replaced the <select class="nav-team"> with a plain <a href="/team">My Team</a>
+  (consistent with League and Cron; no team-name clutter). Other teams are
+  still one click from the League page — standings rows and matchup cards
+  link to /league/team/<name>.
+- Dead code removed with it: the .nav-team CSS, and ALL nav context plumbing
+  in pages.rs (nav_teams/nav_my_team injected in render(), nav_sel in team,
+  league_team x2) — render() is now a straight template render.
+- Docs de-staled: README (was "dropdown of all 10 league teams"), TESTS_INFRA
+  (was "My Team dropdown"). Tests updated for plain links.
+- Verified: 40 Rust + 325 Python fast tests, clippy clean, 48/48 mermaid
+  charts, 0 broken links; live nav shows exactly League/My Team/Cron links
+  and standings still expose all team links.

@@ -99,7 +99,7 @@ built with `cargo build --release` before installing the web agent).
 
 ## web/templates/ (14 templates, shared by the Rust renderer)
 
-- `layout.html` — the shell: top menu (League · My Team dropdown · Cron),
+- `layout.html` — the shell: top menu (League · My Team · Cron, plain links),
   shared CSS, the `/ws` client script.
 - Fantasy: `league.html`, `team.html` (pin buttons), `league_team.html`,
   `matchup.html` (side-by-side GameChannel tables + week/opponent

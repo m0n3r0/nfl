@@ -65,42 +65,7 @@ const CRON_SCHEDULE: [(&str, &str, &str); 9] = [
     ),
 ];
 
-pub(crate) fn render(st: &AppState, template: &str, mut ctx: Value) -> Response {
-    // Global nav: the "My Team" menu is a team picker fed by the latest
-    // league snapshot, injected into every page context here.
-    if let Some(obj) = ctx.as_object_mut() {
-        if !obj.contains_key("nav_teams") {
-            let report = artifacts::read_league_report(&st.cfg.root);
-            let mut teams: Vec<String> = report
-                .as_ref()
-                .and_then(|r| r.get("standings"))
-                .and_then(Value::as_array)
-                .map(|rows| {
-                    rows.iter()
-                        .filter_map(|r| r.get("team").and_then(Value::as_str).map(str::to_string))
-                        .collect()
-                })
-                .unwrap_or_default();
-            if teams.is_empty() {
-                teams = report
-                    .as_ref()
-                    .and_then(|r| r.get("rosters"))
-                    .and_then(Value::as_object)
-                    .map(|o| o.keys().cloned().collect())
-                    .unwrap_or_default();
-                teams.sort();
-            }
-            let my = report
-                .as_ref()
-                .and_then(|r| r.get("matchup"))
-                .and_then(|m| m.get("team"))
-                .and_then(Value::as_str)
-                .unwrap_or("Shiba Innu")
-                .to_string();
-            obj.insert("nav_teams".into(), json!(teams));
-            obj.insert("nav_my_team".into(), json!(my));
-        }
-    }
+pub(crate) fn render(st: &AppState, template: &str, ctx: Value) -> Response {
     match st.env.get_template(template).and_then(|t| t.render(ctx)) {
         Ok(html) => Html(html).into_response(),
         Err(e) => {
@@ -125,8 +90,7 @@ fn team_context(st: &AppState) -> Value {
         Ok(p) => (json!(p), Value::Null),
         Err(e) => (json!({}), Value::String(e.to_string())),
     };
-    json!({"latest": latest, "report": report, "pins": pins, "pins_error": pins_error,
-           "nav_sel": "/team"})
+    json!({"latest": latest, "report": report, "pins": pins, "pins_error": pins_error})
 }
 
 pub async fn team(State(st): State<AppState>) -> Response {
@@ -333,7 +297,7 @@ pub async fn league_team(State(st): State<AppState>, Path(name): Path<String>) -
         let ctx = json!({"name": name, "row": Value::Null, "trend": [], "games": 0,
                          "matchup": Value::Null, "roster": Value::Null,
                          "roster_date": Value::Null, "captured_at": Value::Null,
-                         "logo": Value::Null, "nav_sel": format!("/league/team/{name}")});
+                         "logo": Value::Null});
         return (StatusCode::NOT_FOUND, render(&st, "league_team.html", ctx)).into_response();
     }
     let games = row
@@ -354,7 +318,6 @@ pub async fn league_team(State(st): State<AppState>, Path(name): Path<String>) -
         "roster_date": roster_date.map(Value::String).unwrap_or(Value::Null),
         "captured_at": get("captured_at").unwrap_or(Value::Null),
         "logo": logo,
-        "nav_sel": format!("/league/team/{name}"),
     });
     render(&st, "league_team.html", ctx)
 }

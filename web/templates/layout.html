@@ -11,7 +11,6 @@
   header a:hover { color: #bcd6ff; }
   .nav-label { color: #7a8a99; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; margin-right: 12px; }
   .nav-group { display: inline-flex; align-items: center; flex-wrap: wrap; }
-  .nav-team { font-weight: 600; margin-right: 18px; max-width: 230px; cursor: pointer; }
   .nav-sep { border-left: 1px solid #243240; height: 18px; margin-right: 18px; }
   .wrap { max-width: 1120px; margin: 24px auto; padding: 0 16px; }
   h1 { font-size: 22px; } h2 { font-size: 16px; color: #9fd0ff; margin-top: 26px; }
@@ -35,15 +34,7 @@
   <span class="nav-group">
     <span class="nav-label">FD nation</span>
     <a href="/league">League</a>
-    {% if nav_teams %}
-    <select class="nav-team" aria-label="My Team — pick a team"
-            onchange="if (this.value) window.location.href = this.value">
-      <option value="/team" {% if nav_sel == '/team' %}selected{% endif %}>My Team: {{ nav_my_team }}</option>
-      {% for t in nav_teams %}{% if t != nav_my_team %}<option value="/league/team/{{ t | urlencode }}" {% if nav_sel == '/league/team/' + t %}selected{% endif %}>{{ t }}</option>{% endif %}{% endfor %}
-    </select>
-    {% else %}
     <a href="/team">My Team</a>
-    {% endif %}
     <a href="/cron">Cron</a>
   </span>
   <span class="nav-sep"></span>
