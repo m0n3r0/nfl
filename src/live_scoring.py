@@ -140,6 +140,47 @@ _DEF_TD_TYPES = {
     "Sack Opp Fumble Recovery", "Defensive Touchdown",
 }
 _BLOCK_TYPES = {"Blocked Field Goal", "Blocked Punt", "Blocked Extra Point"}
+# Points scored by the opponent's DEF/ST are NOT charged to our DEF's
+# points-allowed tier (Yahoo rule): the defense wasn't on the field for a
+# pick-six, return TD, safety or defensive XP return. ESPN's raw final
+# score includes them, so `defensive_points_allowed` subtracts them.
+_NON_OFFENSE_SCORE_TYPES = {
+    "Interception Return Touchdown", "Fumble Return Touchdown",
+    "Sack Opp Fumble Recovery", "Defensive Touchdown",
+    "Kickoff Return Touchdown", "Punt Return Touchdown",
+    "Safety", "Extra Point Returned", "Two-Point Return",
+    "Blocked Field Goal", "Blocked Punt", "Blocked Extra Point",
+}
+
+
+def defensive_points_allowed(abbr: str, game: dict) -> int:
+    """Points charged to a DEF's points-allowed tier (Yahoo's rule).
+
+    Yahoo counts only points scored by the opposing OFFENSE. ESPN's
+    `scores` is the raw final (e.g. MIN allowed 35 in a game where SF
+    returned an interception for a TD); the 7 non-offensive points are
+    removed so the tier uses 28. Per-play point deltas come from the
+    cumulative `awayScore`/`homeScore` on scoringPlays (XP folded in).
+    Plays without cumulative scores (synthetic fixtures) are skipped.
+    """
+    opp = next((a for a in game["scores"] if a != abbr), None)
+    if opp is None:
+        return 0
+    raw = game["scores"].get(opp, 0)
+    prev_away = prev_home = 0
+    excluded = 0.0
+    for play in game.get("scoring_plays") or []:
+        away = play.get("awayScore") or 0
+        home = play.get("homeScore") or 0
+        if not away and not home:
+            continue  # synthetic/older fixture: no cumulative data
+        d_away, d_home = away - prev_away, home - prev_home
+        prev_away, prev_home = away, home
+        ttype = (play.get("type") or {}).get("text", "")
+        tm = (play.get("team") or {}).get("abbreviation")
+        if tm == opp and ttype in _NON_OFFENSE_SCORE_TYPES:
+            excluded += max(d_away, d_home)
+    return max(int(raw - excluded), 0)
 
 
 def def_points(abbr: str, game: dict, scoring: dict) -> float:
@@ -149,6 +190,8 @@ def def_points(abbr: str, game: dict, scoring: dict) -> float:
     the opponent's lost fumbles; TDs/safeties/blocks from scoringPlays (the
     authoritative event list — avoids double counting stat-column TDs).
     Return TDs count for the DEF unit regardless of who returned them.
+    Points allowed EXCLUDES opponent DEF/ST scores (pick-sixes, return TDs,
+    safeties) per Yahoo — see defensive_points_allowed.
     """
     d = scoring["def"]
     others = [a for a in game["scores"] if a != abbr]
@@ -166,7 +209,7 @@ def def_points(abbr: str, game: dict, scoring: dict) -> float:
     if opp:
         fum_lost = _num(game["team_stats"].get(opp, {}).get("fumblesLost", "0"))
         pts += fum_lost * d["fumble_recovery"]
-        allowed = game["scores"].get(opp, 0)
+        allowed = defensive_points_allowed(abbr, game)
         for lo, hi, value in d["points_allowed_tiers"]:
             if allowed >= lo and (hi is None or allowed <= hi):
                 pts += value

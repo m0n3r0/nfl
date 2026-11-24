@@ -1,0 +1,601 @@
+{
+ "scores": {
+  "SF": 35,
+  "MIN": 10
+ },
+ "scoring_plays": [
+  {
+   "type": {
+    "id": "67",
+    "text": "Passing Touchdown",
+    "abbreviation": "TD"
+   },
+   "text": "George Kittle 17 Yd pass from Brock Purdy (Eddy Pineiro Kick)",
+   "awayScore": 0,
+   "homeScore": 7,
+   "team": {
+    "id": "25",
+    "uid": "s:20~l:28~t:25",
+    "displayName": "San Francisco 49ers",
+    "abbreviation": "SF",
+    "links": [
+     {
+      "href": "https://www.espn.com/nfl/team/_/name/sf/san-francisco-49ers",
+      "text": "Clubhouse"
+     },
+     {
+      "href": "https://www.espn.com/nfl/team/schedule/_/name/sf",
+      "text": "Schedule"
+     }
+    ],
+    "logo": "https://a.espncdn.com/i/teamlogos/nfl/500/sf.png",
+    "logos": [
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500/sf.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "default"
+      ],
+      "lastUpdated": "2024-06-25T18:56Z"
+     },
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500-dark/sf.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "dark"
+      ],
+      "lastUpdated": "2024-06-25T18:56Z"
+     },
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500/scoreboard/sf.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "scoreboard"
+      ],
+      "lastUpdated": "2024-06-25T18:56Z"
+     },
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/sf.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "scoreboard",
+       "dark"
+      ],
+      "lastUpdated": "2024-06-25T18:57Z"
+     }
+    ]
+   }
+  },
+  {
+   "type": {
+    "id": "68",
+    "text": "Rushing Touchdown",
+    "abbreviation": "TD"
+   },
+   "text": "Aaron Jones Sr. 11 Yd Rush (Will Reichard Kick)",
+   "awayScore": 7,
+   "homeScore": 7,
+   "team": {
+    "id": "16",
+    "uid": "s:20~l:28~t:16",
+    "displayName": "Minnesota Vikings",
+    "abbreviation": "MIN",
+    "links": [
+     {
+      "href": "https://www.espn.com/nfl/team/_/name/min/minnesota-vikings",
+      "text": "Clubhouse"
+     },
+     {
+      "href": "https://www.espn.com/nfl/team/schedule/_/name/min",
+      "text": "Schedule"
+     }
+    ],
+    "logo": "https://a.espncdn.com/i/teamlogos/nfl/500/min.png",
+    "logos": [
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500/min.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "default"
+      ],
+      "lastUpdated": "2023-08-24T19:26Z"
+     },
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500-dark/min.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "dark"
+      ],
+      "lastUpdated": "2024-06-25T18:53Z"
+     },
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500/scoreboard/min.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "scoreboard"
+      ],
+      "lastUpdated": "2023-08-24T19:27Z"
+     },
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/min.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "scoreboard",
+       "dark"
+      ],
+      "lastUpdated": "2024-06-25T18:53Z"
+     }
+    ]
+   }
+  },
+  {
+   "type": {
+    "id": "67",
+    "text": "Passing Touchdown",
+    "abbreviation": "TD"
+   },
+   "text": "George Kittle 8 Yd pass from Brock Purdy (Eddy Pineiro Kick)",
+   "awayScore": 7,
+   "homeScore": 14,
+   "team": {
+    "id": "25",
+    "uid": "s:20~l:28~t:25",
+    "displayName": "San Francisco 49ers",
+    "abbreviation": "SF",
+    "links": [
+     {
+      "href": "https://www.espn.com/nfl/team/_/name/sf/san-francisco-49ers",
+      "text": "Clubhouse"
+     },
+     {
+      "href": "https://www.espn.com/nfl/team/schedule/_/name/sf",
+      "text": "Schedule"
+     }
+    ],
+    "logo": "https://a.espncdn.com/i/teamlogos/nfl/500/sf.png",
+    "logos": [
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500/sf.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "default"
+      ],
+      "lastUpdated": "2024-06-25T18:56Z"
+     },
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500-dark/sf.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "dark"
+      ],
+      "lastUpdated": "2024-06-25T18:56Z"
+     },
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500/scoreboard/sf.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "scoreboard"
+      ],
+      "lastUpdated": "2024-06-25T18:56Z"
+     },
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/sf.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "scoreboard",
+       "dark"
+      ],
+      "lastUpdated": "2024-06-25T18:57Z"
+     }
+    ]
+   }
+  },
+  {
+   "type": {
+    "id": "59",
+    "text": "Field Goal Good",
+    "abbreviation": "FG"
+   },
+   "text": "Will Reichard 48 Yd Field Goal ",
+   "awayScore": 10,
+   "homeScore": 14,
+   "team": {
+    "id": "16",
+    "uid": "s:20~l:28~t:16",
+    "displayName": "Minnesota Vikings",
+    "abbreviation": "MIN",
+    "links": [
+     {
+      "href": "https://www.espn.com/nfl/team/_/name/min/minnesota-vikings",
+      "text": "Clubhouse"
+     },
+     {
+      "href": "https://www.espn.com/nfl/team/schedule/_/name/min",
+      "text": "Schedule"
+     }
+    ],
+    "logo": "https://a.espncdn.com/i/teamlogos/nfl/500/min.png",
+    "logos": [
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500/min.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "default"
+      ],
+      "lastUpdated": "2023-08-24T19:26Z"
+     },
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500-dark/min.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "dark"
+      ],
+      "lastUpdated": "2024-06-25T18:53Z"
+     },
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500/scoreboard/min.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "scoreboard"
+      ],
+      "lastUpdated": "2023-08-24T19:27Z"
+     },
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/min.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "scoreboard",
+       "dark"
+      ],
+      "lastUpdated": "2024-06-25T18:53Z"
+     }
+    ]
+   }
+  },
+  {
+   "type": {
+    "id": "67",
+    "text": "Passing Touchdown",
+    "abbreviation": "TD"
+   },
+   "text": "Mike Evans 4 Yd pass from Brock Purdy (Eddy Pineiro Kick)",
+   "awayScore": 10,
+   "homeScore": 21,
+   "team": {
+    "id": "25",
+    "uid": "s:20~l:28~t:25",
+    "displayName": "San Francisco 49ers",
+    "abbreviation": "SF",
+    "links": [
+     {
+      "href": "https://www.espn.com/nfl/team/_/name/sf/san-francisco-49ers",
+      "text": "Clubhouse"
+     },
+     {
+      "href": "https://www.espn.com/nfl/team/schedule/_/name/sf",
+      "text": "Schedule"
+     }
+    ],
+    "logo": "https://a.espncdn.com/i/teamlogos/nfl/500/sf.png",
+    "logos": [
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500/sf.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "default"
+      ],
+      "lastUpdated": "2024-06-25T18:56Z"
+     },
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500-dark/sf.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "dark"
+      ],
+      "lastUpdated": "2024-06-25T18:56Z"
+     },
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500/scoreboard/sf.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "scoreboard"
+      ],
+      "lastUpdated": "2024-06-25T18:56Z"
+     },
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/sf.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "scoreboard",
+       "dark"
+      ],
+      "lastUpdated": "2024-06-25T18:57Z"
+     }
+    ]
+   }
+  },
+  {
+   "type": {
+    "id": "36",
+    "text": "Interception Return Touchdown",
+    "abbreviation": "TD"
+   },
+   "text": "Ji'Ayir Brown 18 Yd Interception Return (Eddy Pineiro Kick)",
+   "awayScore": 10,
+   "homeScore": 28,
+   "team": {
+    "id": "25",
+    "uid": "s:20~l:28~t:25",
+    "displayName": "San Francisco 49ers",
+    "abbreviation": "SF",
+    "links": [
+     {
+      "href": "https://www.espn.com/nfl/team/_/name/sf/san-francisco-49ers",
+      "text": "Clubhouse"
+     },
+     {
+      "href": "https://www.espn.com/nfl/team/schedule/_/name/sf",
+      "text": "Schedule"
+     }
+    ],
+    "logo": "https://a.espncdn.com/i/teamlogos/nfl/500/sf.png",
+    "logos": [
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500/sf.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "default"
+      ],
+      "lastUpdated": "2024-06-25T18:56Z"
+     },
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500-dark/sf.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "dark"
+      ],
+      "lastUpdated": "2024-06-25T18:56Z"
+     },
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500/scoreboard/sf.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "scoreboard"
+      ],
+      "lastUpdated": "2024-06-25T18:56Z"
+     },
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/sf.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "scoreboard",
+       "dark"
+      ],
+      "lastUpdated": "2024-06-25T18:57Z"
+     }
+    ]
+   }
+  },
+  {
+   "type": {
+    "id": "68",
+    "text": "Rushing Touchdown",
+    "abbreviation": "TD"
+   },
+   "text": "Christian McCaffrey 6 Yd Rush (Eddy Pineiro Kick)",
+   "awayScore": 10,
+   "homeScore": 35,
+   "team": {
+    "id": "25",
+    "uid": "s:20~l:28~t:25",
+    "displayName": "San Francisco 49ers",
+    "abbreviation": "SF",
+    "links": [
+     {
+      "href": "https://www.espn.com/nfl/team/_/name/sf/san-francisco-49ers",
+      "text": "Clubhouse"
+     },
+     {
+      "href": "https://www.espn.com/nfl/team/schedule/_/name/sf",
+      "text": "Schedule"
+     }
+    ],
+    "logo": "https://a.espncdn.com/i/teamlogos/nfl/500/sf.png",
+    "logos": [
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500/sf.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "default"
+      ],
+      "lastUpdated": "2024-06-25T18:56Z"
+     },
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500-dark/sf.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "dark"
+      ],
+      "lastUpdated": "2024-06-25T18:56Z"
+     },
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500/scoreboard/sf.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "scoreboard"
+      ],
+      "lastUpdated": "2024-06-25T18:56Z"
+     },
+     {
+      "href": "https://a.espncdn.com/i/teamlogos/nfl/500-dark/scoreboard/sf.png",
+      "width": 500,
+      "height": 500,
+      "alt": "",
+      "rel": [
+       "full",
+       "scoreboard",
+       "dark"
+      ],
+      "lastUpdated": "2024-06-25T18:57Z"
+     }
+    ]
+   }
+  }
+ ],
+ "teams": {
+  "SF": "San Francisco 49ers",
+  "MIN": "Minnesota Vikings"
+ },
+ "team_stats": {
+  "MIN": {
+   "firstDowns": "19",
+   "firstDownsPassing": "13",
+   "firstDownsRushing": "5",
+   "firstDownsPenalty": "1",
+   "thirdDownEff": "7-14",
+   "fourthDownEff": "1-3",
+   "totalOffensivePlays": "65",
+   "totalYards": "324",
+   "yardsPerPlay": "5.0",
+   "totalDrives": "10",
+   "netPassingYards": "255",
+   "completionAttempts": "29/43",
+   "yardsPerPass": "5.8",
+   "interceptions": "1",
+   "sacksYardsLost": "1-9",
+   "rushingYards": "69",
+   "rushingAttempts": "21",
+   "yardsPerRushAttempt": "3.3",
+   "redZoneAttempts": "1-3",
+   "totalPenaltiesYards": "3-23",
+   "turnovers": "2",
+   "fumblesLost": "1",
+   "defensiveTouchdowns": "0",
+   "possessionTime": "32:23"
+  },
+  "SF": {
+   "firstDowns": "20",
+   "firstDownsPassing": "15",
+   "firstDownsRushing": "4",
+   "firstDownsPenalty": "1",
+   "thirdDownEff": "4-9",
+   "fourthDownEff": "0-0",
+   "totalOffensivePlays": "53",
+   "totalYards": "343",
+   "yardsPerPlay": "6.5",
+   "totalDrives": "9",
+   "netPassingYards": "253",
+   "completionAttempts": "22/27",
+   "yardsPerPass": "9.0",
+   "interceptions": "0",
+   "sacksYardsLost": "1-7",
+   "rushingYards": "90",
+   "rushingAttempts": "25",
+   "yardsPerRushAttempt": "3.6",
+   "redZoneAttempts": "4-4",
+   "totalPenaltiesYards": "6-49",
+   "turnovers": "0",
+   "fumblesLost": "0",
+   "defensiveTouchdowns": "1",
+   "possessionTime": "27:37"
+  }
+ },
+ "players": {
+  "eric wilson": {
+   "display": "Eric Wilson",
+   "team": "MIN",
+   "cats": {
+    "defensive": {
+     "TOT": "1",
+     "SOLO": "1",
+     "SACKS": "1",
+     "TFL": "1",
+     "PD": "0",
+     "QB HTS": "1",
+     "TD": "0"
+    }
+   }
+  }
+ }
+}

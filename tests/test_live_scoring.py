@@ -16,8 +16,9 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.live_scoring import (  # noqa: E402
-    compute_game, def_key_for, def_points, fg_tier_points, load_scoring,
-    norm_name, offense_points, parse_game, play_extras,
+    compute_game, def_key_for, def_points, defensive_points_allowed,
+    fg_tier_points, load_scoring, norm_name, offense_points, parse_game,
+    play_extras,
 )
 
 FIX = Path(__file__).parent / "fixtures" / "live_scoring"
@@ -121,6 +122,18 @@ def _game(players=None, team_stats=None, scores=None, plays=None):
     return {"players": players or {}, "team_stats": team_stats or {},
             "scores": scores or {"A": 0, "B": 0},
             "scoring_plays": plays or [], "teams": {"A": "Team A", "B": "Team B"}}
+
+
+def test_def_pick_six_excluded_from_points_allowed(scoring):
+    """Week-11 MIN@SF: SF's pick-six (7 pts) is not charged to MIN's DEF.
+
+    Yahoo gave the Vikings DEF 0 (allowed 28 -> -1 tier + 1 sack = 0),
+    not -3 (raw 35 -> -4 tier + 1 sack). Regression for the 2026-11-24
+    Otto-matic Win! -3.0 reconciliation delta.
+    """
+    g = json.loads((FIX / "min-sf-week11.json").read_text())
+    assert defensive_points_allowed("MIN", g) == 28
+    assert def_points("MIN", g, scoring) == 0.0
 
 
 def test_def_safety_block_and_return_td(scoring):

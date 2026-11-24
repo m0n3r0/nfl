@@ -1068,3 +1068,25 @@ Parallel-lane audit of every doc against the current code/architecture:
   README links the guide from the intro.
 - Test counts grew via intervening commits (swarm audit 819579e + DEF fix
   99af36a added regression tests): now 324 Python fast + 37 Rust, green.
+
+## 2026-11-24 — DEF pick-six excluded from points-allowed tier
+
+- User: Team View KNP Dripp vs Otto-matic Win! showed Vikings DEF -3,
+  Yahoo had 0; reconciliation delta -3.0 on Otto-matic only.
+- Root cause: MIN@SF final 35-10 included SF's Ji'Ayir Brown 18-yd
+  INTERCEPTION RETURN TD (+XP = 7 pts). Yahoo's DEF points-allowed
+  tiers exclude points scored by the OPPONENT'S DEF/ST (the defense
+  wasn't on the field) → allowed 28 (28-34 tier = -1) + 1 sack = 0.
+  Our def_points used the raw score 35 → -4 tier + 1 sack = -3.
+- Fix: src/live_scoring.py adds defensive_points_allowed(abbr, game):
+  walks scoringPlays cumulative away/home deltas, subtracts plays by
+  the opponent typed as non-offensive (INT/fumble return, kick/punt
+  return, safety, defensive XP/2pt return, blocked kicks). Uses raw
+  score for synthetic fixtures lacking cumulative scores (tests pin
+  the old semantics there). def_points now uses it for the tier.
+- Regression: tests/fixtures/live_scoring/min-sf-week11.json (real
+  ESPN summary trimmed) + test_def_pick_six_excluded_from_points_allowed.
+- Verified: Vikings 0.0, Otto-matic total 93.16 == Yahoo scoreboard,
+  reconciliation delta 0.0, web page shows 0.00. Restarted livepoints
+  agent (it cached the old module) — its own poll now holds the fix.
+- 325 Python fast + 37 Rust tests pass.
