@@ -88,7 +88,7 @@ Nightly `--all-rosters` (21:19) + game-day `--light` (:05/:35).
   no roster reads). `merge_report()` refreshes the snapshot **without
   dropping the nightly rosters**.
 - `write_report()` atomic; `append_audit()` adds one line to the season
-  history `league-report.jsonl` (Team View's past weeks read it).
+  history `league-report.jsonl` (Matchup's past weeks read it).
 - WAF → exit 2 + `waf_blocked`, restore skipped.
 
 ```mermaid
@@ -129,7 +129,7 @@ requests → zero WAF risk). Polite by construction:
   and pushes over /ws).
 - `archive_if_final()` — when every game is `post`, persist
   `logs/live-points-week-N.json` permanently (rewritten only on content
-  change). This is the history Team View browses.
+  change). This is the history Matchup browses.
 - `loop()` — ~10s cycles during games (`clamp_interval` floor 5s),
   sleeps between windows (`_next_window` from the schedule).
 - `--week N --out path` — backtest any finished week from ESPN.

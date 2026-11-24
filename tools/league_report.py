@@ -186,7 +186,7 @@ def main() -> int:
                               file=sys.stderr)
                 # Our own roster too — evaluated on the team page we return
                 # to anyway (no extra load beyond the restore). Without it
-                # Team View lacks our players' NFL teams/game info.
+                # Matchup lacks our players' NFL teams/game info.
                 my_name = matchup_dict.get("team")
                 if my_name:
                     try:

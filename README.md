@@ -72,7 +72,7 @@ flowchart TB
     end
 
     subgraph WEB["🦀 Web layer — loopback only"]
-        AXUM["nfl-webd · Rust/axum · :5000<br/>ALL pages native: /league (home) · /team<br/>/cron · teamview · dashboard · players<br/>predictions · ratings · strategy · SOS<br/>/live-points · /ws · /api/*"]
+        AXUM["nfl-webd · Rust/axum · :5000<br/>ALL pages native: /league (home) · /team<br/>/cron · matchup · dashboard · players<br/>predictions · ratings · strategy · SOS<br/>/live-points · /ws · /api/*"]
     end
 
     subgraph EDGE["☁️ Public edge"]
@@ -145,7 +145,7 @@ under the exact Yahoo league weights (amber `league-scoring.json`),
 validated 15/15 against Yahoo's own finals and continuously reconciled
 against Yahoo's snapshot.
 Once every game of a week is final, the poller archives it permanently
-(`live-points-week-N.json`) — Team View's week selector reads those archives
+(`live-points-week-N.json`) — Matchup's week selector reads those archives
 plus the season history to browse any past week's matchups.
 
 ## Contents
@@ -335,7 +335,7 @@ ONE loopback process (the jra-van-re method, applied to everything):
 **nfl-webd** (Rust/axum, `rust/`) on 127.0.0.1:5000 serves EVERY page
 natively with minijinja over `web/templates/` — the fantasy pages
 (`/league` home, `/team`, `/team/pin`, `/league/team/<name>`,
-`/league/teamview`, `/cron`, `/logos/<file>`, `/live-points`, `/ws`) AND
+`/league/matchup`, `/cron`, `/logos/<file>`, `/live-points`, `/ws`) AND
 the prediction-engine pages (`/dashboard`, `/players`, `/player/<id>`,
 `/predictions`, `/ratings`, `/strategy`, `/sos`, `/api/predictions`,
 `/api/modelcard`). There is no Flask and no reverse proxy anymore: the
@@ -390,8 +390,8 @@ when all pages moved to Rust; the Python engine lives on in `src/` +
 `tools/predictions_report.py`.
 
 Pages: **league** (home — standings, GameChannel-style matchup cards with
-team logos, live scores over WebSocket, Team View links), **team view**
-(`/league/teamview` — Yahoo-matchup-style aligned mirrored table, our
+team logos, live scores over WebSocket, Matchup links), **matchup**
+(`/league/matchup` — Yahoo-matchup-style aligned mirrored table, our
 model's projections vs Yahoo's captured Proj Pts, live Fan Pts column,
 JST game info; `?week=N` browses past weeks from the season history +
 weekly points archives; a team dropdown + `?a=` pick the team, and its
@@ -423,7 +423,7 @@ game-day `--light`) keeps logos fresh; unchanged URLs are cached and never
 re-downloaded. Type is sniffed from magic bytes (cloudinary URLs have no
 extension). Fail-soft: a logo failure is a warning, never a broken report.
 nfl-webd serves them at `/logos/<file>` (strict filename allowlist, no
-traversal) and the league matchup cards, Team View headers, and team pages
+traversal) and the league matchup cards, Matchup headers, and team pages
 show them, falling back to initials when a logo is absent. Both `data/logos/`
 and the manifest are gitignored — managers' custom logos can be personal
 photos. Manual retry: `python tools/logo_sync.py`.
@@ -468,7 +468,7 @@ Backtest any week: `python tools/live_points.py --week N --out /tmp/x.json`.
 History: `live-points.json` is overwritten each cycle, but once every game
 of a week is final the poller archives it permanently to
 `logs/live-points-week-N.json` (rewritten only on stat corrections).
-Weeks 1–10 were backfilled from ESPN on 2026-11-20; Team View's week
+Weeks 1–10 were backfilled from ESPN on 2026-11-20; Matchup's week
 selector reads these archives, with Yahoo's official final scores in the
 header. Matchup scores, standings, rosters, and projections were already
 retained in the append-only `league-report.jsonl` / `team-operator.jsonl`.
@@ -528,7 +528,7 @@ The suite (35 Python files, hermetic-first) includes:
 | `tests/test_bye_weeks.py`, `tests/test_schedule.py`, `tests/test_league_scoring.py`, `tests/test_browser.py` | bye weeks, schedule/kickoff locks, league scoring preset, browser launch/heal |
 
 The Rust web daemon has its own suite (38 tests: pages, pins parity,
-logos, WebSocket push, artifact readers, Team View history, native
+logos, WebSocket push, artifact readers, Matchup history, native
 analytics pages):
 
 ```bash

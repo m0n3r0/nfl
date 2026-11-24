@@ -2,7 +2,7 @@
 //! jv-webd method, now applied to BOTH halves of the app:
 //!
 //!   /            -> 302 to /league (the public face is the league)
-//!   /team, /team/pin, /league, /league/team/<name>, /league/teamview,
+//!   /team, /team/pin, /league, /league/team/<name>, /league/matchup,
 //!   /logos/<file>, /cron
 //!       -> fantasy pages served NATIVELY by axum + minijinja from
 //!          web/templates/, reading local artifacts (logs/*.json[l],
@@ -109,7 +109,10 @@ pub fn router(cfg: Config) -> Router {
         .route("/team/pin", post(pages::pin_toggle))
         .route("/league", get(pages::league))
         .route("/league/team/{name}", get(pages::league_team))
-        .route("/league/teamview", get(pages::teamview))
+        .route("/league/matchup", get(pages::matchup))
+        // Old "Team View" bookmarks keep working: 302 with the query intact
+        // (a=…, week=…), so no one's saved link breaks on the rename.
+        .route("/league/teamview", get(legacy_matchup))
         .route("/logos/{file}", get(logo))
         .route("/live-points", get(live_points))
         .route("/ws", get(ws_upgrade))
@@ -125,6 +128,19 @@ pub fn router(cfg: Config) -> Router {
         .route("/api/modelcard", get(analytics::api_modelcard))
         .fallback(not_found)
         .with_state(st)
+}
+
+/// 302 the retired "Team View" path to /league/matchup, preserving the
+/// query string so old bookmarks (a=…, week=…) land on the same view.
+async fn legacy_matchup(req: Request) -> Response {
+    let mut location = "/league/matchup".to_string();
+    if let Some(q) = req.uri().query() {
+        if !q.is_empty() {
+            location.push('?');
+            location.push_str(q);
+        }
+    }
+    (StatusCode::FOUND, [(header::LOCATION, location)]).into_response()
 }
 
 /// Everything else is a plain 404 — there is no upstream anymore.

@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::{header, Request, StatusCode};
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
 use tower::ServiceExt;
@@ -27,7 +27,7 @@ fn fixture_root(tmp: &Path) -> PathBuf {
         "league.html",
         "league_team.html",
         "cron.html",
-        "teamview.html",
+        "matchup.html",
         "dashboard.html",
         "players.html",
         "player.html",
@@ -393,12 +393,12 @@ async fn league_page_and_team_detail_and_404() {
     assert!(html.contains("value=\"/league/team/Team%20Beta\""));
     assert!(html.contains("mu-score mu-leading"));
     assert!(html.contains("Week 2 matchups"));
-    assert!(html.contains("/league/teamview?a=Shiba%20Innu&amp;b=Team%20Beta"));
+    assert!(html.contains("/league/matchup?a=Shiba%20Innu&amp;b=Team%20Beta"));
     let (status, html) = get_body(app.clone(), "/league/team/Team%20Beta").await;
     assert_eq!(status, StatusCode::OK);
     assert!(html.contains("Beta Rb"));
     assert!(html.contains("Playing us this week")); // opponent matchup card
-    assert!(html.contains("/league/teamview?a=Team%20Beta")); // Team View link
+    assert!(html.contains("/league/matchup?a=Team%20Beta")); // Matchup link
     assert!(html.contains("value=\"/league/team/Team%20Beta\" selected")); // nav picker
     let (_, team_html) = get_body(app.clone(), "/team").await;
     assert!(team_html.contains("value=\"/team\" selected")); // own team preselected
@@ -438,9 +438,9 @@ async fn league_team_roster_falls_back_to_history() {
     assert!(html.contains("Season trajectory"));
 }
 
-// --- Team View (players side by side) ---
+// --- Matchup (players side by side) ---
 
-fn teamview_fixtures(root: &Path) {
+fn matchup_fixtures(root: &Path) {
     write_runs(root, &[operator_record("ok")]);
     let report = json!({
         "captured_at": "2026-09-13T12:19:00+00:00",
@@ -598,11 +598,11 @@ async fn logos_route_serves_local_files_only() {
 }
 
 #[tokio::test]
-async fn teamview_pairs_players_by_slot() {
+async fn matchup_pairs_players_by_slot() {
     let tmp = tempfile_dir();
     let root = fixture_root(&tmp);
-    teamview_fixtures(&root);
-    let (status, html) = get_body(router(cfg(&root)), "/league/teamview").await;
+    matchup_fixtures(&root);
+    let (status, html) = get_body(router(cfg(&root)), "/league/matchup").await;
     assert_eq!(status, StatusCode::OK);
     // matchup-page header: team blocks flanking the score
     assert!(html.contains("tv-tname\">Shiba Innu<") && html.contains("tv-tname\">Team Beta<"));
@@ -632,27 +632,54 @@ async fn teamview_pairs_players_by_slot() {
 }
 
 #[tokio::test]
-async fn teamview_current_opponent_is_schedule_locked_no_dropdown() {
+async fn legacy_teamview_route_redirects_to_matchup_with_query() {
     let tmp = tempfile_dir();
     let root = fixture_root(&tmp);
-    teamview_fixtures(&root); // week 2: Shiba Innu vs Team Beta
+    let app = router(cfg(&root));
+    // Old bookmarks 302 to the new path with the query string intact.
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/league/teamview?a=Team%20Beta&week=2")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::FOUND);
+    assert_eq!(
+        res.headers().get(header::LOCATION).unwrap(),
+        "/league/matchup?a=Team%20Beta&week=2"
+    );
+    // The redirect target itself renders the matchup page.
+    let (status, html) = get_body(app, "/league/matchup?a=Team%20Beta").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(html.contains("tv-tname\">Team Beta<"));
+}
+
+#[tokio::test]
+async fn matchup_current_opponent_is_schedule_locked_no_dropdown() {
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    matchup_fixtures(&root); // week 2: Shiba Innu vs Team Beta
     let app = router(cfg(&root));
     // No opponent dropdown in the current week — only team A is selectable.
-    let (_, html) = get_body(app.clone(), "/league/teamview").await;
+    let (_, html) = get_body(app.clone(), "/league/matchup").await;
     assert!(!html.contains("<select name=\"b\""));
     assert!(html.contains("tv-locked"));
     assert!(!html.contains("TV_OPPONENTS"));
     // A stale b param must NOT pair a team with the wrong opponent.
-    let (_, html) = get_body(app, "/league/teamview?a=Shiba%20Innu&b=No%20Such%20Team").await;
+    let (_, html) = get_body(app, "/league/matchup?a=Shiba%20Innu&b=No%20Such%20Team").await;
     assert!(!html.contains("No Such Team"));
     assert!(html.contains("tv-tname\">Team Beta<")); // still the scheduled opponent
 }
 
 #[tokio::test]
-async fn teamview_historical_week_from_archive() {
+async fn matchup_historical_week_from_archive() {
     let tmp = tempfile_dir();
     let root = fixture_root(&tmp);
-    teamview_fixtures(&root); // current week 2; operator run for week 1 exists
+    matchup_fixtures(&root); // current week 2; operator run for week 1 exists
     let old = json!({
         "captured_at": "2026-09-06T12:00:00+00:00",
         "matchup": {"week": 1, "team": "Shiba Innu", "opponent": "Team Beta"},
@@ -686,7 +713,7 @@ async fn teamview_historical_week_from_archive() {
     let app = router(cfg(&root));
     let (status, html) = get_body(
         app.clone(),
-        "/league/teamview?week=1&a=Team%20Beta&b=Team%20Beta",
+        "/league/matchup?week=1&a=Team%20Beta&b=Team%20Beta",
     )
     .await;
     assert_eq!(status, StatusCode::OK);
@@ -704,16 +731,16 @@ async fn teamview_historical_week_from_archive() {
     assert!(html.contains("tv-locked")); // opponent shown as fixed text
     assert!(!html.contains("<select name=\"b\"")); // no opponent dropdown
     assert!(!html.contains("players remaining")); // suppressed for past weeks
-    let (_, html) = get_body(app, "/league/teamview").await;
+    let (_, html) = get_body(app, "/league/matchup").await;
     assert!(html.contains("Enemy Qb") && !html.contains("Old Qb"));
 }
 
 #[tokio::test]
-async fn teamview_past_own_side_borrows_current_teampos() {
+async fn matchup_past_own_side_borrows_current_teampos() {
     let tmp = tempfile_dir();
     let root = fixture_root(&tmp);
-    teamview_fixtures(&root); // current rosters + week-1 operator plan
-                              // Week-1 snapshot WITHOUT our own roster (pre own-roster capture era).
+    matchup_fixtures(&root); // current rosters + week-1 operator plan
+                             // Week-1 snapshot WITHOUT our own roster (pre own-roster capture era).
     let old = json!({
         "captured_at": "2026-09-06T12:00:00+00:00",
         "matchup": {"week": 1, "team": "Shiba Innu", "opponent": "Team Beta"},
@@ -732,7 +759,7 @@ async fn teamview_past_own_side_borrows_current_teampos() {
                     "def_named": {}, "def": {}, "totals": {}, "games": {}});
     std::fs::write(root.join("logs/live-points-week-1.json"), arch.to_string()).unwrap();
     let app = router(cfg(&root));
-    let (status, html) = get_body(app, "/league/teamview?week=1").await;
+    let (status, html) = get_body(app, "/league/matchup?week=1").await;
     assert_eq!(status, StatusCode::OK);
     assert!(html.contains("25.10")); // archived points via the week-1 plan
     assert!(html.contains("SF - QB")); // team/pos borrowed from current roster
@@ -740,32 +767,32 @@ async fn teamview_past_own_side_borrows_current_teampos() {
 }
 
 #[test]
-fn tv_def_abbr_resolves_city_and_nickname_forms() {
-    use crate::pages::tv_def_abbr;
+fn matchup_def_abbr_resolves_city_and_nickname_forms() {
+    use crate::pages::matchup_def_abbr;
     // Yahoo flips DEF display between nickname and city/state run to run.
-    assert_eq!(tv_def_abbr("Bears"), Some("CHI"));
-    assert_eq!(tv_def_abbr("Chicago"), Some("CHI"));
-    assert_eq!(tv_def_abbr("Minnesota"), Some("MIN"));
-    assert_eq!(tv_def_abbr("Jacksonville"), Some("JAX"));
-    assert_eq!(tv_def_abbr("Steelers D/ST"), Some("PIT"));
-    assert_eq!(tv_def_abbr("Pittsburgh"), Some("PIT"));
+    assert_eq!(matchup_def_abbr("Bears"), Some("CHI"));
+    assert_eq!(matchup_def_abbr("Chicago"), Some("CHI"));
+    assert_eq!(matchup_def_abbr("Minnesota"), Some("MIN"));
+    assert_eq!(matchup_def_abbr("Jacksonville"), Some("JAX"));
+    assert_eq!(matchup_def_abbr("Steelers D/ST"), Some("PIT"));
+    assert_eq!(matchup_def_abbr("Pittsburgh"), Some("PIT"));
     // two-team cities resolve on the full name, never the first token
-    assert_eq!(tv_def_abbr("New York Giants"), Some("NYG"));
-    assert_eq!(tv_def_abbr("Los Angeles Rams"), Some("LAR"));
-    assert_eq!(tv_def_abbr("Los Angeles Chargers"), Some("LAC"));
-    assert_eq!(tv_def_abbr("New York"), None);
-    assert_eq!(tv_def_abbr("Los Angeles"), None);
-    assert_eq!(tv_def_abbr("Not A Team"), None);
+    assert_eq!(matchup_def_abbr("New York Giants"), Some("NYG"));
+    assert_eq!(matchup_def_abbr("Los Angeles Rams"), Some("LAR"));
+    assert_eq!(matchup_def_abbr("Los Angeles Chargers"), Some("LAC"));
+    assert_eq!(matchup_def_abbr("New York"), None);
+    assert_eq!(matchup_def_abbr("Los Angeles"), None);
+    assert_eq!(matchup_def_abbr("Not A Team"), None);
 }
 
 #[tokio::test]
-async fn teamview_past_def_resolves_city_name_from_plan() {
+async fn matchup_past_def_resolves_city_name_from_plan() {
     // The week-8 production bug: the operator plan carries the DEF under
     // its CITY name ("Chicago") with no team field, while the archive keys
     // points by abbr/nickname — every lookup missed and Fan Pts showed "–".
     let tmp = tempfile_dir();
     let root = fixture_root(&tmp);
-    teamview_fixtures(&root); // current week 2; Shiba roster has no DEF row
+    matchup_fixtures(&root); // current week 2; Shiba roster has no DEF row
     let mut run = operator_record("ok");
     run["proposal"]["plan"].as_array_mut().unwrap().push(
         json!({"current_slot": "DEF", "proposed_slot": "DEF",
@@ -793,17 +820,17 @@ async fn teamview_past_def_resolves_city_name_from_plan() {
                     "totals": {}, "games": {}});
     std::fs::write(root.join("logs/live-points-week-1.json"), arch.to_string()).unwrap();
     let app = router(cfg(&root));
-    let (status, html) = get_body(app, "/league/teamview?week=1").await;
+    let (status, html) = get_body(app, "/league/matchup?week=1").await;
     assert_eq!(status, StatusCode::OK);
     assert!(html.contains("Chicago")); // the plan row renders
     assert!(html.contains("6.00")); // city name -> CHI -> archived DEF points
 }
 
 #[tokio::test]
-async fn teamview_other_team_history_keeps_selected_team() {
+async fn matchup_other_team_history_keeps_selected_team() {
     let tmp = tempfile_dir();
     let root = fixture_root(&tmp);
-    teamview_fixtures(&root);
+    matchup_fixtures(&root);
     let old = json!({
         "captured_at": "2026-09-06T12:00:00+00:00",
         "matchup": {"week": 1, "team": "Shiba Innu", "opponent": "Team Beta"},
@@ -828,7 +855,7 @@ async fn teamview_other_team_history_keeps_selected_team() {
     let app = router(cfg(&root));
     // Only a given: b must resolve to Team Beta's week-1 OPPONENT from the
     // historical scoreboard — not snap back to our own matchup.
-    let (status, html) = get_body(app.clone(), "/league/teamview?week=1&a=Team%20Beta").await;
+    let (status, html) = get_body(app.clone(), "/league/matchup?week=1&a=Team%20Beta").await;
     assert_eq!(status, StatusCode::OK);
     assert!(html.contains("Old Qb")); // selected team's historical roster
     assert!(html.contains("12.34")); // its archived points
@@ -846,24 +873,24 @@ async fn teamview_other_team_history_keeps_selected_team() {
     // A stale/wrong b param must NOT override the scheduled opponent
     let (_, html) = get_body(
         app.clone(),
-        "/league/teamview?week=1&a=Team%20Beta&b=No%20Such%20Team",
+        "/league/matchup?week=1&a=Team%20Beta&b=No%20Such%20Team",
     )
     .await;
     assert!(html.contains("Quarter Back")); // still Shiba Innu's week-1 plan
     assert!(!html.contains("No Such Team"));
     // Current week with a only: opponent from the current scoreboard.
     // There is NO b dropdown — the opponent is always schedule-locked.
-    let (_, html) = get_body(app, "/league/teamview?a=Team%20Beta").await;
+    let (_, html) = get_body(app, "/league/matchup?a=Team%20Beta").await;
     assert!(html.contains("Enemy Qb") && html.contains("Quarter Back"));
     assert!(!html.contains("<select name=\"b\""));
     assert!(html.contains("tv-locked"));
 }
 
 #[tokio::test]
-async fn teamview_past_header_uses_final_scoreboard() {
+async fn matchup_past_header_uses_final_scoreboard() {
     let tmp = tempfile_dir();
     let root = fixture_root(&tmp);
-    teamview_fixtures(&root);
+    matchup_fixtures(&root);
     // With-rosters snapshot carries MID-WEEK scores...
     let mid = json!({
         "captured_at": "2026-09-06T12:00:00+00:00",
@@ -891,7 +918,7 @@ async fn teamview_past_header_uses_final_scoreboard() {
                     "def_named": {}, "def": {}, "totals": {}, "games": {}});
     std::fs::write(root.join("logs/live-points-week-1.json"), arch.to_string()).unwrap();
     let app = router(cfg(&root));
-    let (status, html) = get_body(app, "/league/teamview?week=1&a=Team%20Beta").await;
+    let (status, html) = get_body(app, "/league/matchup?week=1&a=Team%20Beta").await;
     assert_eq!(status, StatusCode::OK);
     assert!(html.contains("Old Qb")); // rosters still from the mid snapshot
     assert!(html.contains("105.50")); // header = FINAL score, not 60.00
@@ -900,32 +927,31 @@ async fn teamview_past_header_uses_final_scoreboard() {
 }
 
 #[tokio::test]
-async fn teamview_query_override_and_missing_roster() {
+async fn matchup_query_override_and_missing_roster() {
     let tmp = tempfile_dir();
     let root = fixture_root(&tmp);
-    teamview_fixtures(&root);
+    matchup_fixtures(&root);
     let app = router(cfg(&root));
     // b is ignored — Team Beta's scheduled opponent is Shiba Innu, not
     // Team Beta. Only one side shows Enemy Qb now.
-    let (status, html) =
-        get_body(app.clone(), "/league/teamview?a=Team%20Beta&b=Team%20Beta").await;
+    let (status, html) = get_body(app.clone(), "/league/matchup?a=Team%20Beta&b=Team%20Beta").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(html.matches("tv-name\">Enemy Qb").count(), 1);
     assert!(html.contains("tv-tname\">Shiba Innu<")); // schedule-locked opponent
-    let (status, html) = get_body(app, "/league/teamview?a=No%20Such%20Team&b=Team%20Beta").await;
+    let (status, html) = get_body(app, "/league/matchup?a=No%20Such%20Team&b=Team%20Beta").await;
     assert_eq!(status, StatusCode::OK);
     assert!(html.contains("roster for one of these teams"));
 }
 
 #[tokio::test]
-async fn teamview_current_week_follows_scoreboard_over_matchup() {
+async fn matchup_current_week_follows_scoreboard_over_matchup() {
     // Rollover window: the matchup page can lag a week behind while the
     // scoreboard already shows the new week. snapshot_week() says the
     // scoreboard is authoritative — the new week must be treated as the
     // CURRENT week (not routed to the history/archive path).
     let tmp = tempfile_dir();
     let root = fixture_root(&tmp);
-    teamview_fixtures(&root); // matchup week 2, scoreboard week 2, live week 2
+    matchup_fixtures(&root); // matchup week 2, scoreboard week 2, live week 2
     let mut report: Value = serde_json::from_str(
         &std::fs::read_to_string(root.join("logs/league-report.json")).unwrap(),
     )
@@ -936,32 +962,32 @@ async fn teamview_current_week_follows_scoreboard_over_matchup() {
                       "games": {}});
     std::fs::write(root.join("logs/live-points.json"), live.to_string()).unwrap();
     let app = router(cfg(&root));
-    let (status, html) = get_body(app.clone(), "/league/teamview").await;
+    let (status, html) = get_body(app.clone(), "/league/matchup").await;
     assert_eq!(status, StatusCode::OK);
     assert!(html.contains("data-week=\"3\""), "{html}");
     assert!(!html.contains("finals from the archive"), "{html}");
     // Asking for the true current week must not take the past path.
-    let (_, html) = get_body(app.clone(), "/league/teamview?week=3").await;
+    let (_, html) = get_body(app.clone(), "/league/matchup?week=3").await;
     assert!(!html.contains("finals from the archive"), "{html}");
     // Week 2 is the past one now.
-    let (_, html) = get_body(app, "/league/teamview?week=2").await;
+    let (_, html) = get_body(app, "/league/matchup?week=2").await;
     assert!(html.contains("finals from the archive"), "{html}");
 }
 
 #[tokio::test]
-async fn teamview_week_param_is_bounded() {
+async fn matchup_week_param_is_bounded() {
     // The week selector allocates 1..=max_week — an unbounded week param
     // would be a memory-exhaustion DoS. Out-of-range and future weeks (no
     // snapshots can exist) fall back to the current week.
     let tmp = tempfile_dir();
     let root = fixture_root(&tmp);
-    teamview_fixtures(&root); // current week 2
+    matchup_fixtures(&root); // current week 2
     let app = router(cfg(&root));
     for uri in [
-        "/league/teamview?week=999999999999",
-        "/league/teamview?week=-5",
-        "/league/teamview?week=0",
-        "/league/teamview?week=3", // future week
+        "/league/matchup?week=999999999999",
+        "/league/matchup?week=-5",
+        "/league/matchup?week=0",
+        "/league/matchup?week=3", // future week
     ] {
         let (status, html) = get_body(app.clone(), uri).await;
         assert_eq!(status, StatusCode::OK, "{uri}");
@@ -969,7 +995,7 @@ async fn teamview_week_param_is_bounded() {
         assert!(!html.contains("finals from the archive"), "{uri}");
     }
     // Past weeks still work.
-    let (_, html) = get_body(app, "/league/teamview?week=1").await;
+    let (_, html) = get_body(app, "/league/matchup?week=1").await;
     assert!(html.contains("finals from the archive"));
 }
 

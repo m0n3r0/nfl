@@ -3,6 +3,12 @@
 Persistent context for the user's Yahoo Fantasy Football league. Load this whenever
 the user mentions fantasy football, their league, the draft, lineup, waivers, or Edge/CDP.
 
+> **Naming note (2026-11-24):** the page old entries call **"Team View"** at
+> `/league/teamview` is now **Matchup** at `/league/matchup` (template
+> `matchup.html`, handler `pages::matchup`). Historical entries below keep
+> their original wording as a dated record; `/league/teamview` still 302s to
+> the new path with the query intact.
+
 > **How to read this file:** dated journal entries, newest at the bottom. Entries
 > before "Post-draft + in-season pivot (2026-09-12)" are the DRAFT-ERA record —
 > the Windows box, WSL, the draft driver, mock harness, ADP pipeline and most
@@ -1142,3 +1148,22 @@ Parallel-lane audit of every doc against the current code/architecture:
 - Verified: 47/47 mermaid blocks across 8 docs render via mmdc; 26/26 doc
   links resolve; 38 Rust + 325 Python fast tests; 12/12 routes 200 via
   tunnel; Team View opponent still schedule-locked (stale b ignored).
+
+## 2026-11-24 — "Team View" renamed to "Matchup"
+
+- User: the link called "Team View" is really a side-by-side matchup with
+  the opponent, not a team roster viewer — rename it to "Matchup" and
+  update all code and docs, no stale references.
+- Renamed: route /league/teamview → /league/matchup (old path kept as a
+  302 that preserves the query string so bookmarks survive), template
+  teamview.html → matchup.html, handler pages::teamview → pages::matchup,
+  internal tv_* helpers → matchup_*, url_for key league_teamview →
+  league_matchup, link labels "Team View →" → "Matchup →", page title.
+- Docs updated: README, CODE_GUIDE, GAME_PLAN, RUST_WEB_ARCHITECTURE,
+  RUST_WEB, TESTS_INFRA, TOOLS, plus comments in league_report.py and
+  yahoo/league.py. Historical memory entries keep their original wording
+  with a naming note at the top of this file.
+- Verified: 39 Rust (new legacy-redirect test) + 325 Python fast tests,
+  47/47 mermaid charts render, 0 broken doc links, live tunnel: new route
+  renders KNP Dripp vs Otto-matic Win!, old route 302s with a= query,
+  League page shows "Matchup →".

@@ -14,7 +14,7 @@
 | [YAHOO_LAYER.md](code/YAHOO_LAYER.md) | `yahoo/*.py` (13 files) | The hands: fail-closed CDP reads and exact-ID mutations of Yahoo |
 | [TOOLS.md](code/TOOLS.md) | `cli.py` + `tools/*.py` (26 files) | The robots: cron/launchd entry points and manual utilities |
 | [RUST_WEB.md](code/RUST_WEB.md) | `rust/src/*.rs` (8 files) | The face: one axum daemon serving every page from local artifacts |
-| [RUST_WEB_ARCHITECTURE.md](RUST_WEB_ARCHITECTURE.md) | colored mermaid flowcharts of the Rust web daemon (request flow, Team View, analytics, pins, live push) — the human-friendly view of the Rust code |
+| [RUST_WEB_ARCHITECTURE.md](RUST_WEB_ARCHITECTURE.md) | colored mermaid flowcharts of the Rust web daemon (request flow, Matchup, analytics, pins, live push) — the human-friendly view of the Rust code |
 | [TESTS_INFRA.md](code/TESTS_INFRA.md) | `tests/`, `tools/launchd/`, CI, templates | The safety net: hermetic tests, launchd agents, templates |
 
 ## The one rule everything follows

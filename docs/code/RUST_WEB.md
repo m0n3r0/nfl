@@ -25,7 +25,7 @@ router, serve. `--repo-root`/env make tests and alternate checkouts work.
   the `/ws` broadcast channel + cached menu teams.
 - `router()` — the route table:
   `/` → redirect `/league`; `/league`, `/team`, `/team/pin`,
-  `/league/team/<name>`, `/league/teamview`, `/cron`, `/logos/<file>`,
+  `/league/team/<name>`, `/league/matchup`, `/cron`, `/logos/<file>`,
   `/live-points`, `/ws`; analytics: `/dashboard`, `/players`,
   `/player/<id>`, `/predictions`, `/ratings`, `/strategy`, `/sos`,
   `/api/predictions`, `/api/modelcard`. Unknown → plain 404 (there is no
@@ -63,7 +63,7 @@ flowchart TD
 ## pages.rs — the fantasy pages
 
 Handlers: `league`, `team`, `team_pin` (POST toggle), `league_team`,
-`teamview`, `cron`, `logos`, `live_points`, `ws`.
+`matchup`, `cron`, `logos`, `live_points`, `ws`.
 
 - `league` — newest ok report (history fallback), standings/scoreboard/
   matchup context; the League home.
@@ -71,7 +71,7 @@ Handlers: `league`, `team`, `team_pin` (POST toggle), `league_team`,
   view with pin buttons.
 - `league_team` — any team's page: roster from the latest report
   (history fallback), Yahoo Proj Pts rendered or "—", never invented.
-- `teamview` — **the GameChannel-style table**. Key functions:
+- `matchup` — **the GameChannel-style table**. Key functions:
   - `matchup_entries` — every week's scoreboard entries (live report +
     history), so the opponent dropdown is week-aware.
   - `week_options` / `resolve_week` — the week picker: live week + every
@@ -90,7 +90,7 @@ Handlers: `league`, `team`, `team_pin` (POST toggle), `league_team`,
 
 ```mermaid
 flowchart TD
-    REQ["🩵 /league/teamview?team=X&week=N"] --> WK["🟢 resolve_week<br/>live + archive + history weeks"]
+    REQ["🩵 /league/matchup?team=X&week=N"] --> WK["🟢 resolve_week<br/>live + archive + history weeks"]
     WK --> OPP["🟢 matchup_entries<br/>that week's scoreboard"]
     OPP --> CTX["🟢 team_view_context"]
     REP["🔵 league-report.json (+history)"] --> CTX
@@ -99,7 +99,7 @@ flowchart TD
     CTX --> PTS{"🩷 week final?"}
     PTS -->|yes| ACT["🟡 archived actuals"]
     PTS -->|no| NOW["🟡 live points or Yahoo Proj"]
-    ACT & NOW --> TPL["🟡 teamview.html<br/>side-by-side tables"]
+    ACT & NOW --> TPL["🟡 matchup.html<br/>side-by-side tables"]
     CTX --> HIST["🟢 hist_points<br/>selected team's OWN history"]
     HIST --> TPL
     classDef in fill:#1e3a5f,stroke:#4a90d9,color:#fff
@@ -208,6 +208,6 @@ that let the Flask-era templates move over unchanged (one fix: Python
 
 Hermetic (temp dirs, fixture artifacts): pages render with real shapes,
 pins parity with Python, logos allowlist + traversal rejection,
-WebSocket push on artifact change, artifact-reader fallbacks, Team View
+WebSocket push on artifact change, artifact-reader fallbacks, Matchup
 week resolution + per-team history, analytics pages incl. missing-
 artifact notices and filters. Run: `cargo test --lib`.

@@ -147,7 +147,7 @@ main slate locks Sunday 1:00 PM ET). This grind is what wins a season.
 - **Twice-daily monitor** (08:24 and 20:24 JST) re-checks team state and flags
   anything that needs a human.
 - **During games:** the live-points agent updates scores every ~10s on the
-  web UI (`/league` home page, Team View, My Team) — computed from ESPN
+  web UI (`/league` home page, Matchup, My Team) — computed from ESPN
   stats under the exact Yahoo weights, reconciled against Yahoo's own
   totals; if they ever disagree, the UI shows Yahoo's number.
 - **You** can eyeball the reasoning any time with the league-strength report:

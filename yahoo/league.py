@@ -414,7 +414,7 @@ def my_roster(client: LeagueClient, timeout: float = 30) -> tuple[dict, ...]:
     page with NO navigation (the caller must already be there; the nightly
     league report uses this as its last read, doubling as the tab restore).
     Fills the gap where the snapshot's rosters map held only the other 9
-    teams, which left Team View without our players' NFL teams."""
+    teams, which left Matchup without our players' NFL teams."""
     _fail_if_denied(client)
     payload = client.evaluate(_ROSTER_JS)
     return _roster_rows(payload, MY_TEAM_PATH, "own team")

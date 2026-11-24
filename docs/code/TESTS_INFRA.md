@@ -51,7 +51,7 @@ flowchart LR
 Run: `cd rust && cargo test --lib`. Hermetic: temp-dir repo roots with
 fixture artifacts. Covers page rendering shapes, pins parity with the
 Python store, logos allowlist + path-traversal rejection, WebSocket push
-on artifact change, reader fallbacks, Team View week resolution and
+on artifact change, reader fallbacks, Matchup week resolution and
 per-team history, analytics pages (filters + missing-artifact notices).
 
 ---
@@ -102,7 +102,7 @@ built with `cargo build --release` before installing the web agent).
 - `layout.html` — the shell: top menu (League · My Team dropdown · Cron),
   shared CSS, the `/ws` client script.
 - Fantasy: `league.html`, `team.html` (pin buttons), `league_team.html`,
-  `teamview.html` (side-by-side GameChannel tables + week/opponent
+  `matchup.html` (side-by-side GameChannel tables + week/opponent
   pickers), `cron.html`.
 - Analytics: `dashboard.html`, `players.html`, `player.html`,
   `predictions.html`, `ratings.html`, `strategy.html`, `sos.html`,
@@ -120,7 +120,7 @@ built with `cargo build --release` before installing the web agent).
 | `data/logos/` + `logos.json` | logo_sync | /logos, league pages |
 | `data/league-scoring.json` | captured Yahoo settings | live_scoring |
 | `logs/team-operator.jsonl` | team_operator | /team, /cron |
-| `logs/league-report.json` + `.jsonl` | league_report | league pages, Team View history |
+| `logs/league-report.json` + `.jsonl` | league_report | league pages, Matchup history |
 | `logs/live-points.json` | live_points | /ws push, League |
-| `logs/live-points-week-N.json` | live_points archive | Team View past weeks |
+| `logs/live-points-week-N.json` | live_points archive | Matchup past weeks |
 | `logs/cloudflared-url.txt` | tunnel watcher | you (0600, never committed) |

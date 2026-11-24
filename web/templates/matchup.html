@@ -1,5 +1,5 @@
 {% extends "layout.html" %}
-{% block title %}Team View — NFL Toolkit{% endblock %}
+{% block title %}Matchup — NFL Toolkit{% endblock %}
 {% block body %}
 <style>
   /* Yahoo /f1/1329011/matchup layout (reverse-engineered 2026-11-20 via CDP):
@@ -112,11 +112,11 @@ our model (left) / Yahoo Proj Pts (right). “–” = no data yet.
 {% if is_past %} Viewing week {{ week }} finals from the archive.{% endif %}</p>
 {% if weeks %}
 <div class="tv-weeks">Week:
-  {% for w in weeks %}<a class="tv-week {{ 'on' if w == week else '' }}" href="/league/teamview?week={{ w }}&amp;a={{ a_name | urlencode }}">{{ w }}</a>{% endfor %}
+  {% for w in weeks %}<a class="tv-week {{ 'on' if w == week else '' }}" href="/league/matchup?week={{ w }}&amp;a={{ a_name | urlencode }}">{{ w }}</a>{% endfor %}
 </div>
 {% endif %}
 {% if teams %}
-<form class="tv-pick" method="get" action="/league/teamview">
+<form class="tv-pick" method="get" action="/league/matchup">
   {% if week is not none %}<input type="hidden" name="week" value="{{ week }}">{% endif %}
   <select name="a" aria-label="First team">
     {% for t in teams %}<option value="{{ t }}" {{ 'selected' if t == a_name else '' }}>{{ t }}</option>{% endfor %}

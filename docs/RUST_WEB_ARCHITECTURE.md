@@ -89,7 +89,7 @@ flowchart TD
     R -->|/league| LG["🟢 pages::league"]
     R -->|/team · /team/pin| TM["🟢 pages::team / pin_toggle"]
     R -->|"/league/team/{name}"| LT["🟢 pages::league_team"]
-    R -->|/league/teamview| TV["🟢 pages::teamview"]
+    R -->|/league/matchup| TV["🟢 pages::matchup"]
     R -->|/cron| CR["🟢 pages::cron"]
     R -->|"/dashboard · /players · /player/{id} · /predictions · /ratings · /strategy · /sos"| AN["🟢 analytics::*"]
     R -->|/api/*| API["🟢 analytics::api_* → JSON"]
@@ -113,9 +113,9 @@ flowchart TD
 
 ---
 
-## 4. Team View — the most involved page (after the 2026-11-24 refactor)
+## 4. Matchup — the most involved page (after the 2026-11-24 refactor)
 
-`teamview` used to be one 298-line function. It now reads top-to-bottom as
+`matchup` used to be one 298-line function. It now reads top-to-bottom as
 six plain steps; the two non-trivial decisions (past-week snapshot merge,
 operator plan) are small named helpers. The opponent is always derived
 from that week's scoreboard — no b parameter, no dropdown.
@@ -129,11 +129,11 @@ flowchart TD
     MERGE --> OPP["🟢 opponent_of(a) from scoreboard<br/>(b param ignored)"]
     NOW --> OPP
     OPP --> PLAN["🟢 operator_plan(runs, week)"]
-    PLAN --> SIDES["🟢 tv_side(a) + tv_side(b)<br/>plan for ours · roster for theirs"]
-    SIDES --> LIVE["🟢 tv_live_maps / tv_team_games<br/>Fan Pts + game info only if week matches"]
-    LIVE --> ROWS["🟢 tv_rows: align by slot<br/>starters + bench"]
+    PLAN --> SIDES["🟢 matchup_side(a) + matchup_side(b)<br/>plan for ours · roster for theirs"]
+    SIDES --> LIVE["🟢 matchup_live_maps / matchup_team_games<br/>Fan Pts + game info only if week matches"]
+    LIVE --> ROWS["🟢 matchup_rows: align by slot<br/>starters + bench"]
     ROWS --> SUM["🟢 side_sum(proj/fan_pts)<br/>Null when unknown"]
-    SUM --> CTX["🟡 teamview.html context"]
+    SUM --> CTX["🟡 matchup.html context"]
     classDef entry fill:#1e4a4a,stroke:#41d9d9,color:#fff
     classDef fn fill:#2d4a22,stroke:#6abf4b,color:#fff
     classDef guard fill:#4a1e3b,stroke:#d941a4,color:#fff
@@ -240,7 +240,7 @@ flowchart LR
 
 | Change | Why |
 |---|---|
-| `teamview` 298 → ~200 lines via `past_week_snapshot`, `operator_plan`, `side_sum` | three cohesive decisions got names; no new abstraction layer |
+| `matchup` 298 → ~200 lines via `past_week_snapshot`, `operator_plan`, `side_sum` | three cohesive decisions got names; no new abstraction layer |
 | `live-points.json` read in one place (`read_live_points_text`) | three callers had three slightly different behaviors |
 | 3 bounded `unwrap()`s → `let Some ... else` / `match` | same behavior, no panic path to reason about |
 | Doc comment updated to the schedule-locked opponent | docs described the removed b dropdown |
