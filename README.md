@@ -214,7 +214,7 @@ proxies to the plain-HTTP axum on :5000:
 
 ```bash
 tailscale funnel --bg 5000        # one-time; persisted by tailscaled across reboots
-tailscale funnel status           # verify: https://usermac-studio.tail23a9f5.ts.net
+tailscale funnel status           # https://usermac-studio.opossum-alioth.ts.net
 ```
 
 The URL is **stable** (derived from the machine + tailnet name) but public and

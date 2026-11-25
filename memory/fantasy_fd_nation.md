@@ -1319,3 +1319,15 @@ Parallel-lane audit of every doc against the current code/architecture:
 - Caveat: the URL is internet-facing and predictable (machine.tailnet.ts.net);
   restrict via tailnet access controls if desired. Tailscale macOS app must
   run. The Rust daemon is unchanged — no TLS code added to axum.
+
+## 2026-11-25 — tailnet renamed to opossum-alioth
+
+- Tailnet DNS name changed from tail23a9f5.ts.net to opossum-alioth.ts.net.
+  Funnel config was still bound to the old name, so re-applied
+  `tailscale funnel --bg --yes 5000`; tailscaled provisioned a new cert and
+  now serves BOTH the new and old hostnames (old may stop later — use the new
+  one). Current public URL: https://usermac-studio.opossum-alioth.ts.net.
+- Verified new URL: all pages + /api + /live-points 200 with valid TLS, /ws
+  101, local :5000 still 200. README URL reference updated.
+- Note: after a tailnet rename, Funnel does NOT automatically move to the new
+  DNS name — re-run the funnel command and re-verify with curl.
