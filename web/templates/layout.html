@@ -6,12 +6,22 @@
 <title>{% block title %}NFL Toolkit{% endblock %}</title>
 <style>
   body { font-family: -apple-system, system-ui, sans-serif; margin: 0; background: #0f1419; color: #e6e6e6; }
-  header { background: #16202c; padding: 14px 24px; border-bottom: 1px solid #243240; position: sticky; top: 0; z-index: 10; display: flex; align-items: center; flex-wrap: wrap; row-gap: 6px; }
-  header a { color: #7fb3ff; text-decoration: none; margin-right: 18px; font-weight: 600; }
-  header a:hover { color: #bcd6ff; }
-  .nav-label { color: #7a8a99; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; margin-right: 12px; }
-  .nav-group { display: inline-flex; align-items: center; flex-wrap: wrap; }
-  .nav-sep { border-left: 1px solid #243240; height: 18px; margin-right: 18px; }
+  header { background: linear-gradient(180deg,#1b2735,#16202c); padding: 0 24px;
+           border-bottom: 1px solid #2a3c4e; position: sticky; top: 0; z-index: 10;
+           display: flex; align-items: stretch; flex-wrap: wrap; row-gap: 0; }
+  .nav-group { display: inline-flex; align-items: stretch; flex-wrap: wrap; }
+  .nav-label { align-self: center; color: #6f8296; font-size: 10px; font-weight: 700;
+               text-transform: uppercase; letter-spacing: .08em; margin-right: 10px;
+               white-space: nowrap; }
+  .nav-sep { align-self: center; border-left: 1px solid #2a3c4e; height: 22px; margin: 0 16px; }
+  /* tabs: a quiet link becomes a raised tab when selected (» marker) */
+  .tab { display: inline-flex; align-items: center; color: #9fb4c9; text-decoration: none;
+         font-weight: 600; font-size: 13px; padding: 13px 12px; margin: 0 2px;
+         border-bottom: 3px solid transparent; white-space: nowrap; }
+  .tab:hover { color: #d7e8ff; background: #1d2a38; }
+  .tab.active { color: #fff; background: #223349; border-bottom-color: #5aa9ff;
+                border-radius: 5px 5px 0 0; box-shadow: inset 0 1px #2e4a68; }
+  .tab.active::before { content: "»"; color: #5aa9ff; font-weight: 800; margin-right: 7px; }
   .wrap { max-width: 1120px; margin: 24px auto; padding: 0 16px; }
   .team-picker { margin: 10px 0 4px; }
   .team-picker label { color: #7a8a99; font-size: 12px; margin-right: 8px; }
@@ -35,19 +45,19 @@
 <header>
   <span class="nav-group">
     <span class="nav-label">FD nation</span>
-    <a href="/league">League</a>
-    <a href="/team">My Team</a>
-    <a href="/cron">Cron</a>
+    <a class="tab{% if nav_active == 'league' %} active{% endif %}" {% if nav_active == 'league' %}aria-current="page" {% endif %}href="/league">League</a>
+    <a class="tab{% if nav_active == 'team' %} active{% endif %}" {% if nav_active == 'team' %}aria-current="page" {% endif %}href="/team">My Team</a>
+    <a class="tab{% if nav_active == 'cron' %} active{% endif %}" {% if nav_active == 'cron' %}aria-current="page" {% endif %}href="/cron">Cron</a>
   </span>
   <span class="nav-sep"></span>
   <span class="nav-group">
     <span class="nav-label">Prediction engines</span>
-    <a href="/dashboard">Dashboard</a>
-    <a href="/players">Players</a>
-    <a href="/predictions">Win Predictions</a>
-    <a href="/ratings">Ratings</a>
-    <a href="/strategy?team=BUF">Strategy</a>
-    <a href="/sos">SOS</a>
+    <a class="tab{% if nav_active == 'dashboard' %} active{% endif %}" {% if nav_active == 'dashboard' %}aria-current="page" {% endif %}href="/dashboard">Dashboard</a>
+    <a class="tab{% if nav_active == 'players' %} active{% endif %}" {% if nav_active == 'players' %}aria-current="page" {% endif %}href="/players">Players</a>
+    <a class="tab{% if nav_active == 'predictions' %} active{% endif %}" {% if nav_active == 'predictions' %}aria-current="page" {% endif %}href="/predictions">Win Predictions</a>
+    <a class="tab{% if nav_active == 'ratings' %} active{% endif %}" {% if nav_active == 'ratings' %}aria-current="page" {% endif %}href="/ratings">Ratings</a>
+    <a class="tab{% if nav_active == 'strategy' %} active{% endif %}" {% if nav_active == 'strategy' %}aria-current="page" {% endif %}href="/strategy?team=BUF">Strategy</a>
+    <a class="tab{% if nav_active == 'sos' %} active{% endif %}" {% if nav_active == 'sos' %}aria-current="page" {% endif %}href="/sos">SOS</a>
   </span>
 </header>
 <div class="wrap">

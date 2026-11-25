@@ -213,6 +213,27 @@ async fn nav_groups_fantasy_apart_from_prediction_pages() {
 // --- native pages through the real templates ---
 
 #[tokio::test]
+async fn top_menu_marks_the_current_page_as_a_selected_tab() {
+    let tmp = tempfile_dir();
+    let root = fixture_root(&tmp);
+    web_fixtures(&root);
+    let app = router(cfg(&root));
+    // Fantasy tab from a fantasy page.
+    let (_, html) = get_body(app.clone(), "/team").await;
+    assert!(html.contains("aria-current=\"page\" href=\"/team\""));
+    assert!(html.contains("class=\"tab active\" aria-current=\"page\" href=\"/team\""));
+    assert!(!html.contains("aria-current=\"page\" href=\"/dashboard\""));
+    // Analytics tab from an analytics page; exactly one tab is selected.
+    let (_, html) = get_body(app.clone(), "/dashboard").await;
+    assert!(html.contains("aria-current=\"page\" href=\"/dashboard\""));
+    assert!(!html.contains("aria-current=\"page\" href=\"/team\""));
+    assert_eq!(html.matches("aria-current=\"page\"").count(), 1);
+    // Sub-pages inherit their section's tab (/player/<id> is Players).
+    let (_, html) = get_body(app, "/player/p1").await;
+    assert!(html.contains("aria-current=\"page\" href=\"/players\""));
+}
+
+#[tokio::test]
 async fn root_redirects_to_league() {
     let tmp = tempfile_dir();
     let root = fixture_root(&tmp);

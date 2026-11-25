@@ -1373,3 +1373,15 @@ Parallel-lane audit of every doc against the current code/architecture:
   chart and the note that axum has no built-in TLS listener (Funnel terminates).
 - Pointer added in docs/code/RUST_WEB.md and README docs list. No code/config
   changed. Verified 51/51 mermaid charts, 0 broken links/anchors, 327+41 tests.
+
+## 2026-11-25 — top menu: professional selected-tab styling
+
+- Header restyled from plain links into two tab groups (FD nation /
+  Prediction engines). The current page is a raised tab with white text,
+  blue bottom border and a `»` marker; `aria-current="page"` for a11y.
+- Active state is server-derived: `pages::render()` injects `nav_active` from
+  the template name (one small `nav_key` match); no per-handler context, no
+  JS. Sub-pages map to their section (matchup→League, player/<id>→Players).
+- Verified live via CDP computed styles on /dashboard (bg #223349, border
+  #5aa9ff, ::before "»"); all nine pages mark exactly one tab; 42 Rust +
+  327 Python tests; release binary rebuilt and com.fdnation.web restarted.

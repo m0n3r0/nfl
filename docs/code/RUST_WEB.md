@@ -39,6 +39,10 @@ router, serve. `--repo-root`/env make tests and alternate checkouts work.
   broadcasts the new payload to every WebSocket client (the League page's
   live updates). No extra dependency; the poller's atomic rename makes
   reads safe.
+- `pages::render()` — the single render path: injects `nav_active` from the
+  template name, so every page highlights the right top-menu tab (`»` marker
+  + blue underline) without any handler or JavaScript knowing about the nav.
+  Sub-pages map to their section (`matchup` → League, `player/<id>` → Players).
 
 ```mermaid
 flowchart TD

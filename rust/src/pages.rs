@@ -66,7 +66,28 @@ const CRON_SCHEDULE: [(&str, &str, &str); 9] = [
     ),
 ];
 
+/// Which top-menu tab is active for a template. One mapping here keeps every
+/// handler's context dumb and the nav consistent across fantasy/analytics pages.
+fn nav_key(template: &str) -> Option<&'static str> {
+    match template {
+        "league.html" | "league_team.html" | "matchup.html" => Some("league"),
+        "team.html" => Some("team"),
+        "cron.html" => Some("cron"),
+        "dashboard.html" => Some("dashboard"),
+        "players.html" | "player.html" => Some("players"),
+        "predictions.html" => Some("predictions"),
+        "ratings.html" => Some("ratings"),
+        "strategy.html" => Some("strategy"),
+        "sos.html" => Some("sos"),
+        _ => None,
+    }
+}
+
 pub(crate) fn render(st: &AppState, template: &str, ctx: Value) -> Response {
+    let mut ctx = ctx;
+    if let (Some(active), Some(map)) = (nav_key(template), ctx.as_object_mut()) {
+        map.insert("nav_active".to_string(), json!(active));
+    }
     match st.env.get_template(template).and_then(|t| t.render(ctx)) {
         Ok(html) => Html(html).into_response(),
         Err(e) => {
