@@ -208,17 +208,17 @@ python tools/install_launchd.py --agent predreport  # offline analytics producer
 python tools/predictions_report.py                  # manual artifact refresh
 ```
 
-Public HTTPS comes from **Tailscale Funnel** — no cloudflared agent, no
-launchd tunnel, no URL watcher. tailscaled terminates TLS at the edge and
-proxies to the plain-HTTP axum on :5000:
+Public HTTPS comes from **Tailscale Funnel**: tailscaled terminates TLS at the
+edge and proxies to the plain-HTTP axum on :5000. There is no tunnel agent or
+URL watcher to install — Funnel is tailscaled state, not a launchd job.
 
 ```bash
-tailscale funnel --bg 5000        # one-time; persisted by tailscaled across reboots
+tailscale funnel --bg 5000        # persists across reboots; re-apply after a machine/tailnet rename
 tailscale funnel status           # https://fdnation.opossum-alioth.ts.net
 ```
 
-The URL is **stable** (derived from the machine + tailnet name) but public and
-predictable — Tailscale Funnel is internet-facing by default, so keep access
+The URL is **stable** (machine + tailnet name) but public and predictable —
+Tailscale Funnel is internet-facing by default, so keep access
 controls in the tailnet policy if you want to restrict who can reach it. The
 macOS app must be running for Funnel to work; the Rust binary itself is unchanged.
 

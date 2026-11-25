@@ -17,6 +17,14 @@ the user mentions fantasy football, their league, the draft, lineup, waivers, or
 > guidance. For current operations start at "Post-draft + in-season pivot" and
 > read downward.
 
+> **Public web edge (CURRENT, 2026-11-25):** HTTPS is **Tailscale Funnel**,
+> `tailscale funnel --bg 5000`, canonical URL
+> **https://fdnation.opossum-alioth.ts.net** → plain-HTTP nfl-webd on
+> 127.0.0.1:5000. No cloudflared, tunnel launchd agent, or URL watcher exists.
+> Earlier entries describing a cloudflared quick tunnel, `cloudflared-url.txt`,
+> ephemeral URLs, or old hostnames are **historical only** — do not act on them.
+> After any machine/tailnet rename, re-apply the funnel command and re-verify.
+
 ## League facts (verified 2026-08-20 via live Edge CDP)
 - Platform: Yahoo Fantasy Football, league ID **1329011**, name **"FD nation"**.
 - Manager: user is **"Doge"**, team **#2** (URL team id = 2). **10 teams** (verified 2026-08-28 via live Edge CDP — the FD nation Teams page listed exactly 10 teams; Yahoo Settings confirms "Max Teams: 10"; the earlier "12 teams" claim was incorrect).
@@ -569,22 +577,15 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
   land — run `cli.py ingest --refresh` (or team_operator `--refresh-data`)
   after Thursday US corrections, before weekend lineup decisions.
 
-## 2026-09-20 — Cloudflare tunnel + persistent web UI (jra-van-re method)
+## 2026-09-20 — Persistent web UI (jra-van-re method; edge since replaced)
 
-- Three user LaunchAgents (`tools/install_launchd.py --agent {browser,cloudflared,web}`):
-  `com.fdnation.browser` (keepalive, pre-existing), `com.fdnation.web` (Flask UI on
-  127.0.0.1:5000, KeepAlive, logs/web.log — added after a session-bound process died
-  and took the public URL down), `com.fdnation.cloudflared` (quick tunnel).
-- Tunnel: `cloudflared tunnel --no-autoupdate --url http://127.0.0.1:5000`;
-  `tools/launchd/cloudflared-url-watch` greps logs/cloudflared.log, health-gates the
-  edge, publishes the live URL atomically (0600) to **logs/cloudflared-url.txt**.
-- Caveats: URL is **ephemeral** (changes on cloudflared restart, watcher republishes)
-  and **unauthenticated** — anyone with the URL reads every page; treat the file like
-  a password. Stable URL would need a named tunnel on a domain (unresolved, same as jra).
-- Same day cleanup: jra-van-re's cloudflared (port 4173) had a duplicate orphan +
-  double-loaded job (gui + system domains); gui copy booted out + disabled, system
-  LaunchDaemon booted out + disabled via sudo. jra stack not running; only the nfl
-  tunnel (5000) remains. jra plists left on disk (reversible).
+Historical: the web UI was put behind a launchd KeepAlive agent so a session-bound
+process death could not take the public URL down. The original public edge was a
+quick tunnel with an ephemeral URL — replaced 2026-11-25 by Tailscale Funnel (see
+current-state banner at the top). Same day cleanup: jra-van-re's old tunnel
+(port 4173) had a duplicate orphan + double-loaded job (gui + system domains);
+gui copy booted out + disabled, system LaunchDaemon booted out + disabled via
+sudo. jra stack not running; jra plists left on disk (reversible).
 
 ## 2026-09-20 — Jev advisory layer wired across the codebase
 
@@ -606,9 +607,8 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
   this host (reads fine, writes block; no lock file visible in tabs/).
   com.fdnation.web reinstalled via tools/install_launchd.py (fixed the
   post-move certifi 500: the old process cached the old CA-bundle path).
-  cloudflared + browser plists still reference the old path — running
-  processes survived, but reinstall before their next restart (a cloudflared
-  restart issues a NEW trycloudflare URL; watcher republishes).
+  The browser plist also pointed at the old path — reinstall it too; the
+  public edge is now Tailscale Funnel (no tunnel plist to reinstall).
 - Manual pins (user request: Sun 23:47 / Mon 01:23 --apply runs were
   reverting manual start/sit calls — audit shows 6 moves applied Nov 15):
   /team pin toggles → data/pins.json (git-ignored, atomic, flock).
@@ -644,12 +644,12 @@ This was the bug that would have made the bot fall back to raw-ADP on Sep 1.
 - Pins: rust/src/pins.rs is an exact port of src/pins.py (same file/shape,
   flock + atomic rename, fail-closed); both writers interoperate — verified
   live: axum toggle preserved the user's 6 pins.
-- install_launchd.py: AGENTS now (browser, cloudflared, web, backend); web
+- install_launchd.py: AGENTS are browser/web/livepoints/predreport; web
   template runs rust/target/release/nfl-webd (build first!). XML comments
   must not contain "--" or "&&" (plistlib/expat rejects).
 - Verified: 16 Rust tests + 297 Python fast tests; all routes 200 via :5000
-  and the public tunnel (URL unchanged — cloudflared untouched); dashboard
-  proxied in ~4s; SIGTERM exits clean. Werkzeug no longer faces the tunnel.
+  and the public Tailscale Funnel URL; dashboard proxied in ~4s; SIGTERM exits
+  clean. Werkzeug no longer faces the public edge.
 
 ## 2026-11-20 — Old-web code removed (Flask = analytics backend only)
 
@@ -854,7 +854,8 @@ Parallel-lane audit of every doc against the current code/architecture:
 - docs/GAME_PLAN.md: stale /Users/user/nfl path fixed (repo moved); Part 8
   trackers #102/#103 marked historical (issues gone, windows passed, now
   week 11); pins + live points added to the human/robot division; cheat
-  sheet notes launchd agents (livepoints/web/backend/cloudflared).
+  sheet notes launchd agents (livepoints/web/browser/predreport) and the
+  Tailscale Funnel public edge.
 - skills/fantasy-read/SKILL.md: v1.1.0 — macOS/Chrome current quick start
   via yahoo/cdp.py, Windows/Edge pattern marked draft-era, endpoints
   re-verified (settings scoring table, ?week=N finals, td.pts/Proj DOM).
@@ -973,12 +974,10 @@ Parallel-lane audit of every doc against the current code/architecture:
 - R1 web/Rust, R2 pipeline, R3 docs, R4 mermaid, R5 hygiene — independent
   scoped passes (no subagent tool this session). Ledger:
   ~/.hermes/cache/scratch/nfl-audit-20261120.md.
-- BUGS FOUND+FIXED: installed launchd plists for browser AND cloudflared
-  still pointed at pre-move /Users/user/nfl (browser exit 1 since Sep 15;
-  cloudflared a restart time bomb). Reinstalled both via
-  install_launchd.py; browser preflight green; tunnel URL rotated
-  (watcher published new one, 0600). LESSON: after a repo move, reinstall
-  ALL launchd agents, not just the ones that visibly break.
+- BUGS FOUND+FIXED: installed launchd plist for browser still pointed at the
+  pre-move /Users/user/nfl (browser exit 1 since Sep 15). Reinstalled via
+  install_launchd.py; browser preflight green. LESSON: after a repo move,
+  reinstall ALL launchd agents, not just the ones that visibly break.
 - Docs fixed: README 27->31 Rust tests; mermaid gained the weekly-finals
   archive node/edges (validated by actually rendering with mmdc + Chrome
   for Testing — node v22 available at ~/.local/bin); lib.rs route doc,
@@ -1305,7 +1304,8 @@ Parallel-lane audit of every doc against the current code/architecture:
 ## 2026-11-25 — Cloudflare → Tailscale Funnel (public edge swap)
 
 - User approved Tailscale Funnel on the tailnet (one-time admin URL); enabled
-  with `tailscale funnel --bg 5000`. Public URL (stable, valid cert):
+  with `tailscale funnel --bg 5000`. URL at that time (later renamed — see
+  the two entries below and the banner at the top):
   **https://usermac-studio.tail23a9f5.ts.net** — tailscaled terminates TLS and
   proxies to plain-HTTP nfl-webd on 127.0.0.1:5000. `--bg` persists across
   reboots; no launchd agent or URL watcher needed. Verified all analytics
@@ -1325,8 +1325,9 @@ Parallel-lane audit of every doc against the current code/architecture:
 - Tailnet DNS name changed from tail23a9f5.ts.net to opossum-alioth.ts.net.
   Funnel config was still bound to the old name, so re-applied
   `tailscale funnel --bg --yes 5000`; tailscaled provisioned a new cert and
-  now serves BOTH the new and old hostnames (old may stop later — use the new
-  one). Current public URL: https://usermac-studio.opossum-alioth.ts.net.
+  now serves BOTH the new and old hostnames (old may stop later). URL at that
+  time: https://usermac-studio.opossum-alioth.ts.net (superseded by the two
+  entries below).
 - Verified new URL: all pages + /api + /live-points 200 with valid TLS, /ws
   101, local :5000 still 200. README URL reference updated.
 - Note: after a tailnet rename, Funnel does NOT automatically move to the new
@@ -1337,9 +1338,10 @@ Parallel-lane audit of every doc against the current code/architecture:
 - `tailscale set --hostname=fdnation` (takes a few seconds to propagate to
   status). Machine DNS name is now fdnation.opossum-alioth.ts.net.
 - Re-applied `tailscale funnel --bg --yes 5000`; tailscaled provisioned cert
-  for the new name. Funnel status currently lists three hostnames (old
-  usermac-studio.* and tail23a9f5.* entries linger) — canonical URL is
-  **https://fdnation.opossum-alioth.ts.net**.
+  for the new name. At that moment Funnel still listed three hostnames (old
+  usermac-studio.* and tail23a9f5.* entries lingered); the canonical URL was
+  **https://fdnation.opossum-alioth.ts.net**. The next entry records the reset
+  that removed the stale hostnames.
 - Verified: all pages + /api + /live-points 200, /ws 101, valid TLS, local
   :5000 200. README URL reference updated. Rule: after any machine or tailnet
   rename, re-run the funnel command and curl to confirm.
@@ -1350,3 +1352,15 @@ Parallel-lane audit of every doc against the current code/architecture:
   lists ONLY https://fdnation.opossum-alioth.ts.net; the two old
   usermac-studio.* hostnames no longer resolve (curl 000). Verified pages/API
   200, /ws 101, valid TLS. No repo files changed.
+
+## 2026-11-25 — docs audit: cloudflared → Tailscale purge
+
+- Audited all 25 tracked .md files + code comments + mermaid charts for stale
+  cloudflared/quick-tunnel/ephemeral-URL/old-hostname wording. Active docs
+  (README, TESTS_INFRA, TOOLS, GAME_PLAN, web plist template, Rust comments)
+  already described Tailscale Funnel; removed the last passing "cloudflared"
+  mentions and fixed README's "one-time" claim (a rename needs re-apply).
+- Rewrote the dated journal: added a CURRENT public-edge banner at the top,
+  compressed the old cloudflared entries into historical notes, and qualified
+  the three intermediate URL entries ("URL at that time") so only the final
+  Funnel-reset entry reads as current. No functional code or config changed.

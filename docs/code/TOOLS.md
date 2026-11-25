@@ -339,6 +339,7 @@ flowchart LR
 Renders `tools/launchd/com.fdnation.<agent>.plist.template` (substitutes
 `@REPO_ROOT@`), writes `~/Library/LaunchAgents/`, loads with launchctl.
 Idempotent. Agents: `browser`, `web`, `livepoints`, `predreport` (the Flask
-`backend` agent and the cloudflared tunnel agent are retired). `--no-load` writes
+`backend` agent is retired; public HTTPS is Tailscale Funnel, not a launchd
+agent). `--no-load` writes
 without loading. **After moving the repo, reinstall ALL agents** —
 installed plists embed absolute paths.

@@ -69,10 +69,9 @@ paths):
 | `com.fdnation.livepoints` | ESPN poller `--loop` | KeepAlive |
 | `com.fdnation.predreport` | offline analytics producer | daily 06:12 JST + Wed 21:05 |
 
-The retired `com.fdnation.backend` (Flask :5001) and `com.fdnation.cloudflared`
-(quick tunnel) were removed with the Rust migration and the Tailscale Funnel
-switch. Public HTTPS is now `tailscale funnel --bg 5000` (tailscaled state,
-not a launchd agent). The 9 crontab jobs (operator runs, league reports,
+The retired `com.fdnation.backend` (Flask :5001) was removed with the
+Rust migration. Public HTTPS is `tailscale funnel --bg 5000` (tailscaled
+state, not a launchd agent). The 9 crontab jobs (operator runs, league reports,
 profile backup) are documented in the README's schedule table.
 
 ```mermaid
