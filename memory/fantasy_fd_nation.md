@@ -1331,3 +1331,15 @@ Parallel-lane audit of every doc against the current code/architecture:
   101, local :5000 still 200. README URL reference updated.
 - Note: after a tailnet rename, Funnel does NOT automatically move to the new
   DNS name — re-run the funnel command and re-verify with curl.
+
+## 2026-11-25 — machine renamed to fdnation (final Funnel URL)
+
+- `tailscale set --hostname=fdnation` (takes a few seconds to propagate to
+  status). Machine DNS name is now fdnation.opossum-alioth.ts.net.
+- Re-applied `tailscale funnel --bg --yes 5000`; tailscaled provisioned cert
+  for the new name. Funnel status currently lists three hostnames (old
+  usermac-studio.* and tail23a9f5.* entries linger) — canonical URL is
+  **https://fdnation.opossum-alioth.ts.net**.
+- Verified: all pages + /api + /live-points 200, /ws 101, valid TLS, local
+  :5000 200. README URL reference updated. Rule: after any machine or tailnet
+  rename, re-run the funnel command and curl to confirm.
