@@ -1343,3 +1343,10 @@ Parallel-lane audit of every doc against the current code/architecture:
 - Verified: all pages + /api + /live-points 200, /ws 101, valid TLS, local
   :5000 200. README URL reference updated. Rule: after any machine or tailnet
   rename, re-run the funnel command and curl to confirm.
+
+## 2026-11-25 — Funnel reset (old hostnames removed)
+
+- `tailscale funnel reset` then `tailscale funnel --bg --yes 5000`: Funnel now
+  lists ONLY https://fdnation.opossum-alioth.ts.net; the two old
+  usermac-studio.* hostnames no longer resolve (curl 000). Verified pages/API
+  200, /ws 101, valid TLS. No repo files changed.
