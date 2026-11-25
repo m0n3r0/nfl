@@ -21,9 +21,10 @@
 //!          from ESPN raw stats under the exact Yahoo league weights and
 //!          reconciled against Yahoo's own totals (drift flag).
 //!
-//! Same trust model as jv-webd: this daemon binds loopback; public exposure
-//! goes through the com.fdnation.cloudflared quick tunnel. Every page is a
-//! local artifact read — nothing is computed in the request path.
+//! Same trust model as before: the daemon binds loopback; public exposure
+//! goes through Tailscale Funnel (`tailscale funnel --bg 5000`), which
+//! terminates TLS in tailscaled and proxies to :5000. Every page is a local
+//! artifact read — nothing is computed in the request path.
 
 pub mod analytics;
 pub mod artifacts;
@@ -200,7 +201,7 @@ async fn live_points(State(st): State<AppState>) -> Response {
 }
 
 /// /ws — push live points. Sends the current artifact on connect, then
-/// every watcher broadcast; 30s pings keep the cloudflared tunnel alive.
+/// every watcher broadcast; 30s pings keep the public tunnel alive.
 async fn ws_upgrade(State(st): State<AppState>, ws: WebSocketUpgrade) -> Response {
     ws.on_upgrade(move |socket| ws_conn(socket, st))
 }

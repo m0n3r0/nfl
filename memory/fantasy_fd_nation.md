@@ -1301,3 +1301,21 @@ Parallel-lane audit of every doc against the current code/architecture:
 - Docs: README + SRC_ENGINE updated with new numbers and a colored fresh-data
   mermaid chart; SOS template wording fixed. 50/50 charts, 0 broken links.
 - Verified: 41 Rust + 328 fast + 20 slow Python tests; 7 live analytics routes 200.
+
+## 2026-11-25 — Cloudflare → Tailscale Funnel (public edge swap)
+
+- User approved Tailscale Funnel on the tailnet (one-time admin URL); enabled
+  with `tailscale funnel --bg 5000`. Public URL (stable, valid cert):
+  **https://usermac-studio.tail23a9f5.ts.net** — tailscaled terminates TLS and
+  proxies to plain-HTTP nfl-webd on 127.0.0.1:5000. `--bg` persists across
+  reboots; no launchd agent or URL watcher needed. Verified all analytics
+  pages, `/api/*`, `/live-points`, valid TLS (verify=0), and `/ws` 101 upgrade.
+- Removed cloudflared completely from this repo: unloaded and deleted
+  `com.fdnation.cloudflared` plist, killed its processes, deleted
+  `tools/launchd/cloudflared-run`, `cloudflared-url-watch`, its plist template,
+  and `logs/cloudflared-url.txt`. `install_launchd.py` AGENTS is now
+  browser/web/livepoints/predreport; tests + docs + mermaid charts updated.
+  The myhorse repo's cloudflared was left running (different stack).
+- Caveat: the URL is internet-facing and predictable (machine.tailnet.ts.net);
+  restrict via tailnet access controls if desired. Tailscale macOS app must
+  run. The Rust daemon is unchanged — no TLS code added to axum.

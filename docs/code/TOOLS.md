@@ -338,7 +338,7 @@ flowchart LR
 
 Renders `tools/launchd/com.fdnation.<agent>.plist.template` (substitutes
 `@REPO_ROOT@`), writes `~/Library/LaunchAgents/`, loads with launchctl.
-Idempotent. Agents: `browser`, `cloudflared`, `web`, `livepoints`,
-`predreport` (the Flask `backend` agent is retired). `--no-load` writes
+Idempotent. Agents: `browser`, `web`, `livepoints`, `predreport` (the Flask
+`backend` agent and the cloudflared tunnel agent are retired). `--no-load` writes
 without loading. **After moving the repo, reinstall ALL agents** —
 installed plists embed absolute paths.

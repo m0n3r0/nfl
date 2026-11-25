@@ -1,4 +1,4 @@
-"""Render checks for the launchd agent templates (browser + cloudflared)."""
+"""Render checks for the launchd agent templates (browser + web)."""
 
 import sys
 
@@ -15,17 +15,6 @@ def test_browser_template_renders_repo_root():
     args = plist["ProgramArguments"]
     assert any(a.endswith("tools/preflight.py") for a in args)
     assert all("@REPO_ROOT@" not in a for a in args)
-
-
-def test_cloudflared_template_renders_keepalive_tunnel():
-    plist = install_launchd.render("cloudflared")
-    assert plist["Label"] == "com.fdnation.cloudflared"
-    assert plist["RunAtLoad"] is True
-    assert plist["KeepAlive"] is True
-    (program,) = plist["ProgramArguments"]
-    assert program.endswith("tools/launchd/cloudflared-run")
-    assert "@REPO_ROOT@" not in program
-    assert plist["StandardOutPath"].endswith("logs/cloudflared.log")
 
 
 def test_web_template_renders_axum_front_door():

@@ -12,9 +12,9 @@
     ALL pages native — the fantasy pages (/team, /league, /cron, pins) from
     web/templates + local artifacts, and the prediction-engine analytics
     from data/web/*.json (built OFFLINE by com.fdnation.predreport; the
-    Flask backend and its reverse proxy are gone). Public exposure, when
-    wanted, goes through the com.fdnation.cloudflared quick tunnel, which
-    still points at 127.0.0.1:5000.
+    Flask backend and its reverse proxy are gone). Public exposure goes
+    through Tailscale Funnel (tailscale funnel with the bg flag, target 5000),
+    which proxies to 127.0.0.1:5000.
 
     Build the binary first: the rust/ crate, release profile.
   -->

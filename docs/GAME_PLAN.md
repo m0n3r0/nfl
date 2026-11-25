@@ -242,8 +242,8 @@ Yahoo-exact points to the web UI over WebSocket; the **predreport agent**
 (`com.fdnation.predreport`, `tools/predictions_report.py`) recomputes the
 prediction-engine artifacts daily (06:12 JST + Wed 21:05) so the analytics
 pages stay fast; the **web stack** itself (`com.fdnation.web` = nfl-webd
-:5000 serving ALL pages natively, `com.fdnation.cloudflared` = public
-tunnel) also runs under launchd.
+:5000 serving ALL pages natively) also runs under launchd. Public HTTPS is
+Tailscale Funnel (`tailscale funnel --bg 5000`), not a launchd agent.
 
 ### The tools you'll touch by hand
 

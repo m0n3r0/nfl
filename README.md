@@ -53,7 +53,7 @@ flowchart TB
     end
 
     subgraph EDGE["☁️ Public edge"]
-        TUNNEL["cloudflared quick tunnel<br/>ephemeral URL, unauthenticated"]
+        TUNNEL["Tailscale Funnel<br/>stable HTTPS *.ts.net URL<br/>tailscaled terminates TLS"]
     end
 
     subgraph HUMAN["🧑 You"]
@@ -208,10 +208,19 @@ python tools/install_launchd.py --agent predreport  # offline analytics producer
 python tools/predictions_report.py                  # manual artifact refresh
 ```
 
-An optional Cloudflare quick tunnel (`com.fdnation.cloudflared`) publishes the
-URL to `logs/cloudflared-url.txt` (mode 0600) once the edge serves the app.
-The URL is **ephemeral** and **unauthenticated** — anyone with it can read every
-page, so treat that file like a password; it forwards to :5000 only.
+Public HTTPS comes from **Tailscale Funnel** — no cloudflared agent, no
+launchd tunnel, no URL watcher. tailscaled terminates TLS at the edge and
+proxies to the plain-HTTP axum on :5000:
+
+```bash
+tailscale funnel --bg 5000        # one-time; persisted by tailscaled across reboots
+tailscale funnel status           # verify: https://usermac-studio.tail23a9f5.ts.net
+```
+
+The URL is **stable** (derived from the machine + tailnet name) but public and
+predictable — Tailscale Funnel is internet-facing by default, so keep access
+controls in the tailnet policy if you want to restrict who can reach it. The
+macOS app must be running for Funnel to work; the Rust binary itself is unchanged.
 
 Logos are captured by `tools/logo_sync.py` on every league-report run and
 served at `/logos/<file>` (filename allowlist). Live points come from

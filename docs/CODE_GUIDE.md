@@ -41,7 +41,7 @@ flowchart LR
     subgraph ENTRY["🩵 Entry points"]
         CLI["cli.py<br/>manual analytics commands"]
         CRON["crontab<br/>9 scheduled jobs"]
-        LAUNCHD["launchd agents<br/>web · livepoints · predreport<br/>browser · cloudflared"]
+        LAUNCHD["launchd agents<br/>web · livepoints · predreport<br/>browser"]
     end
 
     subgraph TOOLS["🟢 tools/ — the robots"]

@@ -58,20 +58,21 @@ per-team history, analytics pages (filters + missing-artifact notices).
 
 ## launchd agents (tools/launchd/)
 
-Five agents, all rendered by `tools/install_launchd.py` (`@REPO_ROOT@`
+Four agents, all rendered by `tools/install_launchd.py` (`@REPO_ROOT@`
 substitution; **reinstall after any repo move** — plists embed absolute
 paths):
 
 | Agent | Runs | Schedule |
 |---|---|---|
 | `com.fdnation.browser` | keeps the logged-in Chrome alive | at load + KeepAlive |
-| `com.fdnation.cloudflared` | public tunnel → :5000 (+ URL watcher scripts) | KeepAlive |
 | `com.fdnation.web` | nfl-webd, ALL pages | KeepAlive, logs/web.log |
 | `com.fdnation.livepoints` | ESPN poller `--loop` | KeepAlive |
 | `com.fdnation.predreport` | offline analytics producer | daily 06:12 JST + Wed 21:05 |
 
-The retired `com.fdnation.backend` (Flask :5001) was removed with the
-Rust migration. The 9 crontab jobs (operator runs, league reports,
+The retired `com.fdnation.backend` (Flask :5001) and `com.fdnation.cloudflared`
+(quick tunnel) were removed with the Rust migration and the Tailscale Funnel
+switch. Public HTTPS is now `tailscale funnel --bg 5000` (tailscaled state,
+not a launchd agent). The 9 crontab jobs (operator runs, league reports,
 profile backup) are documented in the README's schedule table.
 
 ```mermaid
@@ -79,14 +80,19 @@ flowchart TD
     TPL["🔵 *.plist.template<br/>@REPO_ROOT@"] --> RENDER["🟢 install_launchd.py render"]
     RENDER --> PLIST["🟡 ~/Library/LaunchAgents/*.plist"]
     PLIST --> LOAD["🟢 launchctl load"]
-    LOAD --> AGENTS["🟢 browser · cloudflared · web ·<br/>livepoints · predreport"]
-    AGENTS --> ART["🟡 artifacts + tunnel + pages"]
+    LOAD --> AGENTS["🟢 browser · web ·<br/>livepoints · predreport"]
+    AGENTS --> ART["🟡 artifacts + pages"]
+    TUNNEL["🟣 Tailscale Funnel → :5000"] --> AXUM["🩵 nfl-webd"]
     classDef in fill:#1e3a5f,stroke:#4a90d9,color:#fff
     classDef fn fill:#2d4a22,stroke:#6abf4b,color:#fff
     classDef out fill:#4a3b1e,stroke:#d9a441,color:#fff
+    classDef edge fill:#3b1e4a,stroke:#9b41d9,color:#fff
+    classDef web fill:#1e4a4a,stroke:#41d9d9,color:#fff
     class TPL in
     class RENDER,LOAD,AGENTS fn
     class PLIST,ART out
+    class TUNNEL edge
+    class AXUM web
 ```
 
 ---
@@ -125,4 +131,3 @@ built with `cargo build --release` before installing the web agent).
 | `logs/league-report.json` + `.jsonl` | league_report | league pages, Matchup history |
 | `logs/live-points.json` | live_points | /ws push, League |
 | `logs/live-points-week-N.json` | live_points archive | Matchup past weeks |
-| `logs/cloudflared-url.txt` | tunnel watcher | you (0600, never committed) |

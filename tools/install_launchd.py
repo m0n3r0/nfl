@@ -7,9 +7,6 @@ and loads it with launchctl (macOS only). Idempotent.
 
 Agents:
   browser      browser keepalive (preflight chain)
-  cloudflared  quick tunnel exposing the local web UI (127.0.0.1:5000) on an
-               ephemeral *.trycloudflare.com URL — unauthenticated; the live
-               URL lands in logs/cloudflared-url.txt (mode 0600)
   web          nfl-webd (Rust/axum, jra-van-re method) on 127.0.0.1:5000:
                ALL pages native — fantasy + prediction-engine analytics
                from local artifacts. Build first: cd rust && cargo build --release
@@ -28,7 +25,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-AGENTS = ("browser", "cloudflared", "web", "livepoints", "predreport")
+AGENTS = ("browser", "web", "livepoints", "predreport")
 
 
 def template_path(agent: str, repo_root: Path = ROOT) -> Path:
