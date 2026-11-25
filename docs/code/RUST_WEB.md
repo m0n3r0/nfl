@@ -3,9 +3,12 @@
 One axum process on 127.0.0.1:5000 serves **every** page natively with
 minijinja over the shared `web/templates/`. No Flask, no proxy, no
 request-time compute: handlers read local artifacts and filter in Rust.
-8 source files, 41 tests. See the colored
-[Rust web architecture guide](../RUST_WEB_ARCHITECTURE.md) for a
-human-oriented flowchart of each layer.
+8 source files, 41 tests. For the HTTP building blocks (tokio / hyper /
+axum / tower / TLS-at-the-edge) and how they replace an Apache/nginx
+httpd, see [HTTP building blocks in the architecture
+guide](../RUST_WEB_ARCHITECTURE.md#1b-http-building-blocks--what-replaces-apachenginx),
+plus the colored [Rust web architecture guide](../RUST_WEB_ARCHITECTURE.md)
+for each layer's flowchart.
 
 Color legend: 🔵 input · 🟢 function · 🟡 output · 🩷 guard · 🟣 external · 🩵 entry.
 

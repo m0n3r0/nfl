@@ -1364,3 +1364,12 @@ Parallel-lane audit of every doc against the current code/architecture:
   compressed the old cloudflared entries into historical notes, and qualified
   the three intermediate URL entries ("URL at that time") so only the final
   Funnel-reset entry reads as current. No functional code or config changed.
+
+## 2026-11-25 — docs: HTTP building blocks (axum vs httpd) added
+
+- Added "1b. HTTP building blocks — what replaces apache/nginx" to
+  docs/RUST_WEB_ARCHITECTURE.md: table mapping tokio/hyper/axum Router/tower/
+  minijinja/ws/Tailscale Funnel to httpd roles, plus a colored request-flow
+  chart and the note that axum has no built-in TLS listener (Funnel terminates).
+- Pointer added in docs/code/RUST_WEB.md and README docs list. No code/config
+  changed. Verified 51/51 mermaid charts, 0 broken links/anchors, 327+41 tests.

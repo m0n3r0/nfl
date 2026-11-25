@@ -9,7 +9,8 @@ Two parts: the **toolkit** (below) and the **FD nation Yahoo operation** module
 
 **Documentation**
 - [Code Guide](docs/CODE_GUIDE.md) — every file, layer by layer, with colored flowcharts.
-- [Rust web architecture](docs/RUST_WEB_ARCHITECTURE.md) — the native web UI.
+- [Rust web architecture](docs/RUST_WEB_ARCHITECTURE.md) — the native web UI,
+  including [HTTP building blocks (axum vs Apache/nginx)](docs/RUST_WEB_ARCHITECTURE.md#1b-http-building-blocks--what-replaces-apachenginx).
 - [Tests & infra](docs/code/TESTS_INFRA.md) — test map, launchd agents, templates.
 
 ## Architecture

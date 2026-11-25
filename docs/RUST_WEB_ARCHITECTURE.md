@@ -48,6 +48,50 @@ flowchart LR
 
 ---
 
+## 1b. HTTP building blocks — what replaces apache/nginx
+
+An httpd (Apache, nginx) is a program that opens a socket, parses HTTP,
+routes a request to application code, and writes the response. axum is a
+**library** that does those same jobs inside our own binary — so `nfl-webd`
+is both the web server and the application. No separate daemon, docroot,
+vhost config, CGI or reverse proxy is needed.
+
+| Building block | Role | What it replaces |
+|---|---|---|
+| `tokio` | async runtime: non-blocking socket I/O (kqueue on macOS), tasks, timers | the event loop / worker model inside httpd |
+| `hyper` (inside axum) | HTTP/1.1 protocol: parse request line/headers/body, frame responses, keep-alive | httpd's HTTP parser and connection handling |
+| `axum::Router` + handlers | method + path dispatch, extractors (`Path`, `Query`, `Json`, `State`) | vhost/location blocks, CGI or CGI-like dispatch |
+| `tower` / `tower-http` | middleware layers (logging, CORS, static files via `ServeDir`) | httpd modules (`mod_log`, `mod_rewrite`, `Alias`) |
+| `minijinja` | HTML templates (this repo) | PHP/SSR templating in the web process |
+| axum `ws` feature | WebSocket upgrade + frames on the same socket | httpd proxy/upgrade modules |
+| **Tailscale Funnel** | public TLS termination at the edge → HTTP to :5000 | httpd's TLS listener / cert config (none local) |
+
+```mermaid
+flowchart TD
+    EDGE["🟣 HTTPS/WSS edge<br/>Tailscale Funnel (TLS)"] -->|plain HTTP :5000| SOCK["🩵 tokio TcpListener<br/>kernel socket"]
+    SOCK --> HYPER["🟢 hyper<br/>HTTP/1.1 parse + framing"]
+    HYPER --> ROUTER["🟢 axum Router<br/>method + path → handler"]
+    ROUTER --> HANDLER["🟢 handler fn<br/>extractors + local artifacts"]
+    HANDLER --> RESP["🟡 IntoResponse<br/>HTML / JSON / WS frame"]
+    RESP --> EDGE
+    classDef edge fill:#3b1e4a,stroke:#9b41d9,color:#fff
+    classDef entry fill:#1e4a4a,stroke:#41d9d9,color:#fff
+    classDef fn fill:#2d4a22,stroke:#6abf4b,color:#fff
+    classDef out fill:#4a3b1e,stroke:#d9a441,color:#fff
+    class EDGE edge
+    class SOCK entry
+    class HYPER,ROUTER,HANDLER fn
+    class RESP out
+```
+
+Note: axum has **no** built-in TLS listener. Public HTTPS here is terminated
+by Tailscale Funnel; if the app ever needed local HTTPS, that would mean an
+extra crate (e.g. `axum-server` + rustls) plus a certificate — not a config
+flag. `axum-server`/`rustls` are already in the local Cargo cache, but this
+repo deliberately keeps the server plain-HTTP behind the tunnel.
+
+---
+
 ## 2. Startup and request path
 
 `main.rs` binds the configured address, `Config::from_env()` discovers the
